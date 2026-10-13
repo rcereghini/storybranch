@@ -1,0 +1,52 @@
+{
+  "name": "storybranch",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch scripts/dev.ts",
+    "build": "vite build && tsx scripts/metadata.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run tests/domain.test.ts tests/foundation.test.ts",
+    "test:integration": "vitest run tests/integration.test.ts",
+    "test:browser": "tsx scripts/browser-check.ts",
+    "test:audio": "tsx scripts/audio-check.ts",
+    "media": "tsx scripts/generate-media.ts",
+    "media:portrait": "tsx scripts/generate-portrait.ts",
+    "media:audio": "tsx scripts/generate-audio-media.ts",
+    "test:media": "tsx scripts/media-check.ts",
+    "phone:emulators": "tsx scripts/phone.ts emulators",
+    "phone:seed": "tsx scripts/phone.ts seed",
+    "phone:build": "tsx scripts/phone.ts build",
+    "phone:serve": "tsx scripts/phone.ts serve",
+    "test:phone": "tsx scripts/phone-preview-check.ts",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "emulators": "tsx scripts/emulators.ts",
+    "seed": "tsx scripts/seed.ts",
+    "format": "prettier --write apps/web/src packages services fixtures scripts tests *.json *config.ts"
+  },
+  "dependencies": {
+    "firebase": "12.4.0",
+    "firebase-admin": "13.5.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.0",
+    "@types/node": "22.18.10",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "firebase-tools": "14.19.1",
+    "playwright": "1.56.0",
+    "prettier": "3.6.2",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vite": "7.1.10",
+    "vitest": "3.2.4"
+  },
+  "packageManager": "pnpm@11.25.0"
+}

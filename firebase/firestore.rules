@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+  match /catalogue/{id} { allow read: if true; }
+  match /playerProfiles/{uid} { allow read: if owner(uid); }
+  match /playthroughs/{id} {
+   allow read: if owner(resource.data.playerUid);
+   match /events/{event} { allow read: if owner(get(/databases/$(database)/documents/playthroughs/$(id)).data.playerUid); }
+  }
+  match /{document=**} { allow write: if false; }
+ }
+}

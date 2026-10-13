@@ -1,0 +1,1 @@
+{"indexes":[{"collectionGroup":"playthroughs","queryScope":"COLLECTION","fields":[{"fieldPath":"playerUid","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]}],"fieldOverrides":[]}

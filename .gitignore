@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-phone/
+.phone-preview.json
+.emulator-data/
+.tools/
+*-debug.log
+.env*
+!.env.example
+test-results/

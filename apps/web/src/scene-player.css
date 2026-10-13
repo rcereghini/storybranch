@@ -1,0 +1,361 @@
+.scene-player {
+  min-width: 0;
+}
+.scene-start {
+  position: absolute;
+  top: 64px;
+  left: 24px;
+  z-index: 2;
+}
+.scene-stage {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  overflow: hidden;
+  background: #0b151a;
+  border: 1px solid #3b5149;
+  border-radius: 10px;
+}
+.scene-stage:before {
+  content: "";
+  width: 100%;
+  min-width: 0;
+  grid-area: 1/1;
+  aspect-ratio: 16/9;
+  pointer-events: none;
+}
+.scene-stage video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #0b151a;
+  z-index: 0;
+}
+.scene-film-label {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  color: #d2e6dc;
+  font:
+    10px/1.5 Consolas,
+    monospace;
+  letter-spacing: 1.8px;
+  padding: 5px 9px;
+  background: #101a1bb8;
+  pointer-events: none;
+  z-index: 1;
+}
+.scene-overlay {
+  position: relative;
+  grid-area: 1/1;
+  z-index: 1;
+  align-self: end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 36px;
+  align-items: end;
+  padding: 110px 36px 28px;
+  background: linear-gradient(transparent, #0b171ce8 24%, #0b171cfc);
+}
+.scene-overlay {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 350ms ease,
+    visibility 0s;
+}
+.scene-overlay[aria-hidden="true"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 350ms ease,
+    visibility 0s 350ms;
+}
+.scene-film-label {
+  transition: opacity 350ms ease;
+}
+.watching .scene-film-label {
+  opacity: 0;
+}
+.player-heading,
+.scene-toolbar,
+.community,
+.character-panel,
+.player-share {
+  transition: opacity 350ms ease;
+}
+.playback-active .player-heading,
+.playback-active .community,
+.playback-active .character-panel,
+.playback-active .player-share {
+  opacity: 0.18;
+}
+.playback-active .scene-toolbar {
+  opacity: 0.35;
+}
+.playback-active
+  :is(
+    .player-heading,
+    .scene-toolbar,
+    .community,
+    .character-panel,
+    .player-share
+  ):is(:hover, :focus-within) {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-overlay,
+  .scene-overlay[aria-hidden="true"],
+  .scene-film-label,
+  .player-heading,
+  .scene-toolbar,
+  .community,
+  .character-panel,
+  .player-share {
+    transition: none;
+  }
+}
+.scene-copy h1 {
+  font:
+    normal clamp(30px, 3.2vw, 48px) / 1.08 Georgia,
+    serif;
+  letter-spacing: -0.8px;
+  margin: 0 0 20px;
+  text-wrap: balance;
+}
+.scene-copy > p:last-child {
+  font:
+    16px/1.65 Georgia,
+    serif;
+  color: #d5e2db;
+  margin: 0;
+  max-width: 48ch;
+}
+.scene-copy .eyebrow {
+  margin-bottom: 12px;
+  font-size: 10px;
+}
+.scene-overlay .choices {
+  min-width: 0;
+}
+.scene-overlay .choices > .eyebrow {
+  display: none;
+}
+.scene-overlay .choices > button {
+  margin: 8px 0 0;
+  padding: 15px 18px;
+  border-color: #75988a;
+  background: #172c29ed;
+  min-height: 54px;
+}
+.scene-overlay .choices > button:hover:not(:disabled) {
+  border-color: #c4fce0;
+  background: #28483c;
+}
+.scene-overlay .choices > button:disabled {
+  opacity: 1;
+  color: #abb9b2;
+  background: #1b2725e8;
+  border-color: #485e55;
+}
+.scene-overlay .choices small {
+  color: #b5c9bf;
+}
+.scene-overlay .choices > p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.scene-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  flex-wrap: wrap;
+}
+.scene-toolbar > span {
+  font:
+    11px/1.5 Consolas,
+    monospace;
+  color: var(--muted);
+}
+.scene-toolbar > a {
+  font-size: 13px;
+  text-decoration: underline;
+  padding: 10px 0;
+  min-height: 44px;
+}
+.scene-player .transcript {
+  margin: 8px 0 20px;
+}
+.player-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.player-heading {
+  padding-bottom: 16px;
+}
+.player-series {
+  font:
+    14px/1.6 "Segoe UI",
+    sans-serif;
+  color: var(--muted);
+  margin: 0;
+}
+.character-panel {
+  border-top: 1px solid var(--line);
+}
+.character-panel > summary {
+  font-size: 14px;
+}
+.character-panel aside {
+  margin-top: 14px;
+}
+.character-panel .stats {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+.character-panel .stats > div {
+  gap: 30px;
+  min-width: 150px;
+}
+.share-story {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 10px;
+}
+.share-story > summary {
+  font-size: 14px;
+}
+.share-story p {
+  font-size: 13px;
+}
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.clip-download {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 11px 18px;
+  min-height: 44px;
+  font-size: 14px;
+}
+.clip-download:hover {
+  background: #2a3a36;
+}
+@media (max-width: 1000px) and (min-width: 701px) {
+  .scene-overlay {
+    gap: 24px;
+    padding: 80px 24px 24px;
+  }
+  .scene-copy > p:last-child {
+    font-size: 14px;
+  }
+  .scene-overlay .choices > button {
+    font-size: 14px;
+    padding: 12px;
+  }
+  .scene-overlay .choices small {
+    font-size: 11px;
+  }
+  .scene-copy h1 {
+    font-size: 32px;
+  }
+}
+@media (max-width: 700px) {
+  .player-grid {
+    padding: 0 4% 28px;
+  }
+  .scene-stage:before {
+    aspect-ratio: 9/16;
+  }
+  .scene-stage {
+    max-width: 480px;
+    margin-inline: auto;
+  }
+  .scene-film-label {
+    top: 16px;
+    left: 16px;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .scene-overlay {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 120px 20px 20px;
+    background: linear-gradient(transparent, #0b171ceb 22%, #0b171cfc);
+  }
+  .scene-copy h1 {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+  .scene-copy > p:last-child {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .scene-copy .eyebrow {
+    font-size: 9px;
+    margin-bottom: 8px;
+  }
+  .scene-overlay .choices > button {
+    font-size: 14px;
+    padding: 12px;
+    gap: 10px;
+  }
+  .scene-overlay .choices small {
+    font-size: 11px;
+  }
+  .scene-overlay .choices .arrow {
+    font-size: 10px;
+  }
+  .scene-toolbar {
+    max-width: 480px;
+    margin: auto;
+  }
+  .scene-toolbar > span {
+    order: 3;
+    width: 100%;
+    text-align: center;
+  }
+  .player-heading {
+    padding-top: 22px;
+    gap: 10px;
+  }
+  .player-heading .eyebrow {
+    font-size: 10px;
+  }
+  .player-heading .saved {
+    font-size: 11px;
+  }
+  .character-panel .stats {
+    display: block;
+  }
+  .character-panel .stats > div {
+    min-width: 0;
+  }
+  .scene-stage.watching:before {
+    aspect-ratio: 9/16;
+  }
+}
+.player-share {
+  padding: 0 6% 24px;
+}
+@media (min-width: 1600px) {
+  .scene-copy h1 {
+    font-size: 48px;
+  }
+}
+
+.player-grid > section {
+  min-width: 0;
+}
