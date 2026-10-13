@@ -6,5 +6,6 @@ dist-phone/
 .tools/
 *-debug.log
 .env*
+.secrets/
 !.env.example
 test-results/

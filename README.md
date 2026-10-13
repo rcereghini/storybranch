@@ -2,11 +2,15 @@
 
 Storybranch is a working name for a video based interactive storytelling platform. Players discover and play adventures, creators build video story graphs, and the community adds side quests without replacing the original adventure.
 
-This repository contains a working M0 foundation and M1 local playable prototype, plus the product specifications. React/TypeScript runs against Firebase Authentication and Firestore emulators. No production credentials are required. Implementation and verification notes: [M0/M1 delivery record](docs/12-local-prototype.md).
+This repository contains a working M0 foundation and M1 local playable prototype, plus the product specifications. React/TypeScript now defaults to Firebase Authentication and Firestore project `storybranch-f77a3` locally and on Netlify. Server credentials are required for that mode; explicit emulator mode remains credential-free. See [shared Firebase setup](docs/15-shared-firebase-setup.md). Implementation and verification notes: [M0/M1 delivery record](docs/12-local-prototype.md).
 
 The player now uses a landscape overlay on larger screens and an authored portrait rendition at ≤700px. Opening the player offers **Start story with sound**. After that explicit tap, saved choices start the next scene automatically using the same video element. Story controls fade during playback; pause, completion or **Skip to choices** restores them. If the browser blocks autoplay, **Play scene** provides a manual fallback. **Share this adventure** offers public story-link sharing/copying and a downloadable portrait MP4 teaser. Links remain local until hosting is configured. See [responsive video and sharing](docs/13-responsive-video-and-sharing.md) for the research, behavior and limits.
 
-## Run locally
+## Run against shared Firebase
+
+Follow [shared Firebase setup](docs/15-shared-firebase-setup.md) to install server credentials in ignored `.secrets/` and `.env.local`, then run `pnpm seed:firebase` and `pnpm dev`. Use a real Firebase Email/Password account; local and hosted saves share the same namespaced data.
+
+## Run locally with emulators
 
 For isolated HTTPS testing on a real phone, see [phone playback preview](docs/14-phone-playback-preview.md). The phone preview has its own disposable emulator data and a private, expiring access link.
 
@@ -21,7 +25,7 @@ Leave the emulators running. In a second terminal:
 
 ```sh
 pnpm seed
-pnpm dev
+pnpm dev:emulator
 ```
 
 Open [Storybranch](http://127.0.0.1:5173). The API listens on port 3001, Auth on 9099, Firestore on 8080, and the [emulator console](http://127.0.0.1:4000) on 4000. All bind to loopback. Use **Sign in**, then **Begin your story**. Signing in lands on the catalogue; `/adventures` lists saved journeys. The story detail route also offers **Start a new journey** when older saves exist.
@@ -53,7 +57,7 @@ Browser checks use installed Chrome on Windows, otherwise Playwright Chromium (`
 
 `pnpm media:portrait` generates the separate 1080×1920 phone and social-teaser MP4 fixtures using H.264-capable Chrome. Normal setup uses the included files. Use new rendition IDs for future media changes. Social upload acceptance and physical-device share sheets have not been tested; this is a local teaser download, not an automatic posting integration.
 
-The production bundle is in `dist/`. `netlify.toml` defines static hosting, generated story/creator metadata, and API function routing. **This is a local emulator build, not a deployable production backend.** The API deliberately refuses to start without `STORYBRANCH_MODE=emulator`; the development launcher sets it. Production project configuration, credentials, authorization hardening, moderation and deployment verification remain future work.
+The production bundle is in `dist/`. `netlify.toml` defines static hosting, generated story/creator metadata, and API function routing. The default deployment uses `storybranch-f77a3` and requires server-only Firebase credentials, Firestore setup and sample content seeding. See [shared Firebase setup](docs/15-shared-firebase-setup.md). Moderation, broader production hardening and live end-to-end verification remain outstanding.
 
 If this machine's bundled Node is the only runtime on PATH, pnpm is at `C:\Users\rcere\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback\pnpm.cmd`. In PowerShell, invoke that path with `&`. If a corporate TLS certificate prevents downloads, enable the trusted OS certificate store with `$env:NODE_USE_SYSTEM_CA='1'`; do not disable TLS verification. Java 21 can be installed normally; `.tools/` is not source-controlled.
 
@@ -92,4 +96,5 @@ The user's latest instruction takes precedence. Confirmed requirements describe 
 The decision register owns decision status. The game rules own gameplay semantics, the data contracts own persistence and command semantics, and the delivery document owns release acceptance. If a change crosses those boundaries, update the affected documents together.
 
 Begin future prompts with the context block in the prompt pack and name one delivery milestone. Do not ask an implementation agent to build the entire product in one pass. No cloud resources, billing accounts, or external publishing have been configured by this documentation work.
+
 

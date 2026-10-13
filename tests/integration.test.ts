@@ -1,4 +1,4 @@
-import "../scripts/local-env";
+import "./emulator-env";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -11,9 +11,29 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../services/api/firebase";
 import { handle } from "../services/api/handler";
+import { ensurePlayerProfile } from "../services/api/player-profile";
 import type { Save } from "../packages/contracts/index";
 let tokens: Record<string, string> = {};
 let rules: RulesTestEnvironment;
+it("creates a live-style profile once without resetting stats or reactivating disabled users", async () => {
+  const uid = `profile-${randomUUID()}`;
+  const ref = db.doc(`playerProfiles/${uid}`);
+  try {
+    await Promise.all([
+      ensurePlayerProfile(db, uid),
+      ensurePlayerProfile(db, uid),
+    ]);
+    expect((await ref.get()).data()?.stats.agility).toBe(5);
+    await ref.update({ "stats.agility": 9, status: "disabled" });
+    await ensurePlayerProfile(db, uid);
+    expect((await ref.get()).data()).toMatchObject({
+      stats: { agility: 9 },
+      status: "disabled",
+    });
+  } finally {
+    await ref.delete();
+  }
+});
 async function call(path: string, body?: unknown, who = "player") {
   const r = await handle(
     new Request(`http://localhost/api${path}`, {

@@ -6,7 +6,7 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { auth } from "./firebase";
+import { auth, emulatorMode } from "./firebase";
 import { createApi, ApiError } from "../../../packages/api-client/index";
 import { evaluate } from "../../../packages/domain/index";
 import type { Save, Story } from "../../../packages/contracts/index";
@@ -46,8 +46,8 @@ function App() {
     [stale, setStale] = useState(false),
     [offline, setOffline] = useState(!navigator.onLine),
     [login, setLogin] = useState(false),
-    [email, setEmail] = useState("player@storybranch.test"),
-    [password, setPassword] = useState("HarborDemo123!"),
+    [email, setEmail] = useState(emulatorMode ? "player@storybranch.test" : ""),
+    [password, setPassword] = useState(emulatorMode ? "HarborDemo123!" : ""),
     [events, setEvents] = useState<Event[]>([]),
     [logCursor, setLogCursor] = useState<string | null>(null),
     [logOpen, setLogOpen] = useState(false),
@@ -148,7 +148,9 @@ function App() {
         setCatalogueReady(ready);
         if (!ready)
           throw new Error(
-            "No adventures are seeded yet. Run pnpm seed, then retry.",
+            emulatorMode
+              ? "No adventures are seeded yet. Run pnpm seed, then retry."
+              : "The story library is not ready yet. Please try again shortly.",
           );
         if (user) await loadSaves();
       }
@@ -754,7 +756,9 @@ function App() {
                   setLogin(false);
                 } catch {
                   setError(
-                    "Sign-in failed. Check your credentials and that the Auth emulator is running.",
+                    emulatorMode
+                      ? "Sign-in failed. Check your credentials and that the Auth emulator is running."
+                      : "Sign-in failed. Check your email and password, then try again.",
                   );
                 } finally {
                   setBusy(false);
@@ -791,25 +795,27 @@ function App() {
                 {error}
               </p>
             )}
-            <div className="demo-accounts">
-              <small>LOCAL EMULATOR ACCOUNTS</small>
-              <p>
-                player@storybranch.test · agility 5<br />
-                progressed@storybranch.test · agility 8<br />
-                Password: HarborDemo123!
-              </p>
-              <button
-                onClick={() =>
-                  setEmail(
-                    email.startsWith("player")
-                      ? "progressed@storybranch.test"
-                      : "player@storybranch.test",
-                  )
-                }
-              >
-                Switch demo character
-              </button>
-            </div>
+            {emulatorMode && (
+              <div className="demo-accounts">
+                <small>LOCAL EMULATOR ACCOUNTS</small>
+                <p>
+                  player@storybranch.test · agility 5<br />
+                  progressed@storybranch.test · agility 8<br />
+                  Password: HarborDemo123!
+                </p>
+                <button
+                  onClick={() =>
+                    setEmail(
+                      email.startsWith("player")
+                        ? "progressed@storybranch.test"
+                        : "player@storybranch.test",
+                    )
+                  }
+                >
+                  Switch demo character
+                </button>
+              </div>
+            )}
           </section>
         </div>
       )}

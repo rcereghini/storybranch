@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { FieldPath, type Transaction } from "firebase-admin/firestore";
 import { ZodError } from "zod";
-import { auth, db } from "./firebase";
+import { auth, db, config } from "./firebase";
 import {
   GameError,
   id,
@@ -14,6 +14,7 @@ import {
 } from "../../packages/contracts/index";
 import { start, transition, validateStory } from "../../packages/domain/index";
 import { resolveFixtureMedia } from "../../fixtures/media";
+import { ensurePlayerProfile } from "./player-profile";
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -94,18 +95,24 @@ export async function handle(request: Request): Promise<Response> {
       throw new GameError("UNAUTHENTICATED", "Sign in to save your adventure.");
     let uid: string;
     try {
-      uid = (await auth.verifyIdToken(token)).uid;
+      uid = (await auth.verifyIdToken(token, config.mode === "firebase")).uid;
     } catch {
       throw new GameError(
         "UNAUTHENTICATED",
         "Your session expired. Sign in again.",
       );
     }
-    const profile = await db.doc(`playerProfiles/${uid}`).get();
+    const profileRef = db.doc(`playerProfiles/${uid}`);
+    if (config.mode === "firebase") {
+      await ensurePlayerProfile(db, uid);
+    }
+    const profile = await profileRef.get();
     if (!profile.exists || profile.data()!.status !== "active")
       throw new GameError(
         "FORBIDDEN",
-        "This account is not enabled for the local prototype. Use a seeded account.",
+        config.mode === "emulator"
+          ? "This account is not enabled for the local prototype. Use a seeded account."
+          : "This account is not enabled for Storybranch.",
       );
     if (request.method === "GET") {
       if (path === "/api/playthroughs") {
@@ -340,7 +347,9 @@ export async function handle(request: Request): Promise<Response> {
               ? error.message
               : code === "VALIDATION_FAILED"
                 ? "Invalid command."
-                : "The local service is unavailable. Check the emulators and retry.",
+                : config.mode === "emulator"
+                  ? "The local service is unavailable. Check the emulators and retry."
+                  : "The story service is unavailable. Please try again shortly.",
           correlationId,
         },
       },

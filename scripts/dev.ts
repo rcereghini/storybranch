@@ -1,7 +1,13 @@
-import "./local-env";
+import { existsSync } from "node:fs";
+if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+process.env.VITE_STORYBRANCH_MODE = process.env.STORYBRANCH_MODE ?? "firebase";
+if (process.env.STORYBRANCH_MODE === "emulator") {
+  process.env.VITE_STORYBRANCH_MODE = "emulator";
+  await import("./local-env");
+}
 import { createServer } from "node:http";
 import { createServer as vite } from "vite";
-import { handle } from "../services/api/handler";
+const { handle } = await import("../services/api/handler");
 const api = createServer(async (req, res) => {
   try {
     const chunks: Buffer[] = [];

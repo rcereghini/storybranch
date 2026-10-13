@@ -1,6 +1,11 @@
 import { spawn } from "node:child_process";
 const server = spawn(process.execPath, ["--import", "tsx", "scripts/dev.ts"], {
   stdio: "inherit",
+  env: {
+    ...process.env,
+    STORYBRANCH_MODE: "emulator",
+    VITE_STORYBRANCH_MODE: "emulator",
+  },
 });
 try {
   let ready = false;

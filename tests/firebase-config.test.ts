@@ -1,0 +1,33 @@
+import { it, expect } from "vitest";
+import { backendConfig } from "../services/api/config";
+import { firebaseConfig } from "../fixtures/firebase-config";
+
+it("uses the requested shared project and isolates live collections", () => {
+  const config = backendConfig({});
+  expect(config.mode).toBe("firebase");
+  expect(config.projectId).toBe(firebaseConfig.projectId);
+  expect(config.prefix).toBe("storybranch/app/");
+});
+it("requires explicit emulator mode and keeps it on demo projects", () => {
+  const config = backendConfig({ STORYBRANCH_MODE: "emulator" });
+  expect(config.projectId).toBe("demo-storybranch");
+  expect(config.prefix).toBe("");
+  expect(
+    backendConfig({
+      STORYBRANCH_MODE: "emulator",
+      STORYBRANCH_PHONE_PREVIEW: "1",
+    }).projectId,
+  ).toBe("demo-storybranch-phone");
+});
+it.each([
+  { FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" },
+  { FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099" },
+  { STORYBRANCH_PHONE_PREVIEW: "1" },
+  { STORYBRANCH_MODE: "other" },
+  {
+    STORYBRANCH_MODE: "emulator",
+    FIRESTORE_EMULATOR_HOST: "remote.example:8080",
+  },
+])("rejects mixed or invalid configuration %j", (env) => {
+  expect(() => backendConfig(env)).toThrow();
+});

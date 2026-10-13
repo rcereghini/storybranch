@@ -8,9 +8,11 @@
   },
   "scripts": {
     "dev": "tsx watch scripts/dev.ts",
+    "dev:emulator": "tsx watch scripts/dev-emulator.ts",
+    "seed:firebase": "tsx scripts/firebase-live.ts",
     "build": "vite build && tsx scripts/metadata.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/domain.test.ts tests/foundation.test.ts tests/api-client.test.ts",
+    "test": "vitest run tests/domain.test.ts tests/foundation.test.ts tests/api-client.test.ts tests/firebase-config.test.ts",
     "test:integration": "vitest run tests/integration.test.ts",
     "test:browser": "tsx scripts/browser-check.ts",
     "test:audio": "tsx scripts/audio-check.ts",

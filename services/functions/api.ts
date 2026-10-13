@@ -1,6 +1,10 @@
 // Return a contract-shaped error even if backend configuration fails at import.
 export default async function api(request: Request): Promise<Response> {
-  if (process.env.STORYBRANCH_MODE !== "emulator") {
+  if (
+    (process.env.STORYBRANCH_MODE ?? "firebase") === "firebase" &&
+    !process.env.FIREBASE_SERVICE_ACCOUNT_JSON &&
+    !process.env.GOOGLE_APPLICATION_CREDENTIALS
+  ) {
     return Response.json(
       {
         error: {
