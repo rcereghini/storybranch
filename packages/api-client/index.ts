@@ -21,9 +21,36 @@ export function createApi(
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    const result = await response.json();
-    if (!response.ok)
-      throw new ApiError(result.error.code, result.error.message);
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new ApiError(
+        "UNAVAILABLE",
+        "The story service is unavailable. Please try again shortly.",
+      );
+    }
+    if (!response.ok) {
+      const error = result?.error;
+      if (
+        error &&
+        typeof error.message === "string" &&
+        [
+          "UNAUTHENTICATED",
+          "FORBIDDEN",
+          "NOT_FOUND",
+          "STALE_REVISION",
+          "IDEMPOTENCY_CONFLICT",
+          "VALIDATION_FAILED",
+          "UNAVAILABLE",
+        ].includes(error.code)
+      )
+        throw new ApiError(error.code, error.message);
+      throw new ApiError(
+        "UNAVAILABLE",
+        "The story service is unavailable. Please try again shortly.",
+      );
+    }
     return result as T;
   };
 }

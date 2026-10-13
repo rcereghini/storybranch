@@ -10,7 +10,7 @@
     "dev": "tsx watch scripts/dev.ts",
     "build": "vite build && tsx scripts/metadata.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/domain.test.ts tests/foundation.test.ts",
+    "test": "vitest run tests/domain.test.ts tests/foundation.test.ts tests/api-client.test.ts",
     "test:integration": "vitest run tests/integration.test.ts",
     "test:browser": "tsx scripts/browser-check.ts",
     "test:audio": "tsx scripts/audio-check.ts",
