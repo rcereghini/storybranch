@@ -255,7 +255,9 @@ function App() {
       report(e);
     }
   };
-  const disabled = busy || offline || stale || !!pending;
+  // Until Firebase restores the session, a signed-in player looks signed out,
+  // so start() would open the sign-in dialog instead of starting the story.
+  const disabled = busy || offline || stale || !!pending || !authReady;
   const resume = saves.find(
     (s) => !s.parentPlaythroughId && s.status === "active",
   );
