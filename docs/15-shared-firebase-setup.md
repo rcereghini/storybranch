@@ -19,11 +19,11 @@ A new authenticated player's Storybranch profile is initialized by the API with 
 
 ## Local server
 
-Place the downloaded key at `.secrets/firebase-admin.json` (ignored by Git). Copy `.env.example` to `.env.local` and adjust the absolute credential path for this checkout:
+Place the downloaded key at `.secrets/firebase-admin.json` (ignored by Git). Copy `.env.example` to `.env.local`. The credential path is relative to the repo root, so it needs no per-checkout edits:
 
 ```dotenv
 STORYBRANCH_MODE=firebase
-GOOGLE_APPLICATION_CREDENTIALS=C:/GameDev/storybranch/.secrets/firebase-admin.json
+GOOGLE_APPLICATION_CREDENTIALS=./.secrets/firebase-admin.json
 ```
 
 Remove emulator-host variables from this live shell. Mixed live/emulator configuration fails closed.
@@ -42,6 +42,12 @@ In the site's environment variables, add `FIREBASE_SERVICE_ACCOUNT_JSON` contain
 The default server mode is `firebase`; an explicit `STORYBRANCH_MODE=firebase` in Functions is also supported. Remove old `STORYBRANCH_MODE=emulator`, `FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`, `STORYBRANCH_PHONE_PREVIEW`, `VITE_PHONE_PREVIEW`, and `VITE_STORYBRANCH_MODE=emulator` overrides from the production deployment.
 
 Redeploy after changing runtime environment variables. The build command remains `pnpm build`; publish `dist`. `/api/catalogue` should return HTTP 200 with Glass Harbor after credentials and seed are complete. Sign in with the real Firebase test user, begin a journey, choose a route, reload, and verify the saved scene.
+
+## Vercel
+
+`vercel.json` builds with `pnpm build:vercel`, serves `dist`, and routes every `/api/*` request to `api/index.js`. That function re-exports a Vite bundle of the same handler (`vite.api.config.ts` → `dist-api/`), because Vercel compiles TypeScript functions file by file and cannot resolve this project's extensionless ESM imports. Netlify configuration is unchanged; both hosts can run side by side.
+
+In Project → Settings → Environment Variables, add `FIREBASE_SERVICE_ACCOUNT_JSON` (entire JSON, marked Sensitive), `STORYBRANCH_PUBLISHER_UIDS`, and `ENABLE_EXPERIMENTAL_COREPACK=1` so the install uses the pinned pnpm version. Add the `*.vercel.app` and any custom domain to Firebase Authentication → Settings → Authorized domains. Redeploy after changing variables.
 
 Netlify variables declared only in `netlify.toml` are not available to Functions: [Netlify documentation](https://docs.netlify.com/build/functions/environment-variables/). Admin setup: [Firebase documentation](https://firebase.google.com/docs/admin/setup).
 

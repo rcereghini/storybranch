@@ -9,3 +9,5 @@ dist-phone/
 .secrets/
 !.env.example
 test-results/
+.vercel/
+dist-api/

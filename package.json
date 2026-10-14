@@ -11,6 +11,7 @@
     "dev:emulator": "tsx watch scripts/dev-emulator.ts",
     "seed:firebase": "tsx scripts/firebase-live.ts",
     "build": "vite build && tsx scripts/metadata.ts",
+    "build:vercel": "pnpm build && vite build --config vite.api.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/domain.test.ts tests/foundation.test.ts tests/api-client.test.ts tests/firebase-config.test.ts tests/authoring.test.ts",
     "test:studio": "tsx scripts/studio-check.ts",
