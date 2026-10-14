@@ -874,7 +874,7 @@ hr {
   text-align: center;
   color: var(--accent);
 }
-.player-notices {
+.app-notices {
   position: fixed;
   top: 80px;
   right: 16px;
@@ -882,8 +882,26 @@ hr {
   z-index: 20;
   pointer-events: none;
 }
-.player-notices > :not(.sr-only) {
+.app-notices > :not(.sr-only):not(.loading-overlay) {
   pointer-events: auto;
+}
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(9 18 20 / 45%);
+  pointer-events: none;
+}
+.loading-card {
+  max-width: calc(100vw - 32px);
+  padding: 24px 32px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: #102224;
+  color: var(--text);
+  box-shadow: 0 16px 48px #0008;
+  text-align: center;
 }
 .dice-face strong {
   font-weight: normal;

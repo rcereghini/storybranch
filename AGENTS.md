@@ -4,6 +4,7 @@ Read `docs/16-story-pages.md` before changing stories, page types, rendering, ro
 
 - Every page renderer MUST be a child of the shared `Page` component and run within a `Story` context. Do not introduce stand-alone screens that bypass the Page lifecycle.
 - Transient notifications must not shift the player layout. Dice results replace the centered dice display in reserved space and appear only on their pending dice page; history belongs in the story log.
+- Loading feedback across the app must use a fixed overlay or reserved content placeholder, never an inserted banner above content. Existing video transitions retain their frame without a visible global loading box.
 - Every new page type MUST declare its typed input, completion trigger, and output destinations before implementation. Document these in the page-type table in `docs/16-story-pages.md` and validate the shape in the portable contracts/domain layer.
 - Output routing, conditions, dice and future battle results MUST be validated by the server. Renderers emit intent; they cannot supply trusted destinations, stats, or random outcomes.
 - Text: Next clicks its single output. Video: completion OR Next triggers its single output. Options: only a chosen option triggers its selected output. Dice: Roll persists/displays a result; a separate Next follows Pass or Fail. Never silently collapse dice back to immediate routing.

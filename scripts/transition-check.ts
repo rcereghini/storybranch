@@ -4,7 +4,31 @@ const browser = await launchBrowser();
 try {
   for (const width of [1440, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
+    let releaseCatalogue!: () => void;
+    const catalogueGate = new Promise<void>((resolve) => {
+      releaseCatalogue = resolve;
+    });
+    await page.route("**/api/catalogue", async (route) => {
+      await catalogueGate;
+      await route.continue();
+    });
     await page.goto("http://127.0.0.1:5173");
+    await page.locator(".loading-overlay").waitFor();
+    const loadingHero = await page.locator(".hero").boundingBox();
+    assert.equal(
+      await page
+        .locator(".loading-overlay")
+        .evaluate((el) => getComputedStyle(el).position),
+      "fixed",
+    );
+    releaseCatalogue();
+    await page.locator(".loading-overlay").waitFor({ state: "hidden" });
+    assert.deepEqual(
+      await page.locator(".hero").boundingBox(),
+      loadingHero,
+      "Catalogue loading must not shift or resize the hero",
+    );
+    await page.unroute("**/api/catalogue");
     await page
       .getByRole("button", { name: /Sign in/ })
       .first()

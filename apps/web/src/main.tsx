@@ -284,11 +284,11 @@ function App() {
           <span className="avatar">{user ? "◈" : "↗"}</span>
         </button>
       </header>
-      <main className={playing ? "playback-active" : undefined}>
-        <div
-          aria-live="polite"
-          className={path.startsWith("/play/") ? "player-notices" : undefined}
-        >
+      <main
+        className={playing ? "playback-active" : undefined}
+        aria-busy={busy}
+      >
+        <div aria-live="polite" className="app-notices">
           {user && savesError && !path.startsWith("/play/") && (
             <div className="notice error" role="alert">
               Your saved-adventure list could not be loaded. Please retry.
@@ -309,11 +309,19 @@ function App() {
           {busy && (
             <div
               className={
-                path.startsWith("/play/") ? "sr-only" : "notice subtle"
+                path.startsWith("/play/") && player
+                  ? "sr-only"
+                  : "loading-overlay"
               }
               role="status"
             >
-              {pending ? "Saving your choice…" : "Loading your adventure…"}
+              <span className="loading-card">
+                {pending
+                  ? player
+                    ? "Saving your choice…"
+                    : "Starting your adventure…"
+                  : "Loading your adventure…"}
+              </span>
             </div>
           )}
           {error && (

@@ -20,6 +20,8 @@ All types receive their authored configuration plus `PageInput` (page, story sav
 
 Roll feedback occupies reserved space in the center of its dice page, replacing the die display without resizing the page. It remains visible after reload while awaiting Next, and disappears on leaving that page; the persisted result remains available to conditions and the story log. Transient player notifications overlay the layout rather than pushing the main content down.
 
+App loading uses a fixed, centered overlay for catalogue/start/initial player requests. It does not occupy document space or intercept navigation. An already loaded player keeps its existing frame during transitions, with screen-reader loading status only. Future loading indicators must overlay content or occupy reserved space where that content belongs, never insert a banner above it.
+
 A normal output moves to a page in the current pinned edition. An ending marks the current save completed and closes that branch. The common completion UI offers replay, return to the parent when present, or other catalogue stories. Selecting another story starts a separate save/context; rewards and local keys do not silently transfer. Recommendations currently use the other catalogue entries, not a personalization service. Authored direct cross-story routes are not implemented; the completion shell currently owns cross-story handoff.
 
 Terminal pages have no *in-story* choices, but still have the common completion outputs. A future type must document all possible exits (including failure/cancel where relevant), use the shared wrapper, reject invalid output shapes and prove reload/retry behavior. This rule is also recorded in root `AGENTS.md` for future implementation work.
