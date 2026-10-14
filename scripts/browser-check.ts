@@ -109,6 +109,10 @@ try {
   await assert.rejects(() => startPlayback(page), /Playback failed:.*"source"/);
   await page.unroute("**/media/*-landscape.mp4");
   await click("Retry video");
+  // The retried clip autoplays and makes the choices inert; if that lands
+  // between focus and Enter the keypress is lost, so wait for it and skip.
+  await startPlayback(page);
+  await click("Skip to choices");
   await page.getByRole("button", { name: /Follow the lanterns/ }).focus();
   await page.keyboard.press("Enter");
   await heading("The lantern market");
