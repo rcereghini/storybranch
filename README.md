@@ -35,7 +35,7 @@ Open [Storybranch](http://127.0.0.1:5173). The API listens on port 3001, Auth on
 | `player@storybranch.test` | `HarborDemo123!` | 5 (rooftop check fails) |
 | `progressed@storybranch.test` | `HarborDemo123!` | 8 (rooftop check succeeds) |
 
-These are intentionally public, emulator-only credentials. Additional creator/author/moderator fixture identities have no privileged application features. Registration and production authentication setup are deferred. Never reuse these passwords for real accounts.
+These are intentionally public, emulator-only credentials. Additional creator/author/moderator fixture identities have no privileged application features. Email/password registration and Google sign-in are supported. Enable both providers for hosted use. Never reuse these passwords for real accounts.
 
 Speak to the courier for the harbor pass, visit the market, try a rooftop escape, or explore either community side quest. Return to the main adventure at any time. Side-quest state never merges into the parent. Replay a loop through the courier to see that its token is awarded once.
 
@@ -46,7 +46,8 @@ Stop `pnpm emulators` with Ctrl+C to export saves and accounts to ignored `.emul
 ```sh
 pnpm check                 # types, pure domain/boundary tests, production build
 pnpm test:integration      # running emulators + seeded data required
-pnpm test:browser          # emulators + seed + pnpm dev required
+pnpm test:browser          # emulators + seed + pnpm dev:emulator required
+pnpm test:auth             # same emulator setup; registration, sign-in and resume
 pnpm test:audio            # shipped audio clips, delayed choice response
 pnpm test:media            # verifies non-silent audio in all three shipped MP4s
 pnpm exec playwright install webkit

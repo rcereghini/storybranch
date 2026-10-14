@@ -12,6 +12,7 @@ await stat(resolve(root, "index.html"));
 const key = randomBytes(32).toString("hex");
 const expires = Date.now() + 8 * 60 * 60 * 1000;
 const allowedAuth = new Set([
+  "/identitytoolkit.googleapis.com/v1/accounts:signUp",
   "/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword",
   "/identitytoolkit.googleapis.com/v1/accounts:lookup",
   "/securetoken.googleapis.com/v1/token",

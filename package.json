@@ -15,6 +15,7 @@
     "test": "vitest run tests/domain.test.ts tests/foundation.test.ts tests/api-client.test.ts tests/firebase-config.test.ts",
     "test:integration": "vitest run tests/integration.test.ts",
     "test:browser": "tsx scripts/browser-check.ts",
+    "test:auth": "tsx scripts/auth-check.ts",
     "test:audio": "tsx scripts/audio-check.ts",
     "media": "tsx scripts/generate-media.ts",
     "media:portrait": "tsx scripts/generate-portrait.ts",

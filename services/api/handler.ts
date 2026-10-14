@@ -103,9 +103,7 @@ export async function handle(request: Request): Promise<Response> {
       );
     }
     const profileRef = db.doc(`playerProfiles/${uid}`);
-    if (config.mode === "firebase") {
-      await ensurePlayerProfile(db, uid);
-    }
+    await ensurePlayerProfile(db, uid);
     const profile = await profileRef.get();
     if (!profile.exists || profile.data()!.status !== "active")
       throw new GameError(

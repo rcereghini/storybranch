@@ -8,7 +8,7 @@ The web config in `fixtures/firebase-config.ts` is public. Analytics is not init
 
 For project `storybranch-f77a3`:
 
-1. Enable Authentication > Sign-in method > Email/Password. Use an existing real account or add a test user under Authentication > Users. The app currently supports sign-in, not self-registration. Do not create the public emulator demo passwords in the live project.
+1. Enable Authentication > Sign-in method > Email/Password. Players can create an email/password account in the app or sign in with an existing account. Enable Google as a second provider and choose the project support email to activate Continue with Google. Do not create the public emulator demo passwords in the live project.
 2. Include `storybranch.com`, your Netlify site hostname, and `localhost` in Authentication > Settings > Authorized domains as appropriate.
 3. Ensure a `(default)` Firestore database exists. Records are stored under `storybranch/app/...`, keeping them separate from pre-existing top-level collections. Authentication users are shared at the project level.
 4. Protect `storybranch/{document=**}` against all client reads/writes. The app uses the server API, not the client Firestore SDK. Admin SDK access uses IAM and bypasses Firestore client rules. If this project has another app, inspect and merge its rules; do not replace them with the emulator rules. A permissive overlapping wildcard rule can override a restrictive match, so check that no other rule grants client writes here.
@@ -48,3 +48,7 @@ Netlify variables declared only in `netlify.toml` are not available to Functions
 ## Verification status
 
 Configuration tests reject invalid modes, non-loopback emulators and mixed live/emulator settings. Emulator integration tests cover auth, cross-user denial, idempotency, races, pinned saves, isolated side quests and profile bootstrap preserving existing/disabled profiles. Live credentials, existing project rules/indexes, provider enablement and real hosted sign-in still require verification after project access is supplied. The public web configuration alone cannot authorize server writes.
+
+Google sign-in uses a user-triggered popup; blocked or cancelled popups leave the form open with recovery guidance. The isolated phone tunnel supports email signup but not Google OAuth. Production Google OAuth and physical-device popup behavior require manual verification.
+
+Authentication update verification: typecheck, production build, 20 unit/domain tests and 9 emulator integration tests passed. Chrome at 390px verified password mismatch handling, email registration, session persistence after reload, new-player save creation, sign-out/sign-in/resume, and opening/cancelling the Google emulator popup. Run `pnpm test:auth` with the emulator dev server. A real Google account consent flow was not performed. Live sample content was seeded and the local function successfully read the live catalogue; the last hosted check still returned the missing-credential response.

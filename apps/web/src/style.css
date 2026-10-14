@@ -828,3 +828,17 @@ hr {
     transition: none !important;
   }
 }
+
+.google-auth {
+  width: 100%;
+  margin-top: 12px;
+  background: #f3f3ee;
+  color: #182220;
+}
+.auth-divider {
+  text-align: center;
+}
+.modal {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}

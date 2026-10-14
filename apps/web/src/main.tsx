@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  type User,
-} from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth, emulatorMode } from "./firebase";
+import { AuthForm } from "./AuthForm";
 import { createApi, ApiError } from "../../../packages/api-client/index";
 import { evaluate } from "../../../packages/domain/index";
 import type { Save, Story } from "../../../packages/contracts/index";
@@ -46,8 +42,6 @@ function App() {
     [stale, setStale] = useState(false),
     [offline, setOffline] = useState(!navigator.onLine),
     [login, setLogin] = useState(false),
-    [email, setEmail] = useState(emulatorMode ? "player@storybranch.test" : ""),
-    [password, setPassword] = useState(emulatorMode ? "HarborDemo123!" : ""),
     [events, setEvents] = useState<Event[]>([]),
     [logCursor, setLogCursor] = useState<string | null>(null),
     [logOpen, setLogOpen] = useState(false),
@@ -68,7 +62,7 @@ function App() {
       if (event.key !== "Tab") return;
       const elements = Array.from(
         document.querySelectorAll<HTMLElement>(
-          '[role="dialog"] button:not(:disabled), [role="dialog"] input',
+          '[role="dialog"] button:not(:disabled), [role="dialog"] input:not(:disabled)',
         ),
       );
       const first = elements[0],
@@ -743,79 +737,7 @@ function App() {
             >
               ×
             </button>
-            <p className="eyebrow">WELCOME, WAYFARER</p>
-            <h2 id="signin-title">Keep your place.</h2>
-            <p>Sign in to save and resume your adventure.</p>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setBusy(true);
-                setError("");
-                try {
-                  await signInWithEmailAndPassword(auth, email, password);
-                  setLogin(false);
-                } catch {
-                  setError(
-                    emulatorMode
-                      ? "Sign-in failed. Check your credentials and that the Auth emulator is running."
-                      : "Sign-in failed. Check your email and password, then try again.",
-                  );
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <label>
-                Email
-                <input
-                  autoFocus
-                  type="email"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </label>
-              <button className="primary" disabled={busy || offline}>
-                Sign in ↗
-              </button>
-            </form>
-            {error && (
-              <p role="alert" className="error-text">
-                {error}
-              </p>
-            )}
-            {emulatorMode && (
-              <div className="demo-accounts">
-                <small>LOCAL EMULATOR ACCOUNTS</small>
-                <p>
-                  player@storybranch.test · agility 5<br />
-                  progressed@storybranch.test · agility 8<br />
-                  Password: HarborDemo123!
-                </p>
-                <button
-                  onClick={() =>
-                    setEmail(
-                      email.startsWith("player")
-                        ? "progressed@storybranch.test"
-                        : "player@storybranch.test",
-                    )
-                  }
-                >
-                  Switch demo character
-                </button>
-              </div>
-            )}
+            <AuthForm offline={offline} onSuccess={() => setLogin(false)} />
           </section>
         </div>
       )}
