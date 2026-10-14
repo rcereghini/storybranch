@@ -8,6 +8,8 @@ The player now uses a landscape overlay on larger screens and an authored portra
 
 ## Run against shared Firebase
 
+**Create** opens the new Creator Studio: private drafts, all five page types, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Sample clips are available now; uploads remain pending. Hosted publishing requires server-only `STORYBRANCH_PUBLISHER_UIDS`; emulator accounts can publish immediately.
+
 The player now supports five explicit page types and two additional mixed-page stories: **The Clockwork Door** and **The Storm Signal**. See [Story and Page model](docs/16-story-pages.md). Reseed to publish the new `pages-v1` editions. Pre-page prototype saves require a new journey; accounts are unchanged.
 
 Follow [shared Firebase setup](docs/15-shared-firebase-setup.md) to install server credentials in ignored `.secrets/` and `.env.local`, then run `pnpm seed:firebase` and `pnpm dev`. Use a real Firebase Email/Password account; local and hosted saves share the same namespaced data.
@@ -49,6 +51,7 @@ Stop `pnpm emulators` with Ctrl+C to export saves and accounts to ignored `.emul
 pnpm check                 # types, pure domain/boundary tests, production build
 pnpm test:integration      # running emulators + seeded data required
 pnpm test:browser          # emulators + seed + pnpm dev:emulator required
+pnpm test:studio           # create, save/reload, preview, publish and play
 pnpm test:auth             # same emulator setup; registration, sign-in and resume
 pnpm test:audio            # shipped audio clips, delayed choice response
 pnpm test:media            # verifies non-silent audio in every shipped MP4

@@ -13,8 +13,126 @@ import { db } from "../services/api/firebase";
 import { handle } from "../services/api/handler";
 import { ensurePlayerProfile } from "../services/api/player-profile";
 import type { Save } from "../packages/contracts/index";
+import { pageStories } from "../fixtures/page-stories";
 let tokens: Record<string, string> = {};
 let rules: RulesTestEnvironment;
+it("protects drafts and atomically publishes immutable editions with retry and stale checks", async () => {
+  const storyId = `author-${randomUUID()}`;
+  const story = JSON.parse(
+    JSON.stringify(pageStories[0]).replaceAll("clockwork-door", storyId),
+  );
+  const path = `/studio/${storyId}`;
+  const saveDraft = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    draft: { story, description: "Creator test" },
+  };
+  expect((await call(path, saveDraft, "none")).status).toBe(401);
+  const created = await call(path, saveDraft);
+  expect(created.status).toBe(200);
+  expect((await call(path, saveDraft)).data).toEqual(created.data);
+  expect(
+    (
+      await call(path, {
+        ...saveDraft,
+        draft: { ...saveDraft.draft, description: "Changed payload" },
+      })
+    ).status,
+  ).toBe(409);
+  expect((await call(path, undefined, "progressed")).status).toBe(404);
+  expect((await call(path, saveDraft, "progressed")).status).toBe(403);
+  expect((await db.doc(`catalogue/${storyId}`).get()).exists).toBe(false);
+  const publish = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    policyVersion: "creator-alpha-1",
+  };
+  expect((await call(`${path}/publish`, publish, "progressed")).status).toBe(
+    403,
+  );
+  const published = await call(`${path}/publish`, publish);
+  expect(published.status).toBe(200);
+  expect((await call(`${path}/publish`, publish)).data).toEqual(published.data);
+  const started = await call(
+    "/playthroughs",
+    { idempotencyKey: randomUUID(), payload: { storyId } },
+    "progressed",
+  );
+  expect(started.status).toBe(200);
+  expect(started.data.save.versionId).toBe("edition-1");
+  const oldVersion = (
+    await db.doc(`stories/${storyId}/versions/edition-1`).get()
+  ).data();
+  const edit = {
+    ...saveDraft,
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    draft: {
+      ...saveDraft.draft,
+      story: { ...story, title: "Revised edition" },
+    },
+  };
+  expect((await call(path, edit)).status).toBe(200);
+  expect(
+    (await call(path, { ...edit, idempotencyKey: randomUUID() })).status,
+  ).toBe(409);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        ...publish,
+        idempotencyKey: randomUUID(),
+      })
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        ...publish,
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (await db.doc(`stories/${storyId}/versions/edition-1`).get()).data(),
+  ).toEqual(oldVersion);
+  expect(
+    (
+      await call(
+        `/playthroughs/${started.data.save.id}`,
+        undefined,
+        "progressed",
+      )
+    ).data.save.versionId,
+  ).toBe("edition-1");
+  const latest = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId },
+  });
+  expect(latest.data.save.versionId).toBe("edition-2");
+  const invalid = {
+    ...edit,
+    idempotencyKey: randomUUID(),
+    expectedRevision: 2,
+    draft: { ...edit.draft, story: { ...story, entryPageId: "missing" } },
+  };
+  expect((await call(path, invalid)).status).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        ...publish,
+        idempotencyKey: randomUUID(),
+        expectedRevision: 3,
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (await db.doc(`stories/${storyId}/versions/edition-3`).get()).exists,
+  ).toBe(false);
+  expect(
+    (await db.doc(`stories/${storyId}`).get()).data()?.publishedVersionId,
+  ).toBe("edition-2");
+});
 it("creates a live-style profile once without resetting stats or reactivating disabled users", async () => {
   const uid = `profile-${randomUUID()}`;
   const ref = db.doc(`playerProfiles/${uid}`);
@@ -257,6 +375,7 @@ it("Firestore rules deny all authoritative writes and private cross-user reads",
     "placements/harbor-market",
     "wallets/player",
     "commandReceipts/forged",
+    "creatorDrafts/player/stories/forged",
   ])
     await assertFails(setDoc(doc(own, path), { forged: true }));
   await assertSucceeds(getDoc(doc(anon, "catalogue/glass-harbor")));

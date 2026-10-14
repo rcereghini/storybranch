@@ -7,6 +7,7 @@ import { createApi, ApiError } from "../../../packages/api-client/index";
 import type { Save, Story } from "../../../packages/contracts/index";
 import "./style.css";
 import { Page } from "./Page";
+import { Studio } from "./Studio";
 import { Story as StoryContainer } from "./Story";
 import type { StoryUser } from "../../../packages/contracts/index";
 import { ShareStory } from "./ShareStory";
@@ -53,8 +54,16 @@ function App() {
     [logOpen, setLogOpen] = useState(false),
     [pending, setPending] = useState<Pending | null>(null),
     [catalogueItems, setCatalogueItems] = useState<CatalogueEntry[]>([]),
-    [catalogueReady, setCatalogueReady] = useState(false);
+    [catalogueCursor, setCatalogueCursor] = useState<string | null>(null),
+    [catalogueReady, setCatalogueReady] = useState(false),
+    [studioDirty, setStudioDirty] = useState(false);
   const navigate = (p: string) => {
+    if (
+      p !== path &&
+      studioDirty &&
+      !confirm("Leave Studio and discard unsaved changes?")
+    )
+      return;
     history.pushState({}, "", p);
     setPath(p);
     setError("");
@@ -153,11 +162,13 @@ function App() {
     try {
       if (path.startsWith("/play/")) await loadPlayer(path.split("/")[2]);
       else {
-        const catalogue = await api<{ items: CatalogueEntry[] }>("/catalogue");
+        const catalogue = await api<{
+          items: CatalogueEntry[];
+          nextCursor: string | null;
+        }>("/catalogue");
         setCatalogueItems(catalogue.items);
-        const ready = catalogue.items.some(
-          (item) => item.id === "glass-harbor",
-        );
+        setCatalogueCursor(catalogue.nextCursor);
+        const ready = catalogue.items.length > 0;
         setCatalogueReady(ready);
         if (!ready)
           throw new Error(
@@ -275,10 +286,24 @@ function App() {
           >
             My adventures
           </button>
+          <button
+            className={path === "/studio" ? "nav-active" : ""}
+            onClick={() => navigate("/studio")}
+          >
+            Create
+          </button>
         </nav>
         <button
           className="account"
-          onClick={() => (user ? void signOut(auth) : setLogin(true))}
+          onClick={() => {
+            if (user) {
+              if (
+                !studioDirty ||
+                confirm("Sign out and discard unsaved changes?")
+              )
+                void signOut(auth);
+            } else setLogin(true);
+          }}
         >
           {user ? `${user.displayName ?? "Player"} · Sign out` : "Sign in"}
           <span className="avatar">{user ? "◈" : "↗"}</span>
@@ -342,7 +367,22 @@ function App() {
             </div>
           )}
         </div>
-        {path.startsWith("/play/") ? (
+        {path === "/studio" ? (
+          user ? (
+            <Studio
+              key={user.uid}
+              onPlay={start}
+              onDirtyChange={setStudioDirty}
+            />
+          ) : (
+            <section className="empty">
+              <h1>Create your own story.</h1>
+              <button className="primary" onClick={() => setLogin(true)}>
+                Sign in to create
+              </button>
+            </section>
+          )
+        ) : path.startsWith("/play/") ? (
           <>
             {!user && authReady && (
               <section className="empty">
@@ -735,7 +775,7 @@ function App() {
                   .filter((item) => item.id !== "glass-harbor")
                   .map((item) => (
                     <article className="reading-page" key={item.id}>
-                      <p className="eyebrow">MIXED-PAGE STORY</p>
+                      <p className="eyebrow">INTERACTIVE STORY</p>
                       <h3>{item.title}</h3>
                       <p>{item.description}</p>
                       <button
@@ -748,6 +788,35 @@ function App() {
                     </article>
                   ))}
               </div>
+              {catalogueCursor && (
+                <button
+                  disabled={busy || offline}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      const next = await api<{
+                        items: CatalogueEntry[];
+                        nextCursor: string | null;
+                      }>(`/catalogue?cursor=${catalogueCursor}`);
+                      setCatalogueItems((old) => [
+                        ...new Map(
+                          [...old, ...next.items].map((item) => [
+                            item.id,
+                            item,
+                          ]),
+                        ).values(),
+                      ]);
+                      setCatalogueCursor(next.nextCursor);
+                    } catch (error) {
+                      report(error);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  More stories
+                </button>
+              )}
               <div className="story-row">
                 <button
                   className="story-card"
@@ -802,7 +871,7 @@ function App() {
       <footer>
         <span className="brand">⌘ storybranch</span>
         <span>Made of moments. Shaped by you.</span>
-        <span>LOCAL PROTOTYPE · M0 / M1</span>
+        <span>STORYBRANCH · CREATOR ALPHA</span>
       </footer>
       {login && (
         <div className="modal-backdrop">

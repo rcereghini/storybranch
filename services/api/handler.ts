@@ -15,6 +15,7 @@ import {
 import { start, transition, validateStory } from "../../packages/domain/index";
 import { resolveFixtureMedia } from "../../fixtures/media";
 import { ensurePlayerProfile } from "./player-profile";
+import { authoring } from "./authoring";
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -117,6 +118,8 @@ export async function handle(request: Request): Promise<Response> {
           ? "This account is not enabled for the local prototype. Use a seeded account."
           : "This account is not enabled for Storybranch.",
       );
+    if (segments[1] === "studio")
+      return json(await authoring(request, uid, segments, cursor, limit));
     if (request.method === "GET") {
       if (path === "/api/playthroughs") {
         let q = db

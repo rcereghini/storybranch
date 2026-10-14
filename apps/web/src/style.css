@@ -907,6 +907,80 @@ hr {
   font-weight: normal;
   align-self: center;
 }
+.studio {
+  padding: 36px 5%;
+}
+.studio h1 {
+  font-size: clamp(28px, 4vw, 48px);
+}
+.studio-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 32px;
+}
+.studio-library button {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.studio-library small {
+  display: block;
+  margin-top: 8px;
+}
+.studio fieldset {
+  border: 1px solid #365051;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 0;
+}
+.studio label {
+  display: block;
+  margin: 16px 0;
+}
+.studio input:not([type="checkbox"]),
+.studio textarea,
+.studio select {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  color: var(--text);
+  background: #102224;
+  border: 1px solid #536568;
+  border-radius: 6px;
+  font: inherit;
+}
+.studio textarea {
+  resize: vertical;
+}
+.studio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 20px 0;
+}
+.studio-output {
+  border-left: 2px solid var(--accent);
+  padding: 0 16px 16px;
+  margin: 20px 0;
+}
+.studio-preview {
+  margin-top: 32px;
+}
+.studio code {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .studio-layout {
+    grid-template-columns: 1fr;
+  }
+  .studio fieldset {
+    padding: 16px;
+  }
+}
 .dice-result-label,
 .dice-result-detail {
   font:

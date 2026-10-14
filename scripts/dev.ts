@@ -14,8 +14,17 @@ const api = createServer(async (req, res) => {
     let bytes = 0;
     for await (const c of req) {
       bytes += c.length;
-      if (bytes > 4096) {
-        res.writeHead(413).end();
+      if (bytes > (req.url?.startsWith("/api/studio") ? 250000 : 4096)) {
+        res
+          .writeHead(400, { "Content-Type": "application/json" })
+          .end(
+            JSON.stringify({
+              error: {
+                code: "VALIDATION_FAILED",
+                message: "Request is too large.",
+              },
+            }),
+          );
         return;
       }
       chunks.push(c);

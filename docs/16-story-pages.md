@@ -46,6 +46,8 @@ Prototype dice default: uniform integer 1–N, pass on value >= target. The API 
 
 ## Mock stories
 
+Creators can now author these same five types through [Creator Studio](17-creator-studio.md). Private preview uses the shared Story/Page renderers and a disposable engine state; published play remains server-authoritative. Publication freezes a new edition without changing the input/output contracts below.
+
 - **The Clockwork Door:** linear text → key/stat-gated text options → linear video → text ending. Includes an alternate early ending.
 - **The Storm Signal:** video options → d20 check → pass/fail destinations; a saved success key unlocks the rescue route.
 - **The Glass Harbor:** explicit video page types, including its separate side-quest stories.
