@@ -37,9 +37,11 @@ This is a teaser download, not a general clip editor or automatic social integra
 
 ## Verification
 
+Scene variance verification: TypeScript, production build and 21 unit/domain/fixture tests passed. All 23 audio-bearing MP4s (20 new scene renditions plus the three original renditions) decoded non-silent audio without clipping. Chrome verified five consecutive source changes at 1440px and 390px, automatic playback on the same video element, and unmuted playback after a 6.5-second server delay. Physical Safari/iPhone remains unverified.
+
 The browser suite checks widths 320, 390, 700, 701, 768, 1024 and 1440, actual video dimensions, overlay bounds, explicit initial sound start and automatic playback after a choice, natural completion, pause/skip, hidden choice accessibility, simulated autoplay refusal and manual recovery, public-link clipboard contents and MP4 download signature, in addition to the existing save/choice/retry/side-quest flow. The foundation suite verifies distinct local rendition references. Physical phones and uploads to TikTok, Reels or Shorts are not verified by these checks.
 
 
-Audio fixture update: player landscape, player portrait and the social teaser use new harbor-*-audio-v1.mp4 renditions and descriptive audio captions. The audio is original synthesized ambience at a moderate level, with no dialogue or external licensed material. Every sample scene currently reuses the same six-second ambience, so the bell sequence restarts on each scene. Saved editions and original media remain unchanged. Generated assets are included; normal startup does not require regeneration.
+Scene variance update: all ten Glass Harbor and side-quest nodes now have distinct `*-mock-v1` landscape and portrait MP4s. Each six-second placeholder uses a numbered scene title, a distinct color/symbol, animated rings and playback progress, plus a different three-note bell pitch over synthesized ambience. These are diagnostic motion graphics, not finished story footage or narration. The original harbor social teaser is unchanged. A story/version/node presentation map selects these assets without modifying published manifests or saved state. Generate with `pnpm media:scenes`; included assets do not need regeneration during normal setup. `pnpm test:media` checks audio across all renditions and `pnpm test:scenes` checks five consecutive scene changes in landscape and portrait on the same authorized video element.
 
 

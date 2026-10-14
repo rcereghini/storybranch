@@ -1,7 +1,31 @@
 import { it, expect } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
-import { harborMedia } from "../fixtures/media";
+import { harborMedia, resolveFixtureMedia } from "../fixtures/media";
+import { stories } from "../fixtures/stories";
 import { mediaSchema } from "../packages/contracts/media";
+it("assigns distinct shipped renditions to every fixture node without changing manifests", () => {
+  const sources: string[] = [];
+  for (const story of stories)
+    for (const node of Object.values(story.nodes)) {
+      expect(node.video).toBe("/media/harbor.webm");
+      const media = resolveFixtureMedia(
+        node.video,
+        story.id,
+        story.versionId,
+        node.id,
+      )!;
+      for (const rendition of [media.landscape, media.portrait!]) {
+        sources.push(rendition.src);
+        expect(
+          readFileSync(`apps/web/public${rendition.src}`).length,
+        ).toBeGreaterThan(1000);
+        expect(
+          readFileSync(`apps/web/public${rendition.poster}`, "utf8"),
+        ).toContain("MOCK SCENE");
+      }
+    }
+  expect(new Set(sources).size).toBe(sources.length);
+});
 it("keeps portable packages free of platform dependencies", () => {
   for (const dir of ["packages/domain", "packages/contracts"])
     for (const file of readdirSync(dir)) {

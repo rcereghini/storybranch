@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { launchBrowser } from "./browser";
-import { harborMedia } from "../fixtures/media";
+import { harborMedia, sceneMedia } from "../fixtures/media";
 const browser = await launchBrowser();
 try {
   const page = await browser.newPage();
@@ -10,6 +10,10 @@ try {
     harborMedia.landscape,
     harborMedia.portrait!,
     harborMedia.socialClip!,
+    ...Object.values(sceneMedia).flatMap((media) => [
+      media.landscape,
+      media.portrait!,
+    ]),
   ]) {
     const result = await page.evaluate(async (src) => {
       const context = new AudioContext();
@@ -41,7 +45,7 @@ try {
     console.log(asset.src, result);
   }
   console.log(
-    "Media PASS: all three shipped MP4s decode non-silent audio with headroom.",
+    "Media PASS: all shipped MP4s decode non-silent audio with headroom.",
   );
 } finally {
   await browser.close();

@@ -173,7 +173,12 @@ export async function handle(request: Request): Promise<Response> {
           return json({
             save: s,
             node,
-            media: resolveFixtureMedia(node.video),
+            media: resolveFixtureMedia(
+              node.video,
+              s.storyId,
+              s.versionId,
+              s.nodeId,
+            ),
             branches,
             featuredId,
           });

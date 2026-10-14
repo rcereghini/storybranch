@@ -1,4 +1,5 @@
 import { mediaSchema } from "../packages/contracts/media";
+import { sceneVariants, sceneAssetId } from "./scene-variants";
 export const harborMedia = mediaSchema.parse({
   landscape: {
     src: "/media/harbor-landscape-audio-v1.mp4",
@@ -17,7 +18,35 @@ export const harborMedia = mediaSchema.parse({
   },
   captions: "/media/harbor-audio-v1.vtt",
 });
-export function resolveFixtureMedia(source: string) {
+export const sceneMedia = Object.fromEntries(
+  sceneVariants.map((scene) => {
+    const id = sceneAssetId(scene);
+    return [
+      `${scene.story}/v1/${scene.node}`,
+      mediaSchema.parse({
+        landscape: {
+          src: `/media/${id}-landscape.mp4`,
+          poster: `/media/${id}-landscape.svg`,
+          type: "video/mp4",
+        },
+        portrait: {
+          src: `/media/${id}-portrait.mp4`,
+          poster: `/media/${id}-portrait.svg`,
+          type: "video/mp4",
+        },
+        captions: harborMedia.captions,
+        socialClip: harborMedia.socialClip,
+      }),
+    ];
+  }),
+);
+export function resolveFixtureMedia(
+  source: string,
+  storyId?: string,
+  versionId?: string,
+  nodeId?: string,
+) {
+  if (source === "/media/harbor.webm" && storyId && versionId && nodeId)
+    return sceneMedia[`${storyId}/${versionId}/${nodeId}`] ?? harborMedia;
   return source === "/media/harbor.webm" ? harborMedia : undefined;
 }
-

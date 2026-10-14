@@ -49,7 +49,8 @@ pnpm test:integration      # running emulators + seeded data required
 pnpm test:browser          # emulators + seed + pnpm dev:emulator required
 pnpm test:auth             # same emulator setup; registration, sign-in and resume
 pnpm test:audio            # shipped audio clips, delayed choice response
-pnpm test:media            # verifies non-silent audio in all three shipped MP4s
+pnpm test:media            # verifies non-silent audio in every shipped MP4
+pnpm test:scenes           # verifies distinct scenes autoplay in landscape/portrait
 pnpm exec playwright install webkit
 pnpm test:audio --webkit   # optional Windows WebKit engine check, not real iOS
 ```
