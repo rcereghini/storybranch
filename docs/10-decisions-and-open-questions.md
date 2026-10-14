@@ -4,6 +4,8 @@ This register distinguishes the user's requirements from proposed defaults. A pr
 
 ## Confirmed decisions
 
+October 13: Stories own context and typed pages; every renderer uses a shared Page parent with explicit inputs/outputs. Remove obsolete prototype compatibility rather than carrying implicit video-only pages. See [Story and Page model](16-story-pages.md). RPG combat remains deferred. Dice and linear Continue behavior are prototype defaults documented there.
+
 | ID | Decision | Source |
 | --- | --- | --- |
 | C01 | Web first, mobile friendly, with an easier path to native clients | Initial request |

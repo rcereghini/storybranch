@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, randomInt } from "node:crypto";
 import { FieldPath, type Transaction } from "firebase-admin/firestore";
 import { ZodError } from "zod";
 import { auth, db, config } from "./firebase";
@@ -57,11 +57,16 @@ async function version(
   const manifest = await tx.get(ref);
   if (!manifest.exists || !manifest.data()!.ready)
     throw new GameError("NOT_FOUND", "Story edition unavailable.");
-  const nodes = await tx.get(ref.collection("nodes"));
+  if (!manifest.data()!.entryPageId)
+    throw new GameError(
+      "NOT_FOUND",
+      "This save uses an earlier prototype format. Start a new journey from Discover.",
+    );
+  const pages = await tx.get(ref.collection("pages"));
   const { manifestHash: _, ready: __, ...data } = manifest.data()!;
   return validateStory({
     ...data,
-    nodes: Object.fromEntries(nodes.docs.map((n) => [n.id, n.data()])),
+    pages: Object.fromEntries(pages.docs.map((n) => [n.id, n.data()])),
   });
 }
 export async function handle(request: Request): Promise<Response> {
@@ -155,30 +160,36 @@ export async function handle(request: Request): Promise<Response> {
           const story = await db.runTransaction((tx) =>
             version(tx, s.storyId, s.versionId),
           );
-          const node = story.nodes[s.nodeId];
+          const page = story.pages[s.pageId];
           let branches: unknown[] = [];
           let featuredId: string | null = null;
-          if (node.branchLocation) {
+          if (page.branchLocation) {
             branches = (
               await db
                 .collection("branches")
-                .where("locationId", "==", node.branchLocation)
+                .where("locationId", "==", page.branchLocation)
                 .limit(20)
                 .get()
             ).docs.map((d) => d.data());
             featuredId =
-              (await db.doc(`placements/${node.branchLocation}`).get()).data()
+              (await db.doc(`placements/${page.branchLocation}`).get()).data()
                 ?.nominatedBranchId ?? null;
           }
           return json({
             save: s,
-            node,
-            media: resolveFixtureMedia(
-              node.video,
-              s.storyId,
-              s.versionId,
-              s.nodeId,
-            ),
+            story: {
+              id: story.id,
+              versionId: story.versionId,
+              title: story.title,
+            },
+            user: {
+              id: uid,
+              stats: profile.data()!.stats,
+              achievements: profile.data()!.achievements ?? [],
+              saveSpots: [{ id: s.id, storyId: s.storyId, pageId: s.pageId }],
+            },
+            page,
+            media: resolveFixtureMedia(page.video ?? ""),
             branches,
             featuredId,
           });
@@ -220,6 +231,7 @@ export async function handle(request: Request): Promise<Response> {
       `commandReceipts/${hash(`${uid}:${kind}:${command.idempotencyKey}`)}`,
     );
     const newId = randomUUID();
+    const rolls = new Map<number, number>();
     const now = Date.now();
     const result = await db.runTransaction(async (tx) => {
       const previous = await tx.get(receipt);
@@ -235,7 +247,7 @@ export async function handle(request: Request): Promise<Response> {
       let event: Record<string, unknown>;
       if (kind === "start") {
         const c = startSchema.parse(command);
-        if (c.payload.storyId !== "glass-harbor")
+        if (!(await tx.get(db.doc(`catalogue/${c.payload.storyId}`))).exists)
           throw new GameError(
             "FORBIDDEN",
             "Side quests must start from their branch location.",
@@ -246,9 +258,9 @@ export async function handle(request: Request): Promise<Response> {
         const story = await version(tx, c.payload.storyId, v);
         save = start(story, newId, uid, profile.data()!.stats as Stats, now);
         event = {
-          label: "Arrived in Glass Harbor",
+          label: `Started ${story.title}`,
           from: null,
-          to: save.nodeId,
+          to: save.pageId,
           revision: 0,
           at: now,
         };
@@ -272,6 +284,11 @@ export async function handle(request: Request): Promise<Response> {
             c.payload.choiceId,
             c.expectedRevision,
             now,
+            (sides) => {
+              if (!rolls.has(sides)) rolls.set(sides, randomInt(1, sides + 1));
+              return rolls.get(sides)!;
+            },
+            c.payload.action,
           );
           save = moved.save;
           event = moved.event;
@@ -292,7 +309,7 @@ export async function handle(request: Request): Promise<Response> {
           ).data();
           if (
             !b ||
-            b.locationId !== story.nodes[current.nodeId].branchLocation ||
+            b.locationId !== story.pages[current.pageId].branchLocation ||
             b.sourceVersionId !== current.versionId
           )
             throw new GameError(
@@ -304,7 +321,7 @@ export async function handle(request: Request): Promise<Response> {
           event = {
             label: "Entered community side quest",
             from: null,
-            to: save.nodeId,
+            to: save.pageId,
             revision: 0,
             at: now,
           };

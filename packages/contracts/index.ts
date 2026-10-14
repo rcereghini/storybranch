@@ -9,6 +9,7 @@ export const statId = z.enum([
 ]);
 export type StatId = z.infer<typeof statId>;
 export type Condition =
+  | { kind: "roll"; pageId: string; op: "gte" | "lte" | "eq"; value: number }
   | { kind: "stat"; stat: StatId; op: "gte" | "lte" | "eq"; value: number }
   | { kind: "key"; keyId: string; present: boolean }
   | { kind: "item"; itemId: string; op: "gte" | "lte" | "eq"; quantity: number }
@@ -21,6 +22,14 @@ const namespaced = z
 const integer = z.number().int().min(0).max(999);
 function conditionAt(depth: number): z.ZodType<Condition> {
   const leaf = [
+    z
+      .object({
+        kind: z.literal("roll"),
+        pageId: id,
+        op: z.enum(["gte", "lte", "eq"]),
+        value: integer,
+      })
+      .strict(),
     z
       .object({
         kind: z.literal("stat"),
@@ -101,7 +110,7 @@ export const effectSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 const route = z
-  .object({ targetNodeId: id, effects: z.array(effectSchema).max(20) })
+  .object({ targetPageId: id, effects: z.array(effectSchema).max(20) })
   .strict();
 export const choiceSchema = z
   .object({
@@ -115,6 +124,15 @@ export const choiceSchema = z
       z.object({ kind: z.literal("direct"), route }).strict(),
       z
         .object({
+          kind: z.literal("dice"),
+          sides: z.number().int().min(2).max(100),
+          target: z.number().int().min(1).max(100),
+          success: route,
+          failure: route,
+        })
+        .strict(),
+      z
+        .object({
           kind: z.literal("check"),
           condition: conditionSchema,
           success: route,
@@ -124,13 +142,23 @@ export const choiceSchema = z
     ]),
   })
   .strict();
-export const nodeSchema = z
+export const pageSchema = z
   .object({
     id,
     title: z.string().max(160),
     transcript: z.string().max(10000),
     kind: z.enum(["scene", "ending"]),
-    video: z.string().regex(/^\/media\/[a-z0-9.-]+$/),
+    pageType: z.enum([
+      "text",
+      "text-options",
+      "video",
+      "video-options",
+      "dice",
+    ]),
+    video: z
+      .string()
+      .regex(/^\/media\/[a-z0-9.-]+$/)
+      .optional(),
     entryEffects: z.array(effectSchema).max(20),
     choices: z.array(choiceSchema).max(20),
     checkpoint: z.boolean().optional(),
@@ -143,14 +171,23 @@ export const storySchema = z
     versionId: id,
     rulesetVersion: z.literal("prototype-1"),
     title: z.string(),
-    entryNodeId: id,
-    nodes: z.record(nodeSchema),
+    entryPageId: id,
+    pages: z.record(pageSchema),
   })
   .strict();
 export type Story = z.infer<typeof storySchema>;
 export type Choice = z.infer<typeof choiceSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 export type Stats = Record<StatId, number>;
+export type StoryPage = Story["pages"][string];
+export type PageOutput = { choiceId: string; action?: "roll" | "continue" };
+export type StoryUser = {
+  id: string;
+  stats: Stats;
+  achievements: string[];
+  saveSpots: Array<{ id: string; storyId: string; pageId: string }>;
+};
+export type PageInput = { page: StoryPage; context: Save; user: StoryUser };
 export type LocalState = {
   stats: Stats;
   keys: string[];
@@ -165,13 +202,21 @@ export type Save = LocalState & {
   storyId: string;
   versionId: string;
   rulesetVersion: string;
-  nodeId: string;
+  pageId: string;
   revision: number;
   status: "active" | "completed";
   statsSnapshot: Stats;
   parentPlaythroughId: string | null;
   parentRevision: number | null;
   updatedAt: number;
+  lastRoll?: {
+    pageId: string;
+    value: number;
+    sides: number;
+    target: number;
+    passed: boolean;
+    pending: boolean;
+  };
 };
 export const startSchema = z
   .object({
@@ -183,7 +228,9 @@ export const choiceCommandSchema = z
   .object({
     idempotencyKey: id,
     expectedRevision: z.number().int().min(0).max(99999999),
-    payload: z.object({ choiceId: id }).strict(),
+    payload: z
+      .object({ choiceId: id, action: z.enum(["roll", "continue"]).optional() })
+      .strict(),
   })
   .strict();
 export const branchCommandSchema = z

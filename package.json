@@ -23,6 +23,7 @@
     "media:scenes": "tsx scripts/generate-scene-media.ts",
     "test:media": "tsx scripts/media-check.ts",
     "test:scenes": "tsx scripts/scene-media-check.ts",
+    "test:pages": "tsx scripts/pages-check.ts",
     "phone:emulators": "tsx scripts/phone.ts emulators",
     "phone:seed": "tsx scripts/phone.ts seed",
     "phone:build": "tsx scripts/phone.ts build",

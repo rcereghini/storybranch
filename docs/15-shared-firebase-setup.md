@@ -33,7 +33,7 @@ pnpm seed:firebase
 pnpm dev
 ```
 
-The live seed writes only sample content under `storybranch/app`; existing catalogue, placement and published pointers are not overwritten, and existing immutable versions must have identical hashes. It does not create Auth accounts or demo profiles. Run it once with server credentials before expecting the catalogue to enable Begin your story. Repeat safely to fill missing sample content.
+The live seed writes only sample content under `storybranch/app`. It creates missing records and promotes the known pre-page `v1` sample catalogue/branch/published pointers to `pages-v1`; newer pointers and placements are left alone. Existing immutable versions must have identical hashes. It does not create Auth accounts or demo profiles. Run it with server credentials to publish the three root mock stories. Repeat safely to fill missing sample content.
 
 ## Netlify
 

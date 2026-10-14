@@ -842,3 +842,40 @@ hr {
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
 }
+.reading-page {
+  padding: clamp(24px, 5vw, 64px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(145deg, #1c302c, #101c24);
+}
+.reading-page h1 {
+  font:
+    clamp(32px, 5vw, 56px) Georgia,
+    serif;
+  margin: 16px 0 24px;
+}
+.page-copy {
+  font:
+    21px/1.8 Georgia,
+    serif;
+  white-space: pre-wrap;
+  max-width: 65ch;
+}
+.dice-face {
+  font:
+    64px Georgia,
+    serif;
+  text-align: center;
+  color: var(--accent);
+}
+.mock-story-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 24px;
+  margin-bottom: 28px;
+}
+.mock-story-grid h3 {
+  font:
+    30px Georgia,
+    serif;
+}

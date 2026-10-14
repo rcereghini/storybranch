@@ -4,24 +4,29 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth, emulatorMode } from "./firebase";
 import { AuthForm } from "./AuthForm";
 import { createApi, ApiError } from "../../../packages/api-client/index";
-import { evaluate } from "../../../packages/domain/index";
 import type { Save, Story } from "../../../packages/contracts/index";
 import "./style.css";
-import { ScenePlayer } from "./ScenePlayer";
+import { Page } from "./Page";
+import { Story as StoryContainer } from "./Story";
+import type { StoryUser } from "../../../packages/contracts/index";
 import { ShareStory } from "./ShareStory";
 import type { SceneMedia } from "../../../packages/contracts/media";
 const api = createApi(fetch, async () =>
   auth.currentUser ? auth.currentUser.getIdToken() : null,
 );
 type Branch = { id: string; title: string; author: string };
+type CatalogueEntry = { id: string; title: string; description: string };
 type Player = {
+  story: { id: string; title: string; versionId: string };
+  user: StoryUser;
   media?: SceneMedia;
   save: Save;
-  node: Story["nodes"][string];
+  page: Story["pages"][string];
   branches: Branch[];
   featuredId: string | null;
 };
 type Event = {
+  roll?: Save["lastRoll"];
   label: string;
   to: string;
   outcome?: string;
@@ -47,6 +52,7 @@ function App() {
     [logCursor, setLogCursor] = useState<string | null>(null),
     [logOpen, setLogOpen] = useState(false),
     [pending, setPending] = useState<Pending | null>(null),
+    [catalogueItems, setCatalogueItems] = useState<CatalogueEntry[]>([]),
     [catalogueReady, setCatalogueReady] = useState(false);
   const navigate = (p: string) => {
     history.pushState({}, "", p);
@@ -132,6 +138,12 @@ function App() {
     )
       return;
     setPlayer(p);
+    if (!catalogueItems.length) {
+      const catalogue = await api<{ items: CatalogueEntry[] }>(
+        "/catalogue",
+      ).catch(() => null);
+      if (catalogue) setCatalogueItems(catalogue.items);
+    }
     setStale(false);
     setError("");
   };
@@ -141,9 +153,8 @@ function App() {
     try {
       if (path.startsWith("/play/")) await loadPlayer(path.split("/")[2]);
       else {
-        const catalogue = await api<{ items: Array<{ id: string }> }>(
-          "/catalogue",
-        );
+        const catalogue = await api<{ items: CatalogueEntry[] }>("/catalogue");
+        setCatalogueItems(catalogue.items);
         const ready = catalogue.items.some(
           (item) => item.id === "glass-harbor",
         );
@@ -187,7 +198,7 @@ function App() {
       setBusy(false);
     }
   };
-  const start = () => {
+  const start = (storyId = player?.save.storyId ?? "glass-harbor") => {
     if (!user) {
       setLogin(true);
       return;
@@ -196,18 +207,18 @@ function App() {
       path: "/playthroughs",
       body: {
         idempotencyKey: crypto.randomUUID(),
-        payload: { storyId: "glass-harbor" },
+        payload: { storyId },
       },
     });
   };
-  const choose = (choiceId: string) =>
+  const choose = (choiceId: string, action?: "roll" | "continue") =>
     player &&
     command({
       path: `/playthroughs/${player.save.id}/choices`,
       body: {
         idempotencyKey: crypto.randomUUID(),
         expectedRevision: player.save.revision,
-        payload: { choiceId },
+        payload: { choiceId, ...(action ? { action } : {}) },
       },
     });
   const branch = (branchId: string) =>
@@ -327,17 +338,21 @@ function App() {
               </section>
             )}
             {player && user && (
-              <>
+              <StoryContainer
+                story={player.story}
+                user={player.user}
+                save={player.save}
+              >
                 <div className="player-heading">
                   <div>
                     <p className="eyebrow">
                       {player.save.parentPlaythroughId
                         ? "COMMUNITY SIDE QUEST"
-                        : "THE GLASS HARBOR"}{" "}
+                        : player.story.title}{" "}
                       <span> / EDITION {player.save.versionId}</span>
                     </p>
                     <p className="player-series">
-                      A city of secrets. Your way out.
+                      Pages shaped by your choices.
                     </p>
                   </div>
                   <div>
@@ -359,64 +374,63 @@ function App() {
                 )}
                 <div className="player-grid">
                   <section>
-                    <ScenePlayer
+                    <Page
                       onPlaybackChange={setPlaying}
-                      sceneId={`${player.save.id}-${player.save.revision}`}
-                      node={player.node}
+                      disabled={disabled}
+                      onOutput={(output) =>
+                        choose(output.choiceId, output.action)
+                      }
+                      page={player.page}
                       media={player.media}
                     >
                       <section className="choices" aria-label="Story choices">
-                        <p className="eyebrow">
-                          {player.save.status === "completed"
-                            ? "YOUR STORY, REMEMBERED"
-                            : "WHAT WILL YOU DO?"}
-                        </p>
-                        {player.node.choices.map((c, i) => {
-                          const locked =
-                            !!c.availableWhen &&
-                            !evaluate(c.availableWhen, player.save);
-                          if (locked && c.unavailableDisplay === "hidden")
-                            return null;
-                          return (
-                            <button
-                              key={c.id}
-                              disabled={disabled || locked}
-                              onClick={() => void choose(c.id)}
-                            >
-                              <span className="choice-number">
-                                {locked ? "⌑" : String(i + 1).padStart(2, "0")}
-                              </span>
-                              <span>
-                                {c.label}
-                                {c.hint && (
-                                  <small>
-                                    {locked ? "Locked · " : ""}
-                                    {c.hint}
-                                  </small>
-                                )}
-                              </span>
-                              <span className="arrow">
-                                {locked ? "Locked" : "↗"}
-                              </span>
-                            </button>
-                          );
-                        })}
                         {player.save.status === "completed" && (
                           <>
                             <p>
                               This ending is saved in your story log. A new
                               journey starts a separate save.
                             </p>
-                            <button disabled={disabled} onClick={start}>
-                              Begin another journey <span>↗</span>
-                            </button>
+                            {!player.save.parentPlaythroughId && (
+                              <button
+                                disabled={disabled}
+                                onClick={() => start()}
+                              >
+                                Begin another journey <span>↗</span>
+                              </button>
+                            )}
                             <button onClick={() => navigate("/adventures")}>
                               Back to my adventures
                             </button>
+                            {player.save.parentPlaythroughId ? (
+                              <button
+                                onClick={() =>
+                                  navigate(
+                                    `/play/${player.save.parentPlaythroughId}`,
+                                  )
+                                }
+                              >
+                                Return to parent story
+                              </button>
+                            ) : (
+                              catalogueItems
+                                .filter(
+                                  (item) => item.id !== player.save.storyId,
+                                )
+                                .slice(0, 2)
+                                .map((item) => (
+                                  <button
+                                    key={item.id}
+                                    disabled={disabled}
+                                    onClick={() => start(item.id)}
+                                  >
+                                    Try {item.title} ↗
+                                  </button>
+                                ))
+                            )}
                           </>
                         )}
                       </section>
-                    </ScenePlayer>
+                    </Page>
                     {player.branches.length > 0 && (
                       <section className="community">
                         <p className="eyebrow">
@@ -549,6 +563,9 @@ function App() {
                           <small>
                             → {e.to}
                             {e.outcome ? ` · ${e.outcome}` : ""}
+                            {e.roll
+                              ? ` · d${e.roll.sides}: ${e.roll.value} (target ${e.roll.target})`
+                              : ""}
                           </small>
                         </li>
                       ))}
@@ -560,7 +577,7 @@ function App() {
                     )}
                   </section>
                 )}
-              </>
+              </StoryContainer>
             )}
           </>
         ) : path === "/adventures" ? (
@@ -587,8 +604,11 @@ function App() {
                     <span>
                       {s.parentPlaythroughId
                         ? "◇ Side quest"
-                        : "◆ The Glass Harbor"}
-                      <strong>{s.nodeId.replaceAll("-", " ")}</strong>
+                        : `◆ ${catalogueItems.find((item) => item.id === s.storyId)?.title ?? s.storyId}`}
+                      <strong>
+                        {s.pageId?.replaceAll("-", " ") ??
+                          "Earlier prototype · start a new journey"}
+                      </strong>
                       <small>
                         {s.status} · {s.versionId} ·{" "}
                         {new Date(s.updatedAt).toLocaleString()}
@@ -670,9 +690,12 @@ function App() {
                 <button onClick={() => navigate(`/play/${resume.id}`)}>
                   <img src="/media/harbor.svg" alt="" />
                   <span>
-                    <strong>The Glass Harbor</strong>
+                    <strong>
+                      {catalogueItems.find((item) => item.id === resume.storyId)
+                        ?.title ?? resume.storyId}
+                    </strong>
                     <small>
-                      {resume.nodeId} · Saved{" "}
+                      {resume.pageId} · Saved{" "}
                       {new Date(resume.updatedAt).toLocaleDateString()}
                     </small>
                   </span>
@@ -686,7 +709,27 @@ function App() {
                   <p className="eyebrow">SMALL WORLDS. MEANINGFUL CHOICES.</p>
                   <h2>Your next adventure</h2>
                 </div>
-                <span className="muted">01 playable story</span>
+                <span className="muted">
+                  {catalogueItems.length} playable stories
+                </span>
+              </div>
+              <div className="mock-story-grid">
+                {catalogueItems
+                  .filter((item) => item.id !== "glass-harbor")
+                  .map((item) => (
+                    <article className="reading-page" key={item.id}>
+                      <p className="eyebrow">MIXED-PAGE STORY</p>
+                      <h3>{item.title}</h3>
+                      <p>{item.description}</p>
+                      <button
+                        className="primary"
+                        disabled={disabled}
+                        onClick={() => start(item.id)}
+                      >
+                        Play {item.title} ↗
+                      </button>
+                    </article>
+                  ))}
               </div>
               <div className="story-row">
                 <button
@@ -728,7 +771,7 @@ function App() {
                     <button
                       className="primary"
                       disabled={disabled || !catalogueReady}
-                      onClick={start}
+                      onClick={() => start()}
                     >
                       Start a new journey ↗
                     </button>

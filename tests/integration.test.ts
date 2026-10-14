@@ -135,7 +135,7 @@ it("persists one transition and event on retries, conflicts on changed payload",
   );
   const resumed = await call(`/playthroughs/${s.id}`);
   expect(resumed.data.save.items["glass-harbor:token"]).toBe(1);
-  expect(resumed.data.save.nodeId).toBe("courier");
+  expect(resumed.data.save.pageId).toBe("courier");
 });
 it("commits only one competing choice at the same revision", async () => {
   const s = await begin();
@@ -156,7 +156,7 @@ it("pins old saves when the published pointer changes", async () => {
   try {
     const r = await call(`/playthroughs/${s.id}/choices`, choice(s, "market"));
     expect(r.status).toBe(200);
-    expect(r.data.save.versionId).toBe("v1");
+    expect(r.data.save.versionId).toBe("pages-v1");
     expect(
       (
         await call("/playthroughs", {
@@ -166,7 +166,9 @@ it("pins old saves when the published pointer changes", async () => {
       ).status,
     ).toBe(404);
   } finally {
-    await db.doc("stories/glass-harbor").update({ publishedVersionId: "v1" });
+    await db
+      .doc("stories/glass-harbor")
+      .update({ publishedVersionId: "pages-v1" });
   }
 });
 it("allows both branches, isolates child changes and returns current parent", async () => {
@@ -196,7 +198,7 @@ it("allows both branches, isolates child changes and returns current parent", as
     before,
   );
   await call(`/playthroughs/${parent.id}/choices`, choice(parent, "dock"));
-  expect((await call(`/playthroughs/${parent.id}`)).data.save.nodeId).toBe(
+  expect((await call(`/playthroughs/${parent.id}`)).data.save.pageId).toBe(
     "dock",
   );
 });
@@ -251,7 +253,7 @@ it("Firestore rules deny all authoritative writes and private cross-user reads",
   for (const path of [
     `playthroughs/${s.id}`,
     "playerProfiles/player",
-    "stories/glass-harbor/versions/v1",
+    "stories/glass-harbor/versions/pages-v1",
     "placements/harbor-market",
     "wallets/player",
     "commandReceipts/forged",
@@ -260,5 +262,53 @@ it("Firestore rules deny all authoritative writes and private cross-user reads",
   await assertSucceeds(getDoc(doc(anon, "catalogue/glass-harbor")));
   await assertFails(
     getDoc(doc(own, "stories/glass-harbor/draftNodes/private")),
+  );
+});
+it("persists one server dice result across retries and rejects injected results", async () => {
+  const started = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: "storm-signal" },
+  });
+  expect(started.status).toBe(200);
+  const s = started.data.save as Save;
+  const entered = await call(
+    `/playthroughs/${s.id}/choices`,
+    choice(s, "roll"),
+  );
+  expect(entered.status).toBe(200);
+  const atRoll = entered.data.save as Save;
+  const command = {
+    ...choice(atRoll, "roll"),
+    payload: { choiceId: "roll", action: "roll" },
+  };
+  const path = `/playthroughs/${s.id}/choices`;
+  expect(
+    (
+      await call(path, {
+        ...command,
+        payload: { choiceId: "roll", result: 20 },
+      })
+    ).status,
+  ).toBe(400);
+  const first = await call(path, command);
+  const retry = await call(path, command);
+  expect(first.status).toBe(200);
+  expect(retry.data).toEqual(first.data);
+  const resumed = await call(`/playthroughs/${s.id}`);
+  expect(resumed.data.save.lastRoll).toEqual(first.data.save.lastRoll);
+  expect(resumed.data.user.id).toBe("player");
+  expect(resumed.data.story.id).toBe("storm-signal");
+  expect(resumed.data.save.pageId).toBe("roll");
+  expect(
+    (
+      await call(path, {
+        ...choice(resumed.data.save, "roll"),
+        payload: { choiceId: "roll", action: "roll" },
+      })
+    ).status,
+  ).toBe(400);
+  const continued = await call(path, choice(resumed.data.save, "roll"));
+  expect(continued.data.save.pageId).toBe(
+    first.data.save.lastRoll.passed ? "signal" : "shelter",
   );
 });

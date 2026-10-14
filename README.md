@@ -8,6 +8,8 @@ The player now uses a landscape overlay on larger screens and an authored portra
 
 ## Run against shared Firebase
 
+The player now supports five explicit page types and two additional mixed-page stories: **The Clockwork Door** and **The Storm Signal**. See [Story and Page model](docs/16-story-pages.md). Reseed to publish the new `pages-v1` editions. Pre-page prototype saves require a new journey; accounts are unchanged.
+
 Follow [shared Firebase setup](docs/15-shared-firebase-setup.md) to install server credentials in ignored `.secrets/` and `.env.local`, then run `pnpm seed:firebase` and `pnpm dev`. Use a real Firebase Email/Password account; local and hosted saves share the same namespaced data.
 
 ## Run locally with emulators

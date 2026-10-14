@@ -6,6 +6,8 @@ All choices below are proposed implementation defaults except the user selected 
 
 ## Application structure
 
+The current player uses `Story` context and a shared `Page` parent for text, text/options, video, video/options and dice. The portable graph is `Story.pages`; see [Story and Page model](16-story-pages.md) for contracts, state ownership and prototype format changes.
+
 ```text
 apps/web                  React web routes and interface
 packages/domain           Pure story, condition, combat, and progression rules

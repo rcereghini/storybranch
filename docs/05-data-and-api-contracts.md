@@ -4,6 +4,8 @@ The following logical model is a proposed schema, suitable for implementation pl
 
 ## Persisted entities
 
+Current implementation contract: stories store `entryPageId` and immutable `versions/{versionId}/pages/{pageId}`; saves store `pageId`. Required page inputs, completion events, outputs, user context and branch closure are specified in [Story and Page model](16-story-pages.md). Earlier node terminology below describes the original design, not a compatibility API.
+
 | Entity and suggested path | Essential fields | Writer and visibility |
 | --- | --- | --- |
 | `users/{uid}` | account status, private preferences, entitlement references | User may edit allowlisted preferences; server controls status; owner reads |

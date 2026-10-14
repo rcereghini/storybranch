@@ -2,6 +2,7 @@ import "./local-env";
 import { createHash } from "node:crypto";
 import { db, auth, config } from "../services/api/firebase";
 import { stories, branches, catalogue } from "../fixtures/stories";
+import { pageStories, pageCatalogue } from "../fixtures/page-stories";
 import { baseStats } from "../packages/domain/index";
 async function fixture(path: string, data: Record<string, unknown>) {
   const ref = db.doc(path);
@@ -10,10 +11,18 @@ async function fixture(path: string, data: Record<string, unknown>) {
     return;
   }
   await db.runTransaction(async (tx) => {
-    if (!(await tx.get(ref)).exists) tx.create(ref, data);
+    const existing = await tx.get(ref);
+    if (!existing.exists) tx.create(ref, data);
+    // Promote only the known pre-page prototype pointers, never a newer publication.
+    else if (
+      (existing.data()?.publishedVersionId === "v1" &&
+        data.publishedVersionId === "pages-v1") ||
+      (existing.data()?.versionId === "v1" && data.versionId === "pages-v1")
+    )
+      tx.set(ref, data);
   });
 }
-for (const story of stories) {
+for (const story of [...stories, ...pageStories]) {
   const ref = db.doc(`stories/${story.id}/versions/${story.versionId}`);
   const hash = createHash("sha256").update(JSON.stringify(story)).digest("hex");
   await db.runTransaction(async (tx) => {
@@ -23,14 +32,16 @@ for (const story of stories) {
         throw new Error("Immutable fixture changed: publish a new version ID.");
       return;
     }
-    const { nodes, ...manifest } = story;
+    const { pages, ...manifest } = story;
     tx.create(ref, { ...manifest, manifestHash: hash, ready: true });
-    for (const n of Object.values(nodes))
-      tx.create(ref.collection("nodes").doc(n.id), n);
+    for (const n of Object.values(pages))
+      tx.create(ref.collection("pages").doc(n.id), n);
   });
   await fixture(`stories/${story.id}`, { publishedVersionId: story.versionId });
 }
 await fixture("catalogue/glass-harbor", catalogue);
+for (const entry of pageCatalogue)
+  await fixture(`catalogue/${entry.id}`, entry);
 for (const branch of branches) await fixture(`branches/${branch.id}`, branch);
 await fixture("placements/harbor-market", {
   nominatedBranchId: "bell-diver",

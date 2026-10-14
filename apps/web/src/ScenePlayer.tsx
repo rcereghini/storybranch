@@ -4,17 +4,21 @@ import type { SceneMedia } from "../../../packages/contracts/media";
 import "./scene-player.css";
 type Props = {
   sceneId: string;
-  node: Story["nodes"][string];
+  page: Story["pages"][string];
   media?: SceneMedia;
   children: ReactNode;
   onPlaybackChange: (playing: boolean) => void;
+  active?: boolean;
+  onComplete?: () => void;
 };
 export function ScenePlayer({
   sceneId,
-  node,
+  page,
   media,
   children,
   onPlaybackChange,
+  active: visible = true,
+  onComplete,
 }: Props) {
   const [portrait, setPortrait] = useState(
     () => matchMedia("(max-width: 700px)").matches,
@@ -34,13 +38,17 @@ export function ScenePlayer({
   }, []);
   const rendition =
     portrait && media?.portrait ? media.portrait : media?.landscape;
-  const source = rendition?.src ?? node.video;
+  const source = rendition?.src ?? page.video;
   useEffect(() => {
     let active = true;
     setWatching(false);
     setFailed(false);
     setBlocked(false);
     const element = video.current;
+    if (!visible) {
+      element?.pause();
+      return;
+    }
     // Reuse the authorized media element across committed scenes. Loading the
     // new source resets its timeline even when fixtures reuse the same URL.
     element?.load();
@@ -61,7 +69,7 @@ export function ScenePlayer({
     return () => {
       active = false;
     };
-  }, [source, retry, sceneId]);
+  }, [source, retry, sceneId, visible]);
   useEffect(() => {
     onPlaybackChange(watching);
     return () => onPlaybackChange(false);
@@ -113,9 +121,12 @@ export function ScenePlayer({
           }}
           onWaiting={() => setWatching(false)}
           onPause={() => setWatching(false)}
-          onEnded={() => setWatching(false)}
+          onEnded={() => {
+            setWatching(false);
+            onComplete?.();
+          }}
           onError={fail}
-          aria-label={`${node.title} scene video`}
+          aria-label={`${page.title} scene video`}
         >
           <source
             src={source}
@@ -139,29 +150,31 @@ export function ScenePlayer({
             Start story with sound
           </button>
         )}
-        <span className="scene-film-label">
-          GLASS HARBOR · PLACEHOLDER FILM
-        </span>
+        <span className="scene-film-label">STORYBRANCH · PLACEHOLDER FILM</span>
         <div className="scene-overlay" aria-hidden={watching} inert={watching}>
           <div className="scene-copy">
             <p className="eyebrow">
-              {node.kind === "ending"
+              {page.kind === "ending"
                 ? "YOUR STORY, REMEMBERED"
                 : "YOUR NEXT MOVE"}
             </p>
-            <h1>{node.title}</h1>
-            <p>{node.transcript}</p>
+            <h1>{page.title}</h1>
+            <p>{page.transcript}</p>
           </div>
           {children}
         </div>
       </div>
       <div className="scene-toolbar">
         <button
-          onClick={() => (watching ? skip() : void play())}
+          onClick={() =>
+            watching ? (onComplete ? onComplete() : skip()) : void play()
+          }
           disabled={failed}
         >
           {watching
-            ? "Skip to choices"
+            ? onComplete
+              ? "Next page"
+              : "Skip to choices"
             : blocked
               ? "Play scene"
               : !hasStarted
@@ -205,7 +218,7 @@ export function ScenePlayer({
       )}
       <details className="transcript" id="scene-transcript">
         <summary>Scene transcript</summary>
-        <p>{node.transcript}</p>
+        <p>{page.transcript}</p>
       </details>
     </div>
   );

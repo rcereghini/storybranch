@@ -22,7 +22,7 @@ export const sceneMedia = Object.fromEntries(
   sceneVariants.map((scene) => {
     const id = sceneAssetId(scene);
     return [
-      `${scene.story}/v1/${scene.node}`,
+      `${scene.story}/pages-v1/${scene.node}`,
       mediaSchema.parse({
         landscape: {
           src: `/media/${id}-landscape.mp4`,
@@ -40,13 +40,8 @@ export const sceneMedia = Object.fromEntries(
     ];
   }),
 );
-export function resolveFixtureMedia(
-  source: string,
-  storyId?: string,
-  versionId?: string,
-  nodeId?: string,
-) {
-  if (source === "/media/harbor.webm" && storyId && versionId && nodeId)
-    return sceneMedia[`${storyId}/${versionId}/${nodeId}`] ?? harborMedia;
-  return source === "/media/harbor.webm" ? harborMedia : undefined;
+export function resolveFixtureMedia(source: string) {
+  return Object.values(sceneMedia).find(
+    (media) => media.landscape.src === source,
+  );
 }

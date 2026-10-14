@@ -102,12 +102,12 @@ try {
   await page.reload();
   await heading("A favor, remembered");
   // Missing media remains playable through the complete transcript.
-  await page.route("**/media/harbor-landscape-audio-v1.mp4", (route) =>
+  await page.route("**/media/*-landscape.mp4", (route) =>
     route.abort(),
   );
   await page.reload();
   await page.getByText("The clip couldn’t load.", { exact: false }).waitFor();
-  await page.unroute("**/media/harbor-landscape-audio-v1.mp4");
+  await page.unroute("**/media/*-landscape.mp4");
   await click("Retry video");
   await page.getByRole("button", { name: /Follow the lanterns/ }).focus();
   await page.keyboard.press("Enter");
@@ -121,8 +121,8 @@ try {
           .querySelector("video")
           ?.currentSrc.includes(
             portrait
-              ? "harbor-portrait-audio-v1.mp4"
-              : "harbor-landscape-audio-v1.mp4",
+              ? "-portrait.mp4"
+              : "-landscape.mp4",
           ),
       width <= 700,
     );
