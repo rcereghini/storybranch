@@ -36,17 +36,38 @@ try {
     await page.getByRole("heading", { name: "Hold fast" }).waitFor();
     assert.equal(await page.locator("video:visible").count(), 0);
     await page.screenshot({ path: `test-results/dice-page-${width}.png` });
+    const beforeRoll = await page.locator(".reading-page").boundingBox();
     await page.getByRole("button", { name: /Roll d20/ }).click();
-    await page.getByText(/Last roll:/).waitFor();
-    const result = await page.getByText(/Last roll:/).innerText();
+    await page
+      .locator(".dice-face")
+      .getByText("You rolled", { exact: true })
+      .waitFor();
+    const result = await page.locator(".dice-face").innerText();
+    const afterRoll = await page.locator(".reading-page").boundingBox();
+    assert.equal(
+      afterRoll!.height,
+      beforeRoll!.height,
+      "Roll result must not resize the page",
+    );
+    await page.screenshot({ path: `test-results/dice-result-${width}.png` });
     await page.reload();
-    await page.getByText(result, { exact: true }).waitFor();
+    await page
+      .locator(".dice-face")
+      .getByText("You rolled", { exact: true })
+      .waitFor();
+    assert.equal(await page.locator(".dice-face").innerText(), result);
     await page.getByRole("button", { name: /Next page/ }).click();
     await page
       .getByRole("heading", {
         name: /A voice through the storm|Safe until morning/,
       })
       .waitFor();
+    assert.equal(
+      await page.locator(".dice-face").count(),
+      0,
+      "Roll result must disappear after Next",
+    );
+    assert.equal(await page.getByText(/Last roll:/).count(), 0);
     assert(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

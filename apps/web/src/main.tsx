@@ -285,7 +285,10 @@ function App() {
         </button>
       </header>
       <main className={playing ? "playback-active" : undefined}>
-        <div aria-live="polite">
+        <div
+          aria-live="polite"
+          className={path.startsWith("/play/") ? "player-notices" : undefined}
+        >
           {user && savesError && !path.startsWith("/play/") && (
             <div className="notice error" role="alert">
               Your saved-adventure list could not be loaded. Please retry.

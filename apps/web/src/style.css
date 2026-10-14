@@ -862,11 +862,39 @@ hr {
   max-width: 65ch;
 }
 .dice-face {
+  height: 200px;
+  display: grid;
+  grid-template-rows: 28px 92px 32px;
+  align-content: center;
+  justify-items: center;
+  margin: 24px 0;
   font:
     64px Georgia,
     serif;
   text-align: center;
   color: var(--accent);
+}
+.player-notices {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  width: min(420px, calc(100vw - 32px));
+  z-index: 20;
+  pointer-events: none;
+}
+.player-notices > :not(.sr-only) {
+  pointer-events: auto;
+}
+.dice-face strong {
+  font-weight: normal;
+  align-self: center;
+}
+.dice-result-label,
+.dice-result-detail {
+  font:
+    16px/1.5 "Segoe UI",
+    sans-serif;
+  color: var(--text);
 }
 .mock-story-grid {
   display: grid;

@@ -86,12 +86,6 @@ export function Page({
   }, [page.id, video]);
   return (
     <article className={`story-page page-${type}`} data-page-type={type}>
-      {save.lastRoll && (
-        <p className="notice" role="status">
-          Last roll: {save.lastRoll.value} / {save.lastRoll.sides} · Target{" "}
-          {save.lastRoll.target} · {save.lastRoll.passed ? "Pass" : "Fail"}
-        </p>
-      )}
       {lastVideo.current && (
         <div hidden={!video}>
           <ScenePlayer
@@ -123,12 +117,26 @@ export function Page({
           </h1>
           <p className="page-copy">{page.transcript}</p>
           {type === "dice" && (
-            <p className="dice-face" aria-hidden="true">
-              ◇ d
-              {page.choices[0].outcome.kind === "dice"
-                ? page.choices[0].outcome.sides
-                : "?"}
-            </p>
+            <div
+              className="dice-face"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span className="dice-result-label">
+                {rolled ? "You rolled" : "Ready to roll"}
+              </span>
+              <strong>
+                {rolled
+                  ? save.lastRoll!.value
+                  : `◇ d${page.choices[0].outcome.kind === "dice" ? page.choices[0].outcome.sides : "?"}`}
+              </strong>
+              <span className="dice-result-detail">
+                {rolled
+                  ? `${save.lastRoll!.passed ? "Pass" : "Fail"} · Target ${save.lastRoll!.target}`
+                  : "Roll to reveal your result"}
+              </span>
+            </div>
           )}
           {outputs}
         </section>
