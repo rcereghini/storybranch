@@ -26,6 +26,7 @@ const heading = async (name: string) => {
   await page.getByRole("heading", { name, exact: true }).waitFor();
 };
 await mkdir("test-results", { recursive: true });
+await context.tracing.start({ screenshots: true, snapshots: true });
 try {
   await page.goto("http://127.0.0.1:5173");
   await heading("The Glass Harbor.");
@@ -105,6 +106,7 @@ try {
   await page.route("**/media/*-landscape.mp4", (route) => route.abort());
   await page.reload();
   await page.getByText("The clip couldn’t load.", { exact: false }).waitFor();
+  await assert.rejects(() => startPlayback(page), /Playback failed:.*"source"/);
   await page.unroute("**/media/*-landscape.mp4");
   await click("Retry video");
   await page.getByRole("button", { name: /Follow the lanterns/ }).focus();
@@ -314,6 +316,14 @@ try {
   console.log(
     "Browser PASS: full player flow, portrait/landscape overlays at 320/390/700/701/768/1024/1440, watch/skip, public-link clipboard, MP4 download, side quests, stale/retry/offline, both endings, no page errors.",
   );
+} catch (error) {
+  await page
+    .screenshot({ path: "test-results/browser-failure.png", fullPage: true })
+    .catch(() => {});
+  await context.tracing
+    .stop({ path: "test-results/browser-failure-trace.zip" })
+    .catch(() => {});
+  throw error;
 } finally {
   await browser.close();
 }
