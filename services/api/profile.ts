@@ -5,6 +5,7 @@ import { profileUpdateSchema } from "../../packages/contracts/profile";
 import {
   outlineKey,
   summarizeDashboard,
+  type ActivityEvent,
   type CatalogueOutline,
   type StoryOutline,
 } from "../../packages/domain/dashboard";
@@ -13,6 +14,9 @@ import { version } from "./story-store";
 
 // The dashboard summarizes at most this many recent saves.
 const DASHBOARD_SAVES = 100;
+// Activity reads the last few story-log events of the latest saves.
+const ACTIVITY_SAVES = 4;
+const ACTIVITY_PER_SAVE = 4;
 
 export async function profileRoutes(
   request: Request,
@@ -25,7 +29,7 @@ export async function profileRoutes(
     throw new GameError("NOT_FOUND", "Route not found.");
   if (segments[1] === "profile" && request.method === "POST") {
     const raw = await request.text();
-    if (raw.length > 1024)
+    if (raw.length > 4096)
       throw new GameError("VALIDATION_FAILED", "Profile update too large.");
     let body: unknown;
     try {
@@ -40,8 +44,12 @@ export async function profileRoutes(
         parsed.error.issues[0]?.message ?? "Invalid profile.",
       );
     // Only presentation fields change; stats and status stay server-owned.
-    await db.doc(`playerProfiles/${uid}`).update(parsed.data);
-    return projectProfile(uid, { ...data, ...parsed.data }, tokenName);
+    // Omitted optional fields keep their stored values.
+    const changes = Object.fromEntries(
+      Object.entries(parsed.data).filter(([, value]) => value !== undefined),
+    );
+    await db.doc(`playerProfiles/${uid}`).update(changes);
+    return projectProfile(uid, { ...data, ...changes }, tokenName);
   }
   if (request.method !== "GET")
     throw new GameError("NOT_FOUND", "Route not found.");
@@ -69,6 +77,8 @@ export async function profileRoutes(
       id: c.id,
       title: c.title,
       description: c.description ?? "",
+      genre: typeof c.genre === "string" ? c.genre : "",
+      duration: typeof c.duration === "string" ? c.duration : "",
       // Seeded entries name versionId; Studio publications publishedVersionId.
       versionId: c.versionId ?? c.publishedVersionId,
     }));
@@ -99,5 +109,32 @@ export async function profileRoutes(
       }
     }),
   );
-  return { profile, summary: summarizeDashboard(saves, outlines, catalogue) };
+  // Recent story-log entries from the most recently played saves.
+  const events: ActivityEvent[] = (
+    await Promise.all(
+      saves.slice(0, ACTIVITY_SAVES).map(async (s) =>
+        (
+          await db
+            .collection(`playthroughs/${s.id}/events`)
+            .orderBy("at", "desc")
+            .limit(ACTIVITY_PER_SAVE)
+            .get()
+        ).docs.map((d) => ({
+          saveId: s.id,
+          label: String(d.data().label ?? ""),
+          at: Number(d.data().at ?? 0),
+        })),
+      ),
+    )
+  ).flat();
+  return {
+    profile,
+    summary: summarizeDashboard(
+      saves,
+      outlines,
+      catalogue,
+      events,
+      profile.favoriteGenres,
+    ),
+  };
 }

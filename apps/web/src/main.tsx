@@ -14,12 +14,15 @@ import { ShareStory } from "./ShareStory";
 import type { SceneMedia } from "../../../packages/contracts/media";
 import type { PlayerProfile } from "../../../packages/contracts/profile";
 import { Dashboard } from "./Dashboard";
+import { Discover, type CatalogueEntry } from "./Discover";
+import { Adventures } from "./Adventures";
 import { Avatar } from "./avatars";
+import { accents } from "./theme";
+import "./hub.css";
 const api = createApi(fetch, async () =>
   auth.currentUser ? auth.currentUser.getIdToken() : null,
 );
 type Branch = { id: string; title: string; author: string };
-type CatalogueEntry = { id: string; title: string; description: string };
 type Player = {
   story: { id: string; title: string; versionId: string };
   user: StoryUser;
@@ -193,11 +196,36 @@ function App() {
       setLoadedKey(key);
     }
   };
+  const loadMoreCatalogue = async () => {
+    setBusy(true);
+    try {
+      const next = await api<{
+        items: CatalogueEntry[];
+        nextCursor: string | null;
+      }>(`/catalogue?cursor=${catalogueCursor}`);
+      setCatalogueItems((old) => [
+        ...new Map(
+          [...old, ...next.items].map((item) => [item.id, item]),
+        ).values(),
+      ]);
+      setCatalogueCursor(next.nextCursor);
+    } catch (error) {
+      report(error);
+    } finally {
+      setBusy(false);
+    }
+  };
   useEffect(() => {
     setPlayer(null);
     setPending(null);
     if (!path.startsWith("/play/") || user) void refresh();
   }, [path, user]);
+  // The chosen accent themes the shell; the story player keeps its own colors.
+  useEffect(() => {
+    const root = document.documentElement.style;
+    if (profile) root.setProperty("--accent", accents[profile.accent].color);
+    else root.removeProperty("--accent");
+  }, [profile?.accent]);
   // The header shows the player's chosen name and avatar on every page.
   useEffect(() => {
     setProfile(null);
@@ -335,27 +363,45 @@ function App() {
             Create
           </button>
         </nav>
-        <button
-          className="account"
-          onClick={() => {
-            if (user) {
-              if (
-                !studioDirty ||
-                confirm("Sign out and discard unsaved changes?")
-              )
-                void signOut(auth);
-            } else setLogin(true);
-          }}
-        >
-          {user
-            ? `${profile?.displayName ?? user.displayName ?? "Player"} · Sign out`
-            : "Sign in"}
-          {user && profile ? (
-            <Avatar id={profile.avatarId} size={30} />
-          ) : (
-            <span className="avatar">{user ? "◈" : "↗"}</span>
-          )}
-        </button>
+        {user ? (
+          <div className="account">
+            <button
+              className="account-chip"
+              aria-label="Open your dashboard"
+              onClick={() => navigate("/")}
+            >
+              {profile ? (
+                <Avatar
+                  id={profile.avatarId}
+                  tint={profile.avatarTint}
+                  frame={profile.avatarFrame}
+                  size={30}
+                />
+              ) : (
+                <span className="avatar">◈</span>
+              )}
+              <span className="account-name">
+                {profile?.displayName ?? user.displayName ?? "Player"}
+              </span>
+            </button>
+            <button
+              className="sign-out"
+              onClick={() => {
+                if (
+                  !studioDirty ||
+                  confirm("Sign out and discard unsaved changes?")
+                )
+                  void signOut(auth);
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <button className="account sign-in" onClick={() => setLogin(true)}>
+            Sign in
+          </button>
+        )}
       </header>
       <main
         className={playing ? "playback-active" : undefined}
@@ -703,234 +749,33 @@ function App() {
             />
           )
         ) : path === "/adventures" ? (
-          <section className="library">
-            <p className="eyebrow">YOUR JOURNEYS</p>
-            <h1>Pick up the thread.</h1>
-            {!user ? (
-              <button className="primary" onClick={() => setLogin(true)}>
-                Sign in to see your saves
-              </button>
-            ) : savesError && saves.length === 0 ? (
-              <p>
-                Your saved adventures will appear when the list is available.
-              </p>
-            ) : saves.length === 0 ? (
-              <p>
-                No adventures yet. Your first choice is waiting.{" "}
-                <button onClick={() => navigate("/discover")}>Discover</button>
-              </p>
-            ) : (
-              <div className="save-list">
-                {saves.map((s) => (
-                  <button key={s.id} onClick={() => navigate(`/play/${s.id}`)}>
-                    <span>
-                      {s.parentPlaythroughId
-                        ? "◇ Side quest"
-                        : `◆ ${catalogueItems.find((item) => item.id === s.storyId)?.title ?? s.storyId}`}
-                      <strong>
-                        {s.pageId?.replaceAll("-", " ") ??
-                          "Earlier prototype · start a new journey"}
-                      </strong>
-                      <small>
-                        {s.status} · {s.versionId} ·{" "}
-                        {new Date(s.updatedAt).toLocaleString()}
-                      </small>
-                    </span>
-                    <span>Resume ↗</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {saveCursor && (
-              <button onClick={() => void loadSaves(saveCursor).catch(report)}>
-                Load more adventures
-              </button>
-            )}
-          </section>
+          <Adventures
+            signedIn={!!user}
+            loaded={loadedKey === loadKey}
+            saves={saves}
+            savesError={savesError}
+            catalogue={catalogueItems}
+            hasMore={!!saveCursor}
+            onLoadMore={() => void loadSaves(saveCursor!).catch(report)}
+            onResume={(saveId) => navigate(`/play/${saveId}`)}
+            onSignIn={() => setLogin(true)}
+            onDiscover={() => navigate("/discover")}
+          />
         ) : (
-          <>
-            <section className="hero">
-              <div className="hero-art" />
-              <div className="hero-content">
-                <p className="eyebrow">
-                  <span className="live-dot" /> THE FIRST STORYBRANCH ORIGINAL
-                </p>
-                <h1>
-                  The Glass
-                  <br />
-                  <em>Harbor</em>
-                  <span className="title-period">.</span>
-                </h1>
-                <p className="hero-subtitle">
-                  Some cities keep secrets.
-                  <br />
-                  This one is waiting for your next move.
-                </p>
-                <div className="tags">
-                  <span>MYSTERY</span>
-                  <span>5–10 MIN</span>
-                  <span>CHOICE-DRIVEN</span>
-                </div>
-                <div className="hero-actions">
-                  <button
-                    className="primary"
-                    disabled={disabled || !catalogueReady}
-                    onClick={() =>
-                      resume ? navigate(`/play/${resume.id}`) : start()
-                    }
-                  >
-                    {resume ? "Resume adventure" : "Begin your story"}{" "}
-                    <span>↗</span>
-                  </button>
-                  <button
-                    className="secondary"
-                    onClick={() =>
-                      document
-                        .getElementById("about")
-                        ?.scrollIntoView({ behavior: "smooth" })
-                    }
-                  >
-                    Explore the story ↓
-                  </button>
-                </div>
-                <p className="hero-note">One harbor. Many ways home.</p>
-              </div>
-              <div className="hero-index">
-                <span>01 / 01</span>
-                <i />
-                <span>THE GLASS HARBOR</span>
-              </div>
-            </section>
-            <section className="intro-strip">
-              <span>EVERY CHOICE LEAVES A TRACE</span>
-              <p>Watch a scene. Trust your instincts. Find your own ending.</p>
-              <span>✦</span>
-            </section>
-            {resume && (
-              <section className="continue">
-                <p className="eyebrow">CONTINUE PLAYING</p>
-                <button onClick={() => navigate(`/play/${resume.id}`)}>
-                  <img src="/media/harbor.svg" alt="" />
-                  <span>
-                    <strong>
-                      {catalogueItems.find((item) => item.id === resume.storyId)
-                        ?.title ?? resume.storyId}
-                    </strong>
-                    <small>
-                      {resume.pageId} · Saved{" "}
-                      {new Date(resume.updatedAt).toLocaleDateString()}
-                    </small>
-                  </span>
-                  <span>Resume ↗</span>
-                </button>
-              </section>
-            )}
-            <section className="discover" id="about">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">SMALL WORLDS. MEANINGFUL CHOICES.</p>
-                  <h2>Your next adventure</h2>
-                </div>
-                <span className="muted">
-                  {catalogueItems.length} playable stories
-                </span>
-              </div>
-              <div className="mock-story-grid">
-                {catalogueItems
-                  .filter((item) => item.id !== "glass-harbor")
-                  .map((item) => (
-                    <article className="reading-page" key={item.id}>
-                      <p className="eyebrow">INTERACTIVE STORY</p>
-                      <h3>{item.title}</h3>
-                      <p>{item.description}</p>
-                      <button
-                        className="primary"
-                        disabled={disabled}
-                        onClick={() => start(item.id)}
-                      >
-                        Play {item.title} ↗
-                      </button>
-                    </article>
-                  ))}
-              </div>
-              {catalogueCursor && (
-                <button
-                  disabled={busy || offline}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      const next = await api<{
-                        items: CatalogueEntry[];
-                        nextCursor: string | null;
-                      }>(`/catalogue?cursor=${catalogueCursor}`);
-                      setCatalogueItems((old) => [
-                        ...new Map(
-                          [...old, ...next.items].map((item) => [
-                            item.id,
-                            item,
-                          ]),
-                        ).values(),
-                      ]);
-                      setCatalogueCursor(next.nextCursor);
-                    } catch (error) {
-                      report(error);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  More stories
-                </button>
-              )}
-              <div className="story-row">
-                <button
-                  className="story-card"
-                  onClick={() => navigate("/s/glass-harbor/the-glass-harbor")}
-                >
-                  <div className="card-art">
-                    <img
-                      src="/media/harbor.svg"
-                      alt="An illustrated lighthouse above a misty harbor"
-                    />
-                    <span>STORYBRANCH ORIGINAL</span>
-                    <b>↗</b>
-                  </div>
-                  <div className="card-copy">
-                    <small>MYSTERY / 5–10 MIN</small>
-                    <h3>The Glass Harbor</h3>
-                    <p>By Storybranch Studio</p>
-                    <span>Teen · mild peril · Community paths open</span>
-                  </div>
-                </button>
-                <div className="editorial">
-                  <span className="editorial-icon">◇</span>
-                  <h3>
-                    A story that knows
-                    <br />
-                    which way you turned.
-                  </h3>
-                  <p>
-                    Climb the rooftops, earn a harbor pass, or follow a stranger
-                    into a smaller story. Your stats open routes. Your choices
-                    leave a record.
-                  </p>
-                  <p className="muted">
-                    Local prototype · original placeholder film and art · full
-                    text transcripts
-                  </p>
-                  {path.startsWith("/s/") && (
-                    <button
-                      className="primary"
-                      disabled={disabled || !catalogueReady}
-                      onClick={() => start()}
-                    >
-                      Start a new journey ↗
-                    </button>
-                  )}
-                </div>
-              </div>
-            </section>
-          </>
+          <Discover
+            path={path}
+            catalogue={catalogueItems}
+            saves={saves}
+            resume={resume}
+            disabled={disabled}
+            catalogueReady={catalogueReady}
+            hasMore={!!catalogueCursor}
+            moreDisabled={busy || offline}
+            onMore={() => void loadMoreCatalogue()}
+            onStart={(storyId) => start(storyId)}
+            onResume={(saveId) => navigate(`/play/${saveId}`)}
+            onNavigate={navigate}
+          />
         )}
       </main>
       <footer>

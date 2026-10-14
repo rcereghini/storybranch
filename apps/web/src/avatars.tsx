@@ -1,6 +1,11 @@
-import type { AvatarId } from "../../../packages/contracts/profile";
+import type {
+  AvatarId,
+  AvatarTint,
+  FrameId,
+} from "../../../packages/contracts/profile";
+import { accents } from "./theme";
 
-// Each preset is a line glyph on its own tinted badge; ids live in contracts.
+// Each preset is a line glyph on a tinted badge; ids live in contracts.
 export const avatars: Record<
   AvatarId,
   { label: string; tint: string; glyph: string }
@@ -55,16 +60,41 @@ export const avatars: Record<
   },
 };
 
+// Frame outlines in the 24-unit badge; the diamond leaves least room, so
+// its glyph is drawn smaller.
+const shapes: Record<FrameId, { path: string; glyphScale: number }> = {
+  circle: {
+    path: "M12 .6a11.4 11.4 0 1 1 0 22.8A11.4 11.4 0 0 1 12 .6z",
+    glyphScale: 0.6,
+  },
+  rounded: {
+    path: "M6.6.6h10.8a6 6 0 0 1 6 6v10.8a6 6 0 0 1-6 6H6.6a6 6 0 0 1-6-6V6.6a6 6 0 0 1 6-6z",
+    glyphScale: 0.62,
+  },
+  hexagon: {
+    path: "M12 .6l9.9 5.7v11.4L12 23.4l-9.9-5.7V6.3z",
+    glyphScale: 0.56,
+  },
+  diamond: { path: "M12 .5L23.5 12 12 23.5.5 12z", glyphScale: 0.46 },
+};
+
 export function Avatar({
   id,
   size = 40,
   label,
+  tint = "preset",
+  frame = "circle",
 }: {
   id: AvatarId;
   size?: number;
   label?: string;
+  tint?: AvatarTint;
+  frame?: FrameId;
 }) {
   const avatar = avatars[id];
+  const color = tint === "preset" ? avatar.tint : accents[tint].color;
+  const shape = shapes[frame];
+  const offset = 12 - 12 * shape.glyphScale;
   return (
     <svg
       className="avatar-badge"
@@ -75,21 +105,21 @@ export function Avatar({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <circle cx="12" cy="12" r="12" fill={avatar.tint} opacity="0.18" />
-      <circle
-        cx="12"
-        cy="12"
-        r="11.4"
+      <path d={shape.path} fill={color} fillOpacity="0.16" />
+      <path
+        d={shape.path}
         fill="none"
-        stroke={avatar.tint}
-        strokeOpacity="0.55"
+        stroke={color}
+        strokeOpacity="0.6"
         strokeWidth="0.6"
       />
-      <g transform="translate(4.8 4.8) scale(0.6)">
+      <g
+        transform={`translate(${offset} ${offset}) scale(${shape.glyphScale})`}
+      >
         <path
           d={avatar.glyph}
           fill="none"
-          stroke={avatar.tint}
+          stroke={color}
           strokeWidth="1.6"
           strokeLinecap="round"
           strokeLinejoin="round"

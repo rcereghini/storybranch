@@ -166,16 +166,50 @@ it("edits only presentation fields and summarizes the player's own progress", as
   );
   expect(saved.status).toBe(200);
   expect(saved.data).toMatchObject({ displayName: "Tess", avatarId: "gear" });
+  const customized = await call(
+    "/profile",
+    {
+      displayName: "Tess",
+      avatarId: "gear",
+      tagline: "Tinkerer",
+      bio: "Gears\nand doors",
+      bannerId: "clockwork",
+      accent: "amber",
+      avatarTint: "sky",
+      avatarFrame: "rounded",
+      favoriteGenres: ["mystery"],
+    },
+    "progressed",
+  );
+  expect(customized.status).toBe(200);
+  // Omitted optional fields keep their stored values.
+  expect(
+    (
+      await call(
+        "/profile",
+        { displayName: "Tess", avatarId: "gear" },
+        "progressed",
+      )
+    ).data,
+  ).toMatchObject({
+    tagline: "Tinkerer",
+    bannerId: "clockwork",
+    favoriteGenres: ["mystery"],
+  });
   for (const bad of [
     { displayName: "", avatarId: "gear" },
     { displayName: "Tess", avatarId: "dragon" },
     { displayName: "Tess", avatarId: "gear", stats: { agility: 99 } },
+    { displayName: "Tess", avatarId: "gear", accent: "#ff00ff" },
+    { displayName: "Tess", avatarId: "gear", bio: "x".repeat(501) },
   ])
     expect((await call("/profile", bad, "progressed")).status).toBe(400);
   const after = await call("/profile", undefined, "progressed");
   expect(after.data).toMatchObject({
     displayName: "Tess",
     avatarId: "gear",
+    accent: "amber",
+    avatarFrame: "rounded",
     stats: { agility: 8 },
   });
   // The other player's profile is untouched.
@@ -205,6 +239,11 @@ it("edits only presentation fields and summarizes the player's own progress", as
     activeSaveId: started.data.save.id,
   });
   expect(harbor.endingsTotal).toBeGreaterThan(0);
+  // The new save's opening event appears in recent activity.
+  expect(dashboard.data.summary.activity[0]).toMatchObject({
+    saveId: started.data.save.id,
+    title: "The Glass Harbor",
+  });
   await call(
     "/profile",
     { displayName: before.data.displayName, avatarId: before.data.avatarId },

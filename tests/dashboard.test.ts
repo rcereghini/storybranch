@@ -3,6 +3,7 @@ import type { Save } from "../packages/contracts/index";
 import { profileUpdateSchema } from "../packages/contracts/profile";
 import { baseStats } from "../packages/domain/index";
 import {
+  genreOf,
   outlineKey,
   summarizeDashboard,
   type StoryOutline,
@@ -40,10 +41,15 @@ const harbor: StoryOutline = {
   },
 };
 const outlines = new Map([[outlineKey("harbor", "v1"), harbor]]);
-const catalogue = [
-  { id: "harbor", title: "The Harbor", description: "Fog.", versionId: "v1" },
-  { id: "door", title: "The Door", description: "Keys.", versionId: "v1" },
-];
+const entry = (id: string, title: string, genre = "") => ({
+  id,
+  title,
+  description: `${title}.`,
+  genre,
+  duration: "5 min",
+  versionId: "v1",
+});
+const catalogue = [entry("harbor", "The Harbor"), entry("door", "The Door")];
 
 it("derives story status, distinct endings and totals from saves", () => {
   const summary = summarizeDashboard(
@@ -99,10 +105,10 @@ it("derives story status, distinct endings and totals from saves", () => {
     ["d", "The dock"],
   ]);
   expect(summary.continue[0]).toMatchObject({ sideQuest: true, title: "bell" });
-  expect(summary.recentEndings.map((e) => e.pageTitle)).toEqual([
-    "Out to sea",
-    "Home again",
-    "Home again",
+  // Reaching "Home again" twice lists it once, at its latest save.
+  expect(summary.recentEndings.map((e) => [e.pageTitle, e.saveId])).toEqual([
+    ["Out to sea", "c"],
+    ["Home again", "b"],
   ]);
 });
 
@@ -118,6 +124,104 @@ it("reports a finished story as completed once nothing is active", () => {
     endingsFound: 1,
   });
   expect(summary.continue).toEqual([]);
+});
+
+it("recommends unplayed favorite genres first, then hidden endings", () => {
+  const shelf = [
+    entry("harbor", "The Harbor", "Mystery"),
+    entry("door", "The Door", "Fantasy"),
+    entry("rocket", "Rocket", "Sci-fi thriller"),
+  ];
+  const finished = [save({ status: "completed", pageId: "home" })];
+  const picks = summarizeDashboard(
+    finished,
+    outlines,
+    shelf,
+    [],
+    ["sci-fi"],
+  ).recommendations;
+  expect(picks.map((p) => [p.storyId, p.reason])).toEqual([
+    ["rocket", "Because you like Sci-fi"],
+    ["door", "New to you"],
+    ["harbor", "2 endings left to find"],
+  ]);
+  expect(genreOf("Sci-fi thriller")).toBe("sci-fi");
+  expect(genreOf("Mixed-page prototype")).toBeNull();
+});
+
+it("merges recent story-log events across saves, newest first", () => {
+  const summary = summarizeDashboard(
+    [save({ id: "a" }), save({ id: "b", storyId: "door", versionId: "v9" })],
+    outlines,
+    catalogue,
+    [
+      { saveId: "a", label: "Arrived", at: 1 },
+      { saveId: "b", label: "Opened the door", at: 3 },
+      { saveId: "a", label: "Took the pass", at: 2 },
+      { saveId: "gone", label: "Deleted save", at: 4 },
+    ],
+  );
+  expect(summary.activity.map((a) => [a.label, a.title])).toEqual([
+    ["Opened the door", "The Door"],
+    ["Took the pass", "The Harbor"],
+    ["Arrived", "The Harbor"],
+  ]);
+});
+
+it("validates profile customizations and defaults older profiles", () => {
+  const full = {
+    displayName: "Wren",
+    avatarId: "raven",
+    tagline: "  Collector of quiet endings ",
+    bio: "Line one\nLine two",
+    bannerId: "aurora",
+    accent: "rose",
+    avatarTint: "sky",
+    avatarFrame: "hexagon",
+    favoriteGenres: ["mystery", "sci-fi"],
+  };
+  expect(profileUpdateSchema.parse(full)).toEqual({
+    ...full,
+    tagline: "Collector of quiet endings",
+  });
+  for (const bad of [
+    { tagline: "x".repeat(81) },
+    { tagline: "tab\there" },
+    { bio: "x".repeat(501) },
+    { bannerId: "space" },
+    { accent: "#ff0000" },
+    { avatarTint: "plaid" },
+    { avatarFrame: "star" },
+    { favoriteGenres: ["mystery", "mystery"] },
+    {
+      favoriteGenres: [
+        "mystery",
+        "fantasy",
+        "sci-fi",
+        "horror",
+        "comedy",
+        "romance",
+      ],
+    },
+    { favoriteGenres: ["western"] },
+  ])
+    expect(profileUpdateSchema.safeParse({ ...full, ...bad }).success).toBe(
+      false,
+    );
+  expect(
+    projectProfile("uid", {
+      stats: baseStats,
+      accent: "neon",
+      bannerId: "storm",
+    }),
+  ).toMatchObject({
+    accent: "teal",
+    bannerId: "storm",
+    tagline: "",
+    favoriteGenres: [],
+    avatarFrame: "circle",
+    avatarTint: "preset",
+  });
 });
 
 it("validates profile edits and defaults older profiles", () => {
