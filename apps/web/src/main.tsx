@@ -12,6 +12,9 @@ import { Story as StoryContainer } from "./Story";
 import type { StoryUser } from "../../../packages/contracts/index";
 import { ShareStory } from "./ShareStory";
 import type { SceneMedia } from "../../../packages/contracts/media";
+import type { PlayerProfile } from "../../../packages/contracts/profile";
+import { Dashboard } from "./Dashboard";
+import { Avatar } from "./avatars";
 const api = createApi(fetch, async () =>
   auth.currentUser ? auth.currentUser.getIdToken() : null,
 );
@@ -57,7 +60,8 @@ function App() {
     [catalogueCursor, setCatalogueCursor] = useState<string | null>(null),
     [catalogueReady, setCatalogueReady] = useState(false),
     [studioDirty, setStudioDirty] = useState(false),
-    [loadedKey, setLoadedKey] = useState<string | null>(null);
+    [loadedKey, setLoadedKey] = useState<string | null>(null),
+    [profile, setProfile] = useState<PlayerProfile | null>(null);
   // Identifies what the latest refresh() must load: this page for this user.
   const loadKey = `${path}|${user?.uid ?? ""}`;
   const navigate = (p: string) => {
@@ -194,6 +198,17 @@ function App() {
     setPending(null);
     if (!path.startsWith("/play/") || user) void refresh();
   }, [path, user]);
+  // The header shows the player's chosen name and avatar on every page.
+  useEffect(() => {
+    setProfile(null);
+    if (!user) return;
+    const uid = user.uid;
+    api<PlayerProfile>("/profile")
+      .then((p) => {
+        if (auth.currentUser?.uid === uid) setProfile(p);
+      })
+      .catch(() => {});
+  }, [user]);
   const command = async (p: Pending) => {
     if (offline || busy) return;
     const requestingUid = auth.currentUser?.uid;
@@ -289,9 +304,21 @@ function App() {
           <span className="alpha">LOCAL ALPHA</span>
         </a>
         <nav aria-label="Main">
+          {user && (
+            <button
+              className={path === "/" ? "nav-active" : ""}
+              onClick={() => navigate("/")}
+            >
+              Dashboard
+            </button>
+          )}
           <button
-            className={path === "/" ? "nav-active" : ""}
-            onClick={() => navigate("/")}
+            className={
+              path === "/discover" || (!user && path === "/")
+                ? "nav-active"
+                : ""
+            }
+            onClick={() => navigate(user ? "/discover" : "/")}
           >
             Discover
           </button>
@@ -320,8 +347,14 @@ function App() {
             } else setLogin(true);
           }}
         >
-          {user ? `${user.displayName ?? "Player"} · Sign out` : "Sign in"}
-          <span className="avatar">{user ? "◈" : "↗"}</span>
+          {user
+            ? `${profile?.displayName ?? user.displayName ?? "Player"} · Sign out`
+            : "Sign in"}
+          {user && profile ? (
+            <Avatar id={profile.avatarId} size={30} />
+          ) : (
+            <span className="avatar">{user ? "◈" : "↗"}</span>
+          )}
         </button>
       </header>
       <main
@@ -652,6 +685,23 @@ function App() {
               </StoryContainer>
             )}
           </>
+        ) : path === "/" && (user || !authReady) ? (
+          user ? (
+            <Dashboard
+              key={user.uid}
+              profile={profile}
+              disabled={disabled}
+              onProfileSaved={setProfile}
+              onResume={(saveId) => navigate(`/play/${saveId}`)}
+              onStart={(storyId) => start(storyId)}
+              onNavigate={navigate}
+            />
+          ) : (
+            <div
+              className="placeholder summary-placeholder"
+              aria-hidden="true"
+            />
+          )
         ) : path === "/adventures" ? (
           <section className="library">
             <p className="eyebrow">YOUR JOURNEYS</p>
@@ -667,7 +717,7 @@ function App() {
             ) : saves.length === 0 ? (
               <p>
                 No adventures yet. Your first choice is waiting.{" "}
-                <button onClick={() => navigate("/")}>Discover</button>
+                <button onClick={() => navigate("/discover")}>Discover</button>
               </p>
             ) : (
               <div className="save-list">

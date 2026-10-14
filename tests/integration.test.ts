@@ -152,6 +152,65 @@ it("creates a live-style profile once without resetting stats or reactivating di
     await ref.delete();
   }
 });
+it("edits only presentation fields and summarizes the player's own progress", async () => {
+  expect((await call("/profile", undefined, "none")).status).toBe(401);
+  const before = await call("/profile", undefined, "progressed");
+  expect(before.status).toBe(200);
+  expect(before.data).toMatchObject({ stats: { agility: 8 } });
+  expect(typeof before.data.displayName).toBe("string");
+
+  const saved = await call(
+    "/profile",
+    { displayName: "  Tess  ", avatarId: "gear" },
+    "progressed",
+  );
+  expect(saved.status).toBe(200);
+  expect(saved.data).toMatchObject({ displayName: "Tess", avatarId: "gear" });
+  for (const bad of [
+    { displayName: "", avatarId: "gear" },
+    { displayName: "Tess", avatarId: "dragon" },
+    { displayName: "Tess", avatarId: "gear", stats: { agility: 99 } },
+  ])
+    expect((await call("/profile", bad, "progressed")).status).toBe(400);
+  const after = await call("/profile", undefined, "progressed");
+  expect(after.data).toMatchObject({
+    displayName: "Tess",
+    avatarId: "gear",
+    stats: { agility: 8 },
+  });
+  // The other player's profile is untouched.
+  expect((await call("/profile")).data.displayName).not.toBe("Tess");
+  expect((await call("/profile/other", undefined, "progressed")).status).toBe(
+    404,
+  );
+
+  const started = await call(
+    "/playthroughs",
+    { idempotencyKey: randomUUID(), payload: { storyId: "glass-harbor" } },
+    "progressed",
+  );
+  const dashboard = await call("/dashboard", undefined, "progressed");
+  expect(dashboard.status).toBe(200);
+  expect(dashboard.data.profile.displayName).toBe("Tess");
+  expect(dashboard.data.summary.continue[0]).toMatchObject({
+    saveId: started.data.save.id,
+    title: "The Glass Harbor",
+    sideQuest: false,
+  });
+  const harbor = dashboard.data.summary.stories.find(
+    (s: { storyId: string }) => s.storyId === "glass-harbor",
+  );
+  expect(harbor).toMatchObject({
+    status: "in-progress",
+    activeSaveId: started.data.save.id,
+  });
+  expect(harbor.endingsTotal).toBeGreaterThan(0);
+  await call(
+    "/profile",
+    { displayName: before.data.displayName, avatarId: before.data.avatarId },
+    "progressed",
+  );
+});
 async function call(path: string, body?: unknown, who = "player") {
   const r = await handle(
     new Request(`http://localhost/api${path}`, {
