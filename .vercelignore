@@ -1,0 +1,13 @@
+# The Vercel CLI uploads the working directory and does not read .gitignore.
+# Keep credentials and local-only data out of deployments.
+.secrets/
+.env*
+!.env.example
+.emulator-data/
+.tools/
+.phone-preview.json
+test-results/
+dist/
+dist-api/
+dist-phone/
+*-debug.log
