@@ -1,5 +1,5 @@
 import { createHash, randomUUID, randomInt } from "node:crypto";
-import { FieldPath, type Transaction } from "firebase-admin/firestore";
+import { FieldPath } from "firebase-admin/firestore";
 import { ZodError } from "zod";
 import { auth, db, config } from "./firebase";
 import {
@@ -9,13 +9,14 @@ import {
   choiceCommandSchema,
   branchCommandSchema,
   type Save,
-  type Story,
   type Stats,
 } from "../../packages/contracts/index";
-import { start, transition, validateStory } from "../../packages/domain/index";
+import { start, transition } from "../../packages/domain/index";
 import { resolveFixtureMedia } from "../../fixtures/media";
 import { ensurePlayerProfile } from "./player-profile";
 import { authoring } from "./authoring";
+import { profileRoutes } from "./profile";
+import { version } from "./story-store";
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -49,27 +50,6 @@ async function owner(saveId: string, uid: string) {
     );
   return s;
 }
-async function version(
-  tx: Transaction,
-  storyId: string,
-  versionId: string,
-): Promise<Story> {
-  const ref = db.doc(`stories/${storyId}/versions/${versionId}`);
-  const manifest = await tx.get(ref);
-  if (!manifest.exists || !manifest.data()!.ready)
-    throw new GameError("NOT_FOUND", "Story edition unavailable.");
-  if (!manifest.data()!.entryPageId)
-    throw new GameError(
-      "NOT_FOUND",
-      "This save uses an earlier prototype format. Start a new journey from Discover.",
-    );
-  const pages = await tx.get(ref.collection("pages"));
-  const { manifestHash: _, ready: __, ...data } = manifest.data()!;
-  return validateStory({
-    ...data,
-    pages: Object.fromEntries(pages.docs.map((n) => [n.id, n.data()])),
-  });
-}
 export async function handle(request: Request): Promise<Response> {
   const correlationId = randomUUID();
   try {
@@ -100,8 +80,14 @@ export async function handle(request: Request): Promise<Response> {
     if (!token)
       throw new GameError("UNAUTHENTICATED", "Sign in to save your adventure.");
     let uid: string;
+    let tokenName: string | undefined;
     try {
-      uid = (await auth.verifyIdToken(token, config.mode === "firebase")).uid;
+      const decoded = await auth.verifyIdToken(
+        token,
+        config.mode === "firebase",
+      );
+      uid = decoded.uid;
+      tokenName = typeof decoded.name === "string" ? decoded.name : undefined;
     } catch {
       throw new GameError(
         "UNAUTHENTICATED",
@@ -120,6 +106,10 @@ export async function handle(request: Request): Promise<Response> {
       );
     if (segments[1] === "studio")
       return json(await authoring(request, uid, segments, cursor, limit));
+    if (segments[1] === "profile" || segments[1] === "dashboard")
+      return json(
+        await profileRoutes(request, uid, segments, profile.data()!, tokenName),
+      );
     if (request.method === "GET") {
       if (path === "/api/playthroughs") {
         let q = db
