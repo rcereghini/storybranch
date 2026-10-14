@@ -31,7 +31,7 @@ try {
   await page.getByRole("button", { name: "Retry saved adventures" }).waitFor();
   await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
   await page.getByRole("button", { name: "Start a new journey" }).click();
-  await page.getByRole("button", { name: "Start story with sound" }).waitFor();
+  await page.locator("video").waitFor();
   await page.getByRole("button", { name: /Speak to the courier/ }).click();
   await page
     .getByLabel("A favor, remembered scene video", { exact: true })

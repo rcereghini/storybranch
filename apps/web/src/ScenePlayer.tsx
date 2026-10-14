@@ -10,6 +10,7 @@ type Props = {
   onPlaybackChange: (playing: boolean) => void;
   active?: boolean;
   onComplete?: () => void;
+  pending?: boolean;
 };
 export function ScenePlayer({
   sceneId,
@@ -19,6 +20,7 @@ export function ScenePlayer({
   onPlaybackChange,
   active: visible = true,
   onComplete,
+  pending = false,
 }: Props) {
   const [portrait, setPortrait] = useState(
     () => matchMedia("(max-width: 700px)").matches,
@@ -28,8 +30,10 @@ export function ScenePlayer({
     [failed, setFailed] = useState(false),
     [retry, setRetry] = useState(0);
   const video = useRef<HTMLVideoElement>(null);
-  const started = useRef(false);
-  const [hasStarted, setHasStarted] = useState(false);
+  const frame = useRef<HTMLCanvasElement>(null);
+  const [buffering, setBuffering] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [captions, setCaptions] = useState(true);
   useEffect(() => {
     const query = matchMedia("(max-width: 700px)");
     const update = () => setPortrait(query.matches);
@@ -45,16 +49,27 @@ export function ScenePlayer({
     setFailed(false);
     setBlocked(false);
     const element = video.current;
+    if (element && frame.current && element.readyState >= 2) {
+      const canvas = frame.current;
+      canvas.width = element.videoWidth;
+      canvas.height = element.videoHeight;
+      try {
+        canvas.getContext("2d")?.drawImage(element, 0, 0);
+      } catch {
+        /* Media can still play when frame capture is unavailable. */
+      }
+    }
     if (!visible) {
+      setBuffering(false);
       element?.pause();
       return;
     }
     // Reuse the authorized media element across committed scenes. Loading the
     // new source resets its timeline even when fixtures reuse the same URL.
     element?.load();
-    // The first audible play is directly inside a user gesture, not an effect
-    // after authentication, routing, or a save request has completed.
-    if (!started.current) return;
+    setBuffering(true);
+    // Start automatically when the story opens; keep this authorized element
+    // for subsequent pages. A denied play gets one prominent gesture fallback.
     element?.play().catch((error: unknown) => {
       if (
         !active ||
@@ -62,6 +77,7 @@ export function ScenePlayer({
       )
         return;
       setWatching(false);
+      setBuffering(false);
       if (error instanceof DOMException && error.name === "NotAllowedError")
         setBlocked(true);
       else setFailed(true);
@@ -77,11 +93,9 @@ export function ScenePlayer({
   useEffect(() => {
     if (video.current)
       for (const track of video.current.textTracks)
-        track.mode = watching ? "showing" : "disabled";
-  }, [watching]);
+        track.mode = watching && captions ? "showing" : "disabled";
+  }, [watching, captions]);
   const play = async () => {
-    started.current = true;
-    setHasStarted(true);
     try {
       if (video.current) {
         if (video.current.ended) video.current.currentTime = 0;
@@ -89,6 +103,7 @@ export function ScenePlayer({
       }
       setBlocked(false);
     } catch (error) {
+      setBuffering(false);
       if (error instanceof DOMException && error.name === "NotAllowedError")
         setBlocked(true);
       else if (!(error instanceof DOMException && error.name === "AbortError"))
@@ -97,10 +112,12 @@ export function ScenePlayer({
     }
   };
   const skip = () => {
+    setBuffering(false);
     video.current?.pause();
     setWatching(false);
   };
   const fail = () => {
+    setBuffering(false);
     setFailed(true);
     setWatching(false);
   };
@@ -111,16 +128,38 @@ export function ScenePlayer({
       >
         <video
           ref={video}
-          controls={watching}
+          controls={false}
+          muted={muted}
           playsInline
           preload="metadata"
           poster={rendition?.poster ?? "/media/harbor.svg"}
           onPlaying={() => {
+            setBuffering(false);
             setWatching(true);
             setBlocked(false);
           }}
-          onWaiting={() => setWatching(false)}
-          onPause={() => setWatching(false)}
+          onWaiting={() => {
+            const element = video.current,
+              canvas = frame.current;
+            if (
+              element &&
+              canvas &&
+              element.currentTime > 0 &&
+              element.readyState >= 2
+            ) {
+              canvas.width = element.videoWidth;
+              canvas.height = element.videoHeight;
+              try {
+                canvas.getContext("2d")?.drawImage(element, 0, 0);
+              } catch {
+                /* Keep playing if capture is unavailable. */
+              }
+            }
+            setBuffering(true);
+          }}
+          onPause={() => {
+            if ((video.current?.readyState ?? 0) >= 3) setWatching(false);
+          }}
           onEnded={() => {
             setWatching(false);
             onComplete?.();
@@ -141,7 +180,12 @@ export function ScenePlayer({
             default
           />
         </video>
-        {!hasStarted && (
+        <canvas
+          ref={frame}
+          className={`scene-held-frame ${buffering ? "visible" : ""}`}
+          aria-hidden="true"
+        />
+        {blocked && (
           <button
             className="scene-start primary"
             onClick={() => void play()}
@@ -151,7 +195,13 @@ export function ScenePlayer({
           </button>
         )}
         <span className="scene-film-label">STORYBRANCH · PLACEHOLDER FILM</span>
-        <div className="scene-overlay" aria-hidden={watching} inert={watching}>
+        <div
+          className="scene-overlay"
+          aria-hidden={
+            watching || ((buffering || pending) && !blocked && !failed)
+          }
+          inert={watching || ((buffering || pending) && !blocked && !failed)}
+        >
           <div className="scene-copy">
             <p className="eyebrow">
               {page.kind === "ending"
@@ -166,6 +216,27 @@ export function ScenePlayer({
       </div>
       <div className="scene-toolbar">
         <button
+          onClick={() => {
+            const stage = video.current?.parentElement;
+            if (document.fullscreenElement) void document.exitFullscreen();
+            else void stage?.requestFullscreen?.().catch(() => {});
+          }}
+        >
+          Fullscreen
+        </button>
+        <button
+          onClick={() => (watching ? skip() : void play())}
+          disabled={failed || buffering || pending}
+        >
+          {watching ? "Pause video" : "Play video"}
+        </button>
+        <button aria-pressed={muted} onClick={() => setMuted(!muted)}>
+          {muted ? "Unmute" : "Mute"}
+        </button>
+        <button aria-pressed={captions} onClick={() => setCaptions(!captions)}>
+          Captions
+        </button>
+        <button
           onClick={() =>
             watching ? (onComplete ? onComplete() : skip()) : void play()
           }
@@ -177,18 +248,18 @@ export function ScenePlayer({
               : "Skip to choices"
             : blocked
               ? "Play scene"
-              : !hasStarted
-                ? "Play scene"
-                : "Watch scene"}
+              : "Watch scene"}
         </button>
         <span aria-live="polite">
           {watching
-            ? "Playing · captions on"
+            ? buffering
+              ? "Buffering…"
+              : captions
+                ? "Playing · captions on"
+                : "Playing"
             : blocked
               ? "Press Play scene to start with sound. Your browser requires a tap."
-              : !hasStarted
-                ? "Start playback once; your choices continue the story."
-                : "Scene paused · choose at your own pace"}
+              : "Scene paused · choose at your own pace"}
         </span>
         <a
           href="#scene-transcript"

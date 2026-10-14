@@ -13,6 +13,7 @@ export function Page({
   onPlaybackChange,
   onOutput,
   disabled,
+  transitioning,
 }: {
   page: StoryPage;
   media?: SceneMedia;
@@ -20,6 +21,7 @@ export function Page({
   onPlaybackChange: (playing: boolean) => void;
   onOutput: (output: PageOutput) => void;
   disabled: boolean;
+  transitioning: boolean;
 }) {
   const { save } = useStory();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -93,6 +95,7 @@ export function Page({
       {lastVideo.current && (
         <div hidden={!video}>
           <ScenePlayer
+            pending={transitioning}
             sceneId={lastVideo.current.sceneId}
             page={lastVideo.current.page}
             media={lastVideo.current.media}

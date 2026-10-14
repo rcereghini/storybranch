@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { launchBrowser } from "./browser";
+import { launchBrowser, startPlayback } from "./browser";
 const { key } = JSON.parse(await readFile(".phone-preview.json", "utf8"));
 const base = process.env.PHONE_PREVIEW_URL ?? "http://127.0.0.1:4173";
 const browser = await launchBrowser();
@@ -48,9 +48,7 @@ try {
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   await page.goto(base + "/s/glass-harbor/the-glass-harbor");
   await page.getByRole("button", { name: /Start a new journey/ }).click();
-  await page
-    .getByRole("button", { name: "Start story with sound", exact: true })
-    .click();
+  await startPlayback(page);
   await page.waitForFunction(() => {
     const v = document.querySelector("video")!;
     return v.currentTime > 0.1 && !v.paused && !v.muted;

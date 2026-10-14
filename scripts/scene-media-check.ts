@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { launchBrowser } from "./browser";
+import { launchBrowser, startPlayback } from "./browser";
 const browser = await launchBrowser();
 try {
   for (const width of [1440, 390]) {
@@ -17,7 +17,7 @@ try {
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
     await page.getByRole("button", { name: "Start a new journey" }).click();
-    await page.getByRole("button", { name: "Start story with sound" }).click();
+    await startPlayback(page);
     const element = await page.locator("video").elementHandle();
     for (const [node, choice] of [
       ["dock", "Speak to the courier"],

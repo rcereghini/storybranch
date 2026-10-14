@@ -304,7 +304,12 @@ function App() {
             </div>
           )}
           {busy && (
-            <div className="notice subtle" role="status">
+            <div
+              className={
+                path.startsWith("/play/") ? "sr-only" : "notice subtle"
+              }
+              role="status"
+            >
               {pending ? "Saving your choice…" : "Loading your adventure…"}
             </div>
           )}
@@ -375,6 +380,7 @@ function App() {
                 <div className="player-grid">
                   <section>
                     <Page
+                      transitioning={busy}
                       onPlaybackChange={setPlaying}
                       disabled={disabled}
                       onOutput={(output) =>

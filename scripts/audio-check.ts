@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { launchBrowser } from "./browser";
+import { launchBrowser, startPlayback } from "./browser";
 import { webkit, type Browser } from "playwright";
 let webkitBrowser: Browser | undefined;
 
@@ -29,9 +29,7 @@ try {
   await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
   await page.getByRole("button", { name: /Start a new journey/ }).click();
   await page.locator("video").waitFor();
-  await page
-    .getByRole("button", { name: "Start story with sound", exact: true })
-    .click();
+  await startPlayback(page);
   const url = page.url();
   const state = await context.storageState({ indexedDB: true });
 
@@ -43,16 +41,7 @@ try {
   const test = await fresh.newPage();
   console.log("Playback page created.");
   await test.goto(url);
-  await test
-    .getByRole("button", { name: "Start story with sound", exact: true })
-    .waitFor();
-  assert.equal(
-    await test.locator(".scene-overlay").getAttribute("aria-hidden"),
-    "false",
-  );
-  await test
-    .getByRole("button", { name: "Start story with sound", exact: true })
-    .click();
+  await startPlayback(test);
   await test.waitForFunction(() => {
     const v = document.querySelector("video")!;
     return (
@@ -103,7 +92,7 @@ try {
     ),
   );
   console.log(
-    `Audio PASS (${webkitBrowser ? "Playwright WebKit on Windows" : "Chrome"}): explicit sound start; one Play tap; actual H.264/AAC fixture with audio track; next scene plays unmuted after 6.5s validation delay; same video element and volume across choice and portrait switch. Safari/physical devices not covered.`,
+    `Audio PASS (${webkitBrowser ? "Playwright WebKit on Windows" : "Chrome"}): automatic sound start or browser gesture fallback; actual H.264/AAC fixture with audio track; next scene plays unmuted after 6.5s validation delay; same video element and volume across choice and portrait switch. Safari/physical devices not covered.`,
   );
 } catch (error) {
   console.error("Audio verification failed:", error);

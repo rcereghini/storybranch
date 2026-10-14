@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { launchBrowser } from "./browser";
+import { launchBrowser, startPlayback } from "./browser";
 const browser = await launchBrowser();
 try {
   for (const width of [1440, 390]) {
@@ -22,7 +22,7 @@ try {
     await page.getByRole("heading", { name: "The thirteenth chime" }).waitFor();
     await page.screenshot({ path: `test-results/text-options-${width}.png` });
     await page.getByRole("button", { name: /Use the clockwork key/ }).click();
-    await page.getByRole("button", { name: "Start story with sound" }).click();
+    await startPlayback(page);
     if (width === 390)
       await page
         .getByRole("button", { name: "Next page", exact: true })
@@ -30,7 +30,7 @@ try {
     await page.getByRole("heading", { name: "A new beginning" }).waitFor();
     await page.getByRole("button", { name: /Try The Storm Signal/ }).waitFor();
     await page.getByRole("button", { name: /Try The Storm Signal/ }).click();
-    await page.getByRole("button", { name: "Start story with sound" }).click();
+    await startPlayback(page);
     await page.getByRole("button", { name: "Skip to choices" }).click();
     await page.getByRole("button", { name: /Climb the mast/ }).click();
     await page.getByRole("heading", { name: "Hold fast" }).waitFor();

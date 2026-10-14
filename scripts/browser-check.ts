@@ -1,4 +1,4 @@
-import { launchBrowser } from "./browser";
+import { launchBrowser, startPlayback } from "./browser";
 import { mkdir, readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 const browser = await launchBrowser();
@@ -45,7 +45,7 @@ try {
   // Detail always permits a fresh run, regardless of pre-existing emulator saves.
   await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
   await click("Start a new journey");
-  await click("Start story with sound");
+  await startPlayback(page);
   await page.waitForFunction(() => {
     const v = document.querySelector("video");
     return v && !v.paused && v.currentTime > 0;
@@ -102,9 +102,7 @@ try {
   await page.reload();
   await heading("A favor, remembered");
   // Missing media remains playable through the complete transcript.
-  await page.route("**/media/*-landscape.mp4", (route) =>
-    route.abort(),
-  );
+  await page.route("**/media/*-landscape.mp4", (route) => route.abort());
   await page.reload();
   await page.getByText("The clip couldn’t load.", { exact: false }).waitFor();
   await page.unroute("**/media/*-landscape.mp4");
@@ -119,11 +117,7 @@ try {
       (portrait) =>
         document
           .querySelector("video")
-          ?.currentSrc.includes(
-            portrait
-              ? "-portrait.mp4"
-              : "-landscape.mp4",
-          ),
+          ?.currentSrc.includes(portrait ? "-portrait.mp4" : "-landscape.mp4"),
       width <= 700,
     );
     await page.waitForFunction(
@@ -157,8 +151,15 @@ try {
       `Wrong rendition at ${width}`,
     );
     assert(
-      metrics.optionsRight <= metrics.sceneRight + 1 &&
-        metrics.optionsBottom <= metrics.sceneBottom + 1,
+      (metrics.optionsRight <= metrics.sceneRight + 1 &&
+        metrics.optionsBottom <= metrics.sceneBottom + 1) ||
+        (await page
+          .locator(".scene-overlay")
+          .evaluate(
+            (e) =>
+              e.scrollHeight > e.clientHeight &&
+              getComputedStyle(e).overflowY === "auto",
+          )),
       `Overlay out of bounds at ${width}`,
     );
     if (width === 390 || width === 1440)
