@@ -39,6 +39,7 @@ function App() {
     [playing, setPlaying] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [savesError, setSavesError] = useState(false),
     [stale, setStale] = useState(false),
     [offline, setOffline] = useState(!navigator.onLine),
     [login, setLogin] = useState(false),
@@ -92,6 +93,7 @@ function App() {
       setAuthReady(true);
       setPlayer(null);
       setSaves([]);
+      setSavesError(false);
       setPending(null);
     });
     return () => {
@@ -109,12 +111,17 @@ function App() {
   };
   const loadSaves = async (cursor?: string) => {
     const requestingUid = auth.currentUser?.uid;
-    const r = await api<{ items: Save[]; nextCursor: string | null }>(
-      `/playthroughs${cursor ? `?cursor=${cursor}` : ""}`,
-    );
-    if (auth.currentUser?.uid !== requestingUid) return;
-    setSaves((old) => (cursor ? [...old, ...r.items] : r.items));
-    setSaveCursor(r.nextCursor);
+    try {
+      const r = await api<{ items: Save[]; nextCursor: string | null }>(
+        `/playthroughs${cursor ? `?cursor=${cursor}` : ""}`,
+      );
+      if (auth.currentUser?.uid !== requestingUid) return;
+      setSaves((old) => (cursor ? [...old, ...r.items] : r.items));
+      setSaveCursor(r.nextCursor);
+      setSavesError(false);
+    } catch {
+      if (auth.currentUser?.uid === requestingUid) setSavesError(true);
+    }
   };
   const loadPlayer = async (id: string) => {
     const requestingUid = auth.currentUser?.uid;
@@ -130,6 +137,7 @@ function App() {
   };
   const refresh = async () => {
     setBusy(true);
+    setError("");
     try {
       if (path.startsWith("/play/")) await loadPlayer(path.split("/")[2]);
       else {
@@ -172,7 +180,6 @@ function App() {
       if (path !== `/play/${result.save.id}`)
         navigate(`/play/${result.save.id}`);
       else await loadPlayer(result.save.id);
-      await loadSaves();
     } catch (e) {
       report(e);
       if (e instanceof ApiError && e.code !== "UNAVAILABLE") setPending(null);
@@ -268,6 +275,17 @@ function App() {
       </header>
       <main className={playing ? "playback-active" : undefined}>
         <div aria-live="polite">
+          {user && savesError && !path.startsWith("/play/") && (
+            <div className="notice error" role="alert">
+              Your saved-adventure list could not be loaded. Please retry.
+              <button
+                disabled={busy || offline}
+                onClick={() => void loadSaves()}
+              >
+                Retry saved adventures
+              </button>
+            </div>
+          )}
           {offline && (
             <div className="notice">
               You’re offline. Read the current scene; reconnect to save a
@@ -553,6 +571,10 @@ function App() {
               <button className="primary" onClick={() => setLogin(true)}>
                 Sign in to see your saves
               </button>
+            ) : savesError && saves.length === 0 ? (
+              <p>
+                Your saved adventures will appear when the list is available.
+              </p>
             ) : saves.length === 0 ? (
               <p>
                 No adventures yet. Your first choice is waiting.{" "}

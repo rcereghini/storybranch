@@ -47,6 +47,8 @@ Netlify variables declared only in `netlify.toml` are not available to Functions
 
 ## Verification status
 
+Live save-list diagnosis: the catalogue now responds successfully, but the `playthroughs` query reports `FAILED_PRECONDITION` because its composite index is missing. Creating that index with the runtime credential returned IAM `PERMISSION_DENIED`; a project administrator must create the index described above. The player no longer refreshes the save list after every successful choice. List failures show a separate retry notice on catalogue/library screens, not a failed-choice message. Chrome regression `node --import tsx scripts/save-list-check.ts` verifies that choices persist and reload while the list endpoint returns 503.
+
 Configuration tests reject invalid modes, non-loopback emulators and mixed live/emulator settings. Emulator integration tests cover auth, cross-user denial, idempotency, races, pinned saves, isolated side quests and profile bootstrap preserving existing/disabled profiles. Live credentials, existing project rules/indexes, provider enablement and real hosted sign-in still require verification after project access is supplied. The public web configuration alone cannot authorize server writes.
 
 Google sign-in uses a user-triggered popup; blocked or cancelled popups leave the form open with recovery guidance. The isolated phone tunnel supports email signup but not Google OAuth. Production Google OAuth and physical-device popup behavior require manual verification.
