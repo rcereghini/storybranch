@@ -56,7 +56,10 @@ function App() {
     [catalogueItems, setCatalogueItems] = useState<CatalogueEntry[]>([]),
     [catalogueCursor, setCatalogueCursor] = useState<string | null>(null),
     [catalogueReady, setCatalogueReady] = useState(false),
-    [studioDirty, setStudioDirty] = useState(false);
+    [studioDirty, setStudioDirty] = useState(false),
+    [loadedKey, setLoadedKey] = useState<string | null>(null);
+  // Identifies what the latest refresh() must load: this page for this user.
+  const loadKey = `${path}|${user?.uid ?? ""}`;
   const navigate = (p: string) => {
     if (
       p !== path &&
@@ -157,6 +160,7 @@ function App() {
     setError("");
   };
   const refresh = async () => {
+    const key = loadKey;
     setBusy(true);
     setError("");
     try {
@@ -182,6 +186,7 @@ function App() {
       report(e);
     } finally {
       setBusy(false);
+      setLoadedKey(key);
     }
   };
   useEffect(() => {
@@ -257,7 +262,15 @@ function App() {
   };
   // Until Firebase restores the session, a signed-in player looks signed out,
   // so start() would open the sign-in dialog instead of starting the story.
-  const disabled = busy || offline || stale || !!pending || !authReady;
+  // Overlapping refreshes (StrictMode, then the auth change) each clear busy,
+  // so also wait until the refresh for the current page and user has finished.
+  const disabled =
+    busy ||
+    offline ||
+    stale ||
+    !!pending ||
+    !authReady ||
+    loadedKey !== loadKey;
   const resume = saves.find(
     (s) => !s.parentPlaythroughId && s.status === "active",
   );
