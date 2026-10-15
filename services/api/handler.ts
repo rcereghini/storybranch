@@ -54,7 +54,8 @@ export async function handle(request: Request): Promise<Response> {
   const correlationId = randomUUID();
   try {
     const url = new URL(request.url);
-    const segments = url.pathname.split("/").filter(Boolean);
+    const path = url.pathname;
+    const segments = path.split("/").filter(Boolean);
     for (const segment of segments) id.parse(segment);
     const cursor = url.searchParams.get("cursor");
     if (cursor) id.parse(cursor);
