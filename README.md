@@ -10,7 +10,7 @@ The player now uses a landscape overlay on larger screens and an authored portra
 
 Signed-in players land on their **Dashboard**: profile with display name and avatar, shared stats, progress across stories, endings found and where they left off. The catalogue lives under **Discover** (`/discover`). See [Player dashboard and profile](docs/18-player-dashboard.md).
 
-**Create** opens the new Creator Studio: private drafts, all five page types, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Sample clips are available now; uploads remain pending. Hosted publishing requires server-only `STORYBRANCH_PUBLISHER_UIDS`; emulator accounts can publish immediately.
+**Create** opens the new Creator Studio: private drafts, all five page types, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Video pages can use sample clips or uploaded MP4/WebM clips stored in Firebase Storage. Hosted publishing requires server-only `STORYBRANCH_PUBLISHER_UIDS`; emulator accounts can publish immediately.
 
 The player now supports five explicit page types and two additional mixed-page stories: **The Clockwork Door** and **The Storm Signal**. See [Story and Page model](docs/16-story-pages.md). Reseed to publish the new `pages-v1` editions. Pre-page prototype saves require a new journey; accounts are unchanged.
 

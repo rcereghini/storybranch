@@ -80,8 +80,63 @@ try {
     assert.deepEqual(errors, []);
     await page.close();
   }
+  // Upload a clip, preview it, publish and play it from Storage.
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 950 },
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("http://127.0.0.1:5173/studio");
+  await page.getByRole("button", { name: "Sign in to create" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Sign in ↗" })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "New story", exact: true }).click();
+  await page
+    .getByLabel("Story title", { exact: true })
+    .fill(`Uploaded clip ${Date.now()}`);
+  await page.getByLabel("Page type", { exact: true }).selectOption("video");
+  await page
+    .getByLabel("Upload a clip", { exact: true })
+    .setInputFiles("apps/web/public/media/harbor-landscape-audio-v1.mp4");
+  await page
+    .getByText("Uploaded harbor-landscape-audio-v1.mp4", { exact: false })
+    .waitFor({ timeout: 30000 });
+  assert.match(
+    await page.getByLabel("Video clip", { exact: true }).inputValue(),
+    /^asset:/,
+  );
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByText("Draft saved privately.", { exact: false }).waitFor();
+  const storageSource = (scope: string) =>
+    page.waitForFunction(
+      (selector) => {
+        const video = document.querySelector<HTMLVideoElement>(selector);
+        return (
+          !!video &&
+          video.currentSrc.startsWith("http://127.0.0.1:9299/") &&
+          video.readyState >= 1
+        );
+      },
+      `${scope} video`,
+      { timeout: 20000 },
+    );
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await storageSource(".studio-preview");
+  await page.getByRole("button", { name: "Close preview" }).click();
+  await page
+    .getByRole("button", { name: "Publish edition", exact: true })
+    .click();
+  await page.getByText("Published edition-1.", { exact: false }).waitFor();
+  await page.locator(".loading-overlay").waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Play published story" }).click();
+  await storageSource(".scene-player");
+  assert.deepEqual(errors, []);
+  await page.close();
   console.log(
-    "PASS: desktop/mobile create, edit, private save/reload, shared Page preview, publish and authoritative play.",
+    "PASS: desktop/mobile create, edit, private save/reload, shared Page preview, publish and authoritative play; clip upload, preview and published playback from Storage.",
   );
 } finally {
   await browser.close();

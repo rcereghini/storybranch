@@ -1,2 +1,28 @@
 rules_version = '2';
-service firebase.storage { match /b/{bucket}/o { match /{path=**} { allow read, write: if false; } } }
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Live records sit under storybranch/app; the emulator project has no prefix.
+    function asset(assetId) {
+      return bucket == 'storybranch-f77a3.firebasestorage.app'
+        ? firestore.get(/databases/(default)/documents/storybranch/app/assets/$(assetId))
+        : firestore.get(/databases/(default)/documents/assets/$(assetId));
+    }
+    // A creator may upload a clip only once, into a pending asset the API
+    // created for them, with exactly the declared size and type. Nobody reads
+    // through rules: playback uses download tokens the API issues.
+    match /uploads/{uid}/{assetId} {
+      allow create: if request.auth != null
+        && resource == null
+        && request.auth.uid == uid
+        && request.resource.size <= 100 * 1024 * 1024
+        && request.resource.contentType.matches('video/(mp4|webm)')
+        && asset(assetId).data.ownerUid == uid
+        && asset(assetId).data.status == 'pending'
+        && asset(assetId).data.bytes == request.resource.size
+        && asset(assetId).data.contentType == request.resource.contentType;
+    }
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

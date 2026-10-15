@@ -19,7 +19,7 @@ jobs:
       - run: pnpm check
       # Match local Chrome's H.264/AAC support for the shipped MP4 fixtures.
       - run: pnpm exec playwright install --with-deps chrome
-      - run: pnpm exec firebase emulators:exec --project demo-storybranch --only auth,firestore "pnpm seed && pnpm test:integration && pnpm exec tsx scripts/ci-browser.ts"
+      - run: pnpm exec firebase emulators:exec --project demo-storybranch --only auth,firestore,storage "pnpm seed && pnpm test:integration && pnpm exec tsx scripts/ci-browser.ts"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

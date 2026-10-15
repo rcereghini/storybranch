@@ -8,6 +8,7 @@ import {
 } from "../../packages/contracts/authoring";
 import { validatePublication } from "../../packages/domain/authoring";
 import { resolveFixtureMedia } from "../../fixtures/media";
+import { assetIdOf } from "../../packages/contracts/media";
 import { db, config } from "./firebase";
 import { publisherAllowed } from "./creator-access";
 
@@ -117,8 +118,19 @@ export async function authoring(
       if (!old) throw new GameError("NOT_FOUND", "Save your draft first.");
       const versionId = `edition-${old.revision}`;
       const story = validatePublication({ ...old.story, versionId });
+      const clips = [];
       for (const page of Object.values(story.pages)) {
-        if (page.video && !resolveFixtureMedia(page.video))
+        const assetId = assetIdOf(page.video);
+        if (assetId) {
+          const clip = db.doc(`assets/${assetId}`);
+          const asset = (await tx.get(clip)).data();
+          if (asset?.ownerUid !== uid || asset.status !== "ready")
+            throw new GameError(
+              "VALIDATION_FAILED",
+              `${page.title}: choose one of your finished uploads or a sample clip.`,
+            );
+          clips.push(clip);
+        } else if (page.video && !resolveFixtureMedia(page.video))
           throw new GameError(
             "VALIDATION_FAILED",
             `${page.title}: choose an available sample clip.`,
@@ -149,6 +161,8 @@ export async function authoring(
         for (const page of Object.values(pages))
           tx.create(version.collection("pages").doc(page.id), page);
       }
+      // Published clips stay available to every pinned save.
+      for (const clip of clips) tx.update(clip, { published: true });
       result = { ...old, publishedVersionId: versionId };
       tx.set(ref, result);
       tx.update(root, { publishedVersionId: versionId });

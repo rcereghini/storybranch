@@ -6,6 +6,7 @@ export function backendConfig(env: Record<string, string | undefined>) {
     if (
       env.FIRESTORE_EMULATOR_HOST ||
       env.FIREBASE_AUTH_EMULATOR_HOST ||
+      env.FIREBASE_STORAGE_EMULATOR_HOST ||
       env.STORYBRANCH_PHONE_PREVIEW === "1"
     )
       throw new Error("Firebase mode cannot use emulator settings");
@@ -15,6 +16,8 @@ export function backendConfig(env: Record<string, string | undefined>) {
       prefix: "storybranch/app/",
       firestoreHost: undefined,
       authHost: undefined,
+      bucket: "storybranch-f77a3.firebasestorage.app",
+      storageHost: undefined,
     } as const;
   }
   const phone = env.STORYBRANCH_PHONE_PREVIEW === "1";
@@ -24,7 +27,9 @@ export function backendConfig(env: Record<string, string | undefined>) {
     (env.FIRESTORE_EMULATOR_HOST &&
       env.FIRESTORE_EMULATOR_HOST !== firestoreHost) ||
     (env.FIREBASE_AUTH_EMULATOR_HOST &&
-      env.FIREBASE_AUTH_EMULATOR_HOST !== authHost)
+      env.FIREBASE_AUTH_EMULATOR_HOST !== authHost) ||
+    (env.FIREBASE_STORAGE_EMULATOR_HOST &&
+      env.FIREBASE_STORAGE_EMULATOR_HOST !== "127.0.0.1:9299")
   )
     throw new Error("Only loopback emulators are supported");
   return {
@@ -33,5 +38,8 @@ export function backendConfig(env: Record<string, string | undefined>) {
     prefix: "",
     firestoreHost,
     authHost,
+    bucket: "demo-storybranch.appspot.com",
+    // The phone preview runs without a Storage emulator, so it has no uploads.
+    storageHost: phone ? undefined : "127.0.0.1:9299",
   } as const;
 }

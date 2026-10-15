@@ -22,6 +22,11 @@ it("requires explicit emulator mode and keeps it on demo projects", () => {
 it.each([
   { FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" },
   { FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099" },
+  { FIREBASE_STORAGE_EMULATOR_HOST: "127.0.0.1:9299" },
+  {
+    STORYBRANCH_MODE: "emulator",
+    FIREBASE_STORAGE_EMULATOR_HOST: "remote.example:9299",
+  },
   { STORYBRANCH_PHONE_PREVIEW: "1" },
   { STORYBRANCH_MODE: "other" },
   {

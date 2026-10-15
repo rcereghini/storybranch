@@ -43,6 +43,16 @@ The default server mode is `firebase`; an explicit `STORYBRANCH_MODE=firebase` i
 
 Redeploy after changing runtime environment variables. The build command remains `pnpm build`; publish `dist`. `/api/catalogue` should return HTTP 200 with Glass Harbor after credentials and seed are complete. Sign in with the real Firebase test user, begin a journey, choose a route, reload, and verify the saved scene.
 
+## Storage for clip uploads
+
+The project's default bucket `storybranch-f77a3.firebasestorage.app` exists. Before hosted uploads work, an administrator must deploy `firebase/storage.rules`. If another app shares this bucket, merge its rules first instead of replacing them.
+
+```sh
+pnpm exec firebase deploy --only storage --project storybranch-f77a3
+```
+
+The rules read `storybranch/app/assets/{assetId}` from Firestore to authorize each upload. The first deploy asks to let Storage rules read Firestore; accept it. No CORS configuration is needed: the Storage SDK and `<video>` playback work without it. Uploading is limited to `STORYBRANCH_PUBLISHER_UIDS`. Locally the Storage emulator runs on port 9299 with the other emulators.
+
 ## Vercel
 
 `vercel.json` builds with `pnpm build:vercel`, serves `dist`, and routes every `/api/*` request to `api/index.js`. That function re-exports a Vite bundle of the same handler (`vite.api.config.ts` → `dist-api/`), because Vercel compiles TypeScript functions file by file and cannot resolve this project's extensionless ESM imports. Netlify configuration is unchanged; both hosts can run side by side.
