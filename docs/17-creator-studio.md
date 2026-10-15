@@ -22,12 +22,12 @@ Set server-only `STORYBRANCH_PUBLISHER_UIDS` to a comma-separated list of Fireba
 
 On a Video page, **Upload a clip** accepts an MP4 or WebM file of up to 100 MB and 60 seconds. When it finishes, the page uses the clip and **Video clip** lists it under **Your clips** for any page. Save the draft to keep the choice. Preview plays the uploaded clip. Publishing makes every clip the story uses public; unused and draft-only clips stay private.
 
-1. `POST /api/uploads` with `{idempotencyKey, fileName, contentType, bytes, durationSeconds}` creates a pending asset (`assets/{assetId}`) and returns its Storage path `uploads/{uid}/{assetId}`.
+1. `POST /api/uploads` with `{idempotencyKey, fileName, contentType, bytes, durationSeconds}` creates a pending clip record (`users/{uid}/clips/{clipId}`) and returns its Storage path, which is the same `users/{uid}/clips/{clipId}`.
 2. The browser uploads the file directly to Firebase Storage with the Storage SDK, so large files never pass through the API (Vercel limits request bodies to about 4.5 MB). `firebase/storage.rules` accepts the write only from that user, once, into a pending asset with exactly the declared size and type. Rules allow no reads.
 3. `POST /api/uploads/{assetId}/complete` checks the stored size and type, and the file's leading bytes (an MP4 `ftyp` box or the WebM EBML header). A file that fails is deleted along with its asset. A file that passes gets a Firebase download token and becomes `ready`.
 4. `GET /api/uploads` lists the caller's clips. Download URLs are returned only to the owner, and to players for pages in published editions.
 
-Pages store an uploaded clip as `video: "asset:<assetId>"`. Publishing rejects a clip that is missing, not ready, or owned by someone else, then marks used clips `published`. Players get `media.landscape.src` as the Storage download URL. Uploaded clips have no portrait rendition, poster, captions or social teaser, so the player contains the one rendition at every width and shows no captions track.
+Pages store an uploaded clip as `video: "asset:<assetId>"`. Publishing rejects a clip that is missing, not ready, or not among the publisher's own clips, marks used clips `published`, and records each clip's Storage file and token in the edition so playback never reads the creator's clip records. Players get `media.landscape.src` as the Storage download URL. Uploaded clips have no portrait rendition, poster, captions or social teaser, so the player contains the one rendition at every width and shows no captions track.
 
 Hosted uploads use the same allowlist as publishing (`STORYBRANCH_PUBLISHER_UIDS`); emulator accounts can upload immediately. Each account can keep 50 clips. The length comes from the browser and is informational: the server checks size, type and file signature, not duration or whether the video decodes. There is no transcoding, thumbnail, moderation, deletion or storage quota beyond those limits. The phone preview has no Storage emulator and shows uploads as unavailable.
 
@@ -42,7 +42,7 @@ All endpoints require a verified active Firebase user:
 | `POST /api/studio/{storyId}` | Save `{idempotencyKey, expectedRevision, draft: {story, description}}`. Revision 0 creates; later revisions use optimistic concurrency. |
 | `POST /api/studio/{storyId}/publish` | Publish `{idempotencyKey, expectedRevision, policyVersion: "creator-alpha-1"}`. Requires creator allowlist in Firebase mode. |
 
-Drafts live at `creatorDrafts/{uid}/stories/{storyId}` within the existing configured database prefix. A first save reserves story ownership at `stories/{storyId}`. IDs of existing sample stories cannot be claimed. API authorization derives identity from the token; direct Firestore draft access and writes remain denied by default.
+Drafts live at `users/{uid}/drafts/{storyId}`. A first save reserves story ownership at `stories/{storyId}`. IDs of existing sample stories cannot be claimed. API authorization derives identity from the token; direct Firestore draft access and writes remain denied by default.
 
 Draft requests are bounded to 250,000 UTF-8 bytes, 80 pages, 20 choices per page, 160-character titles and 500-character descriptions. Schema validation applies even to private drafts. Publication also validates graph references, page completion contracts, key namespaces, a reachable ending, unreachable pages and loops with no route to an ending. Cycles with an exit are allowed. This is structural validation, not a proof that every conditional route is satisfiable for every player state.
 

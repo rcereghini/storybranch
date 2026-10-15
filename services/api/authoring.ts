@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { FieldPath } from "firebase-admin/firestore";
+import { FieldPath, type DocumentReference } from "firebase-admin/firestore";
 import { GameError } from "../../packages/contracts/index";
 import {
   draftCommandSchema,
@@ -8,8 +8,10 @@ import {
 } from "../../packages/contracts/authoring";
 import { validatePublication } from "../../packages/domain/authoring";
 import { resolveFixtureMedia } from "../../fixtures/media";
-import { assetIdOf } from "../../packages/contracts/media";
+import { assetIdOf, type PublishedClip } from "../../packages/contracts/media";
 import { db, config } from "./firebase";
+import * as paths from "./paths";
+import { publishedClip } from "./uploads";
 import { publisherAllowed } from "./creator-access";
 
 export async function authoring(
@@ -24,7 +26,7 @@ export async function authoring(
     uid,
     process.env.STORYBRANCH_PUBLISHER_UIDS,
   );
-  const collection = db.collection(`creatorDrafts/${uid}/stories`);
+  const collection = db.collection(paths.drafts(uid));
   const storyId = segments[2];
   if (request.method === "GET" && segments.length === 2) {
     let query = collection.orderBy(FieldPath.documentId()).limit(limit);
@@ -72,9 +74,7 @@ export async function authoring(
   const fingerprint = createHash("sha256")
     .update(JSON.stringify({ segments, command }))
     .digest("hex");
-  const receipt = db.doc(
-    `commandReceipts/${createHash("sha256").update(`${uid}:author:${command.idempotencyKey}`).digest("hex")}`,
-  );
+  const receipt = db.doc(paths.receipt(uid, "author", command.idempotencyKey));
   return db.runTransaction(async (tx) => {
     const previous = await tx.get(receipt);
     if (previous.exists) {
@@ -118,18 +118,22 @@ export async function authoring(
       if (!old) throw new GameError("NOT_FOUND", "Save your draft first.");
       const versionId = `edition-${old.revision}`;
       const story = validatePublication({ ...old.story, versionId });
-      const clips = [];
+      // Only the publisher's own finished clips; the edition records each
+      // clip's file so players never read the creator's clip records.
+      const clips = new Map<string, DocumentReference>();
+      const published: Record<string, PublishedClip> = {};
       for (const page of Object.values(story.pages)) {
         const assetId = assetIdOf(page.video);
         if (assetId) {
-          const clip = db.doc(`assets/${assetId}`);
+          const clip = db.doc(paths.clip(uid, assetId));
           const asset = (await tx.get(clip)).data();
-          if (asset?.ownerUid !== uid || asset.status !== "ready")
+          if (asset?.status !== "ready")
             throw new GameError(
               "VALIDATION_FAILED",
               `${page.title}: choose one of your finished uploads or a sample clip.`,
             );
-          clips.push(clip);
+          clips.set(assetId, clip);
+          published[assetId] = publishedClip(asset);
         } else if (page.video && !resolveFixtureMedia(page.video))
           throw new GameError(
             "VALIDATION_FAILED",
@@ -157,12 +161,13 @@ export async function authoring(
           ...manifest,
           ready: true,
           manifestHash,
+          ...(clips.size ? { clips: published } : {}),
         });
         for (const page of Object.values(pages))
           tx.create(version.collection("pages").doc(page.id), page);
       }
       // Published clips stay available to every pinned save.
-      for (const clip of clips) tx.update(clip, { published: true });
+      for (const clip of clips.values()) tx.update(clip, { published: true });
       result = { ...old, publishedVersionId: versionId };
       tx.set(ref, result);
       tx.update(root, { publishedVersionId: versionId });
@@ -173,7 +178,13 @@ export async function authoring(
         publishedVersionId: versionId,
       });
     }
-    tx.create(receipt, { actor: uid, fingerprint, result, at: Date.now() });
+    tx.create(receipt, {
+      actor: uid,
+      fingerprint,
+      result,
+      at: Date.now(),
+      ...paths.receiptExpiry(Date.now()),
+    });
     return result;
   });
 }

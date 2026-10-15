@@ -1,1 +1,11 @@
-{"indexes":[{"collectionGroup":"playthroughs","queryScope":"COLLECTION","fields":[{"fieldPath":"playerUid","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]}],"fieldOverrides":[]}
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "receipts",
+      "fieldPath": "expireAt",
+      "ttl": true,
+      "indexes": []
+    }
+  ]
+}

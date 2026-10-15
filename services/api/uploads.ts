@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import * as paths from "./paths";
 import type { DocumentData } from "firebase-admin/firestore";
 import { GameError } from "../../packages/contracts/index";
 import {
@@ -6,6 +7,7 @@ import {
   uploadCommandSchema,
   uploadLimits,
   type ClipAsset,
+  type PublishedClip,
   type SceneMedia,
   type UploadListing,
 } from "../../packages/contracts/media";
@@ -14,9 +16,10 @@ import { db, bucket, config } from "./firebase";
 import { publisherAllowed } from "./creator-access";
 import { downloadUrl, sniffVideo } from "./video-check";
 
-// Clips live at uploads/{uid}/{assetId}. The browser uploads straight to
-// Storage; Storage rules accept only a pending asset this API created for the
-// same user, with the declared size and type (firebase/storage.rules).
+// A clip's record is users/{uid}/clips/{assetId} and its file sits at the
+// same path in Storage. The browser uploads straight to Storage; Storage rules
+// accept only a pending clip this API created for the same user, with the
+// declared size and type (firebase/storage.rules).
 function access(uid: string) {
   if (!config.storageHost && config.mode === "emulator")
     return "Clip uploads are not available in this preview.";
@@ -27,20 +30,19 @@ function access(uid: string) {
   return null;
 }
 
-export function assetMedia(asset: DocumentData): SceneMedia | undefined {
-  if (asset.status !== "ready") return undefined;
-  return {
-    landscape: {
-      src: downloadUrl(
-        config.storageHost,
-        config.bucket,
-        asset.path,
-        asset.token,
-      ),
-      type: asset.contentType,
-    },
-  };
-}
+const clipMedia = (clip: PublishedClip): SceneMedia => ({
+  landscape: {
+    src: downloadUrl(config.storageHost, config.bucket, clip.path, clip.token),
+    type: clip.contentType,
+  },
+});
+export const assetMedia = (asset: DocumentData) =>
+  asset.status === "ready" ? clipMedia(asset as PublishedClip) : undefined;
+export const publishedClip = (asset: DocumentData): PublishedClip => ({
+  path: asset.path,
+  token: asset.token,
+  contentType: asset.contentType,
+});
 
 function view(id: string, asset: DocumentData): ClipAsset {
   return {
@@ -56,12 +58,15 @@ function view(id: string, asset: DocumentData): ClipAsset {
   };
 }
 
-// Media for a page in a published edition: a shipped clip or a ready upload.
-export async function pageMedia(video: string | undefined) {
+// Media for a page in a published edition: a shipped clip or an uploaded clip
+// the edition recorded when it was published.
+export function pageMedia(
+  video: string | undefined,
+  clips: Record<string, PublishedClip>,
+) {
   const assetId = assetIdOf(video);
   if (!assetId) return resolveFixtureMedia(video ?? "");
-  const asset = await db.doc(`assets/${assetId}`).get();
-  return asset.exists ? assetMedia(asset.data()!) : undefined;
+  return clips[assetId] ? clipMedia(clips[assetId]) : undefined;
 }
 
 export async function uploads(
@@ -72,8 +77,7 @@ export async function uploads(
   const reason = access(uid);
   if (request.method === "GET" && segments.length === 2) {
     const records = await db
-      .collection("assets")
-      .where("ownerUid", "==", uid)
+      .collection(paths.clips(uid))
       .limit(uploadLimits.maxAssets)
       .get();
     const listing: UploadListing = {
@@ -108,9 +112,7 @@ async function create(request: Request, uid: string) {
   const fingerprint = createHash("sha256")
     .update(JSON.stringify(command))
     .digest("hex");
-  const receipt = db.doc(
-    `commandReceipts/${createHash("sha256").update(`${uid}:upload:${command.idempotencyKey}`).digest("hex")}`,
-  );
+  const receipt = db.doc(paths.receipt(uid, "upload", command.idempotencyKey));
   const previous = await receipt.get();
   if (previous.exists) {
     if (previous.data()!.fingerprint !== fingerprint)
@@ -121,11 +123,7 @@ async function create(request: Request, uid: string) {
     return previous.data()!.result;
   }
   // A soft cap: concurrent requests can pass together, which is acceptable here.
-  const owned = await db
-    .collection("assets")
-    .where("ownerUid", "==", uid)
-    .count()
-    .get();
+  const owned = await db.collection(paths.clips(uid)).count().get();
   if (owned.data().count >= uploadLimits.maxAssets)
     throw new GameError(
       "VALIDATION_FAILED",
@@ -136,7 +134,7 @@ async function create(request: Request, uid: string) {
     ownerUid: uid,
     status: "pending",
     published: false,
-    path: `uploads/${uid}/${assetId}`,
+    path: paths.clipFile(uid, assetId),
     fileName: command.fileName,
     contentType: command.contentType,
     bytes: command.bytes,
@@ -149,8 +147,14 @@ async function create(request: Request, uid: string) {
   await db.runTransaction(async (tx) => {
     const again = await tx.get(receipt);
     if (again.exists) return;
-    tx.create(db.doc(`assets/${assetId}`), asset);
-    tx.create(receipt, { actor: uid, fingerprint, result, at: Date.now() });
+    tx.create(db.doc(paths.clip(uid, assetId)), asset);
+    tx.create(receipt, {
+      actor: uid,
+      fingerprint,
+      result,
+      at: Date.now(),
+      ...paths.receiptExpiry(Date.now()),
+    });
   });
   const stored = (await receipt.get()).data()!;
   if (stored.fingerprint !== fingerprint)
@@ -162,12 +166,10 @@ async function create(request: Request, uid: string) {
 }
 
 async function complete(uid: string, assetId: string) {
-  const ref = db.doc(`assets/${assetId}`);
+  const ref = db.doc(paths.clip(uid, assetId));
   const snapshot = await ref.get();
   if (!snapshot.exists) throw new GameError("NOT_FOUND", "Clip not found.");
   const asset = snapshot.data()!;
-  if (asset.ownerUid !== uid)
-    throw new GameError("FORBIDDEN", "This clip belongs to another creator.");
   if (asset.status === "ready") return { asset: view(assetId, asset) };
   const file = bucket.file(asset.path);
   const [exists] = await file.exists();

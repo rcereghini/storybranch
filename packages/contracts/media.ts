@@ -61,6 +61,12 @@ export type ClipAsset = {
   // Present once ready; only ever sent to the owner or for published pages.
   media?: SceneMedia;
 };
+// The Storage file behind an uploaded clip, frozen into a published edition.
+export type PublishedClip = {
+  path: string;
+  token: string;
+  contentType: (typeof videoTypes)[number];
+};
 export type UploadListing = {
   enabled: boolean;
   reason: string | null;

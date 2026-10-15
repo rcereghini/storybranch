@@ -3,7 +3,10 @@ import { db, auth } from "../services/api/firebase";
 import { createHash } from "node:crypto";
 import { writeFile, readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
-const saves = await db.collection("playthroughs").orderBy("__name__").get();
+const saves = await db
+  .collectionGroup("playthroughs")
+  .orderBy("__name__")
+  .get();
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
   if (value && typeof value === "object")
@@ -22,7 +25,7 @@ const snapshot = {
   saveHash: createHash("sha256")
     .update(canonical(saves.docs.map((d) => d.data())))
     .digest("hex"),
-  receiptCount: (await db.collection("commandReceipts").count().get()).data()
+  receiptCount: (await db.collectionGroup("receipts").count().get()).data()
     .count,
   authCount: (await auth.listUsers()).users.length,
 };
