@@ -1,6 +1,6 @@
 # Player dashboard and profile
 
-Signed-in players land on their dashboard at `/`. Signed-out visitors still see the landing page there, and everyone can browse the catalogue at `/discover` (the **Discover** nav item). The Glass Harbor detail route (`/s/...`) keeps its **Start a new journey** action.
+Signed-in players land on their dashboard at `/`. Signed-out visitors still see the landing page there, and everyone can browse the catalogue at `/discover` (the **Discover** nav item). Every story has a detail page at `/s/<storyId>` with **Start a new journey**; the Endings collection links to `/s/<storyId>/ending/<pageId>` (see [sharing](13-responsive-video-and-sharing.md)).
 
 ## Dashboard sections
 
