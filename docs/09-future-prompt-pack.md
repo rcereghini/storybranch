@@ -6,7 +6,7 @@ Use these prompts in the project workspace. Start each new implementation conver
 
 ```text
 We are building Storybranch, a React and TypeScript video adventure platform,
-with Firebase authentication/database and Netlify web hosting. Read README.md,
+with Firebase authentication/database and Vercel web hosting. Read README.md,
 docs/01-product-requirements.md, docs/02-game-and-community-rules.md, and
 docs/10-decisions-and-open-questions.md before making changes. Then read the
 architecture, contracts, and acceptance criteria relevant to this task.

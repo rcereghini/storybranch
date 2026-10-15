@@ -7,7 +7,7 @@ Storybranch lets people play, create, and expand video based choose your own adv
 | ID | Requirement |
 | --- | --- |
 | R01 | Build a web application using React and TypeScript, with an architecture that supports mobile use and later native clients. |
-| R02 | Use Firebase for authentication and database services, and Netlify for web hosting. |
+| R02 | Use Firebase for authentication and database services, and Vercel for web hosting (originally Netlify; changed October 15, 2026, see C02). |
 | R03 | Provide a creator for video based branching stories and shareable story and creator library links. Include social sharing controls. |
 | R04 | Support generic stats shared across games and story specific keys or flags that affect choices. Stat checks can route a choice to a failure video. |
 | R05 | Integrate a video generation provider such as Higgsfield, with an in-app currency to pay for generation. |

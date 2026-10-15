@@ -1,4 +1,5 @@
-// Vercel runs this bundle (see vite.api.config.ts) with the same handler Netlify uses.
+// Vercel runs this bundle (see vite.api.config.ts); services/functions/api.ts
+// wraps the shared handler.
 import api from "../functions/api";
 export const GET = api;
 export const POST = api;

@@ -11,7 +11,7 @@ October 13: Stories own context and typed pages; every renderer uses a shared Pa
 | ID | Decision | Source |
 | --- | --- | --- |
 | C01 | Web first, mobile friendly, with an easier path to native clients | Initial request |
-| C02 | React and TypeScript, Firebase login/database, Netlify hosting | Initial request |
+| C02 | React and TypeScript, Firebase login/database, Vercel hosting | Initial request named Netlify; changed to Vercel October 15, 2026 and the Netlify configuration removed |
 | C03 | Video stories with creator tools, shareable story/library links, and social controls | Initial request |
 | C04 | Generic shared stats, unique story keys, player levels, achievements, and log | Initial request |
 | C05 | Optional command based combat with win/loss story routes | Initial request |
@@ -42,11 +42,11 @@ Implementation default for C12: 16:9 desktop, 9:16 mobile at ≤700 CSS pixels, 
 | P10 | Authorized existing branches survive later closure to new branching | Protects community work; final derivative terms remain a launch gate |
 | P11 | Platform XP only from validated reward definitions | Prevents arbitrary creator-authored XP farming |
 | P12 | Credits fund generation only; failed deliverables release reserved credits | Separates creation costs from gameplay and enables clear accounting |
-| P13 | Firebase Storage for media; durable Google Cloud worker/queue for production jobs | Complements Firebase data and Netlify hosting without long-lived web requests |
+| P13 | Firebase Storage for media; durable Google Cloud worker/queue for production jobs | Complements Firebase data and Vercel hosting without long-lived web requests |
 | P14 | Account required to save/play persistently; public story detail and catalogue can be browsed anonymously | Keeps discovery shareable and authoritative saves simple |
 | P15 | No nested community branches or multiplayer in v1 | Bounds state and provenance complexity |
 | P16 | Signed-in players land on a dashboard; the catalogue moves to Discover | Built October 14, 2026. Changes C07 (catalogue as logged-in home), so it needs explicit confirmation or reverting |
-| P17 | Production hosting on Vercel; Netlify configuration kept | Live since October 14, 2026 at www.storybranch.com. Changes C02 (Netlify hosting); confirm whether Netlify is retired |
+| P17 | Production hosting on Vercel | Confirmed October 15, 2026 and folded into C02; Netlify is retired |
 
 ## Decisions required before the relevant feature launches
 
