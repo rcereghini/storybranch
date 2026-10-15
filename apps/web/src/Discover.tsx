@@ -45,7 +45,19 @@ export function Discover({
 }) {
   const [query, setQuery] = useState("");
   const [genre, setGenre] = useState<GenreId | "all">("all");
-  const detail = path.startsWith("/s/");
+  // /s/<story>[/<slug>] is a story page; /s/<story>/ending/<page> is a shared
+  // ending. The ending's title comes from its static link-preview page.
+  const [, , detailId, ...rest] = path.split("/");
+  const detail = path.startsWith("/s/") && !!detailId;
+  // Creator stories have no preview page, so the title may be unknown.
+  const sharedEnding =
+    detail && rest[0] === "ending" && rest[1]
+      ? (document
+          .querySelector('meta[name="storybranch:ending"]')
+          ?.getAttribute("content") ?? "")
+      : null;
+  const detailEntry = catalogue.find((c) => c.id === detailId);
+  const featured = !detail || detailId === "glass-harbor";
   const genres = useMemo(
     () =>
       [...new Set(catalogue.map((c) => genreOf(c.genre ?? "")))].filter(
@@ -74,86 +86,162 @@ export function Discover({
 
   return (
     <div className="discover-page">
-      <section className="hero">
-        <div className="hero-art" />
-        <div className="hero-content">
-          <p className="eyebrow">
-            <span className="live-dot" /> THE FIRST STORYBRANCH ORIGINAL
-          </p>
-          <h1>
-            The Glass
-            <br />
-            <em>Harbor</em>
-            <span className="title-period">.</span>
-          </h1>
-          <p className="hero-subtitle">
-            Some cities keep secrets.
-            <br />
-            This one is waiting for your next move.
-          </p>
-          <div className="tags">
-            <span>MYSTERY</span>
-            <span>5–10 MIN</span>
-            <span>CHOICE-DRIVEN</span>
-          </div>
-          <div className="hero-actions">
-            <button
-              className="primary"
-              disabled={disabled || !catalogueReady}
-              onClick={() => (resume ? onResume(resume.id) : onStart())}
-            >
-              {resume ? "Resume adventure" : "Begin your story"} <span>↗</span>
-            </button>
-            <button
-              className="secondary"
-              onClick={() =>
-                document
-                  .getElementById(detail ? "story-detail" : "library")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              Explore the story ↓
-            </button>
-          </div>
-          <p className="hero-note">One harbor. Many ways home.</p>
-        </div>
-      </section>
-
-      {detail ? (
-        <section className="story-detail" id="story-detail">
-          <StoryCover
-            storyId="glass-harbor"
-            title="The Glass Harbor"
-            className="detail-cover"
-          />
-          <div className="detail-copy">
+      {featured && (
+        <section className="hero">
+          <div className="hero-art" />
+          <div className="hero-content">
             <p className="eyebrow">
-              MYSTERY · 5–10 MIN · BY STORYBRANCH STUDIO
+              <span className="live-dot" /> THE FIRST STORYBRANCH ORIGINAL
             </p>
-            <h2>A story that knows which way you turned.</h2>
-            <p>
-              Climb the rooftops, earn a harbor pass, or follow a stranger into
-              a smaller story. Your stats open routes. Your choices leave a
-              record.
+            <h1>
+              The Glass
+              <br />
+              <em>Harbor</em>
+              <span className="title-period">.</span>
+            </h1>
+            <p className="hero-subtitle">
+              Some cities keep secrets.
+              <br />
+              This one is waiting for your next move.
             </p>
-            <ul className="chips">
-              <li>Teen · mild peril</li>
-              <li>Community paths open</li>
-              <li>Full text transcripts</li>
-            </ul>
-            <div className="detail-actions">
+            <div className="tags">
+              <span>MYSTERY</span>
+              <span>5–10 MIN</span>
+              <span>CHOICE-DRIVEN</span>
+            </div>
+            <div className="hero-actions">
               <button
                 className="primary"
                 disabled={disabled || !catalogueReady}
-                onClick={() => onStart()}
+                onClick={() => (resume ? onResume(resume.id) : onStart())}
               >
-                Start a new journey ↗
+                {resume ? "Resume adventure" : "Begin your story"}{" "}
+                <span>↗</span>
               </button>
-              <button className="ghost" onClick={() => onNavigate("/discover")}>
+              <button
+                className="secondary"
+                onClick={() =>
+                  document
+                    .getElementById(detail ? "story-detail" : "library")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
+                Explore the story ↓
+              </button>
+            </div>
+            <p className="hero-note">One harbor. Many ways home.</p>
+          </div>
+        </section>
+      )}
+
+      {detail ? (
+        <section className="story-detail" id="story-detail">
+          {sharedEnding !== null && (
+            <p className="shared-ending" role="note">
+              {sharedEnding ? (
+                <>
+                  <span>A friend reached</span> <strong>{sharedEnding}</strong>
+                  <span>. Which ending will you find?</span>
+                </>
+              ) : (
+                "A friend shared an ending from this story. Which one will you find?"
+              )}
+            </p>
+          )}
+          {detailId === "glass-harbor" ? (
+            <>
+              <StoryCover
+                storyId="glass-harbor"
+                title="The Glass Harbor"
+                className="detail-cover"
+              />
+              <div className="detail-copy">
+                <p className="eyebrow">
+                  MYSTERY · 5–10 MIN · BY STORYBRANCH STUDIO
+                </p>
+                <h2>A story that knows which way you turned.</h2>
+                <p>
+                  Climb the rooftops, earn a harbor pass, or follow a stranger
+                  into a smaller story. Your stats open routes. Your choices
+                  leave a record.
+                </p>
+                <ul className="chips">
+                  <li>Teen · mild peril</li>
+                  <li>Community paths open</li>
+                  <li>Full text transcripts</li>
+                </ul>
+                <div className="detail-actions">
+                  <button
+                    className="primary"
+                    disabled={disabled || !catalogueReady}
+                    onClick={() => onStart("glass-harbor")}
+                  >
+                    Start a new journey ↗
+                  </button>
+                  <button
+                    className="ghost"
+                    onClick={() => onNavigate("/discover")}
+                  >
+                    Browse all stories
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : detailEntry ? (
+            <>
+              <StoryCover
+                storyId={detailEntry.id}
+                title={detailEntry.title}
+                className="detail-cover"
+              />
+              <div className="detail-copy">
+                <p className="eyebrow">
+                  {[
+                    detailEntry.genre,
+                    detailEntry.duration,
+                    detailEntry.creator && `BY ${detailEntry.creator}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                    .toUpperCase() || "AN INTERACTIVE STORY"}
+                </p>
+                <h1 className="detail-title">{detailEntry.title}</h1>
+                <p>{detailEntry.description}</p>
+                {detailEntry.rating && (
+                  <ul className="chips">
+                    <li>{detailEntry.rating}</li>
+                  </ul>
+                )}
+                <div className="detail-actions">
+                  <button
+                    className="primary"
+                    disabled={disabled || !catalogueReady}
+                    onClick={() => onStart(detailEntry.id)}
+                  >
+                    Start a new journey ↗
+                  </button>
+                  <button
+                    className="ghost"
+                    onClick={() => onNavigate("/discover")}
+                  >
+                    Browse all stories
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : catalogueReady ? (
+            <div className="empty-state">
+              <p>This story isn’t available right now.</p>
+              <button
+                className="primary"
+                onClick={() => onNavigate("/discover")}
+              >
                 Browse all stories
               </button>
             </div>
-          </div>
+          ) : (
+            <div className="placeholder-block tall" aria-hidden="true" />
+          )}
         </section>
       ) : (
         <section

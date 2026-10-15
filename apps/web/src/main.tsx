@@ -689,12 +689,22 @@ function App() {
                     </aside>
                   </details>
                 </div>
-                <div className="player-share">
-                  <ShareStory
-                    storyId={player.save.storyId}
-                    media={player.media}
-                  />
-                </div>
+                {/* Side quests start only from their branch location, so
+                    a public link to one would lead nowhere. */}
+                {!player.save.parentPlaythroughId && (
+                  <div className="player-share">
+                    <ShareStory
+                      storyId={player.save.storyId}
+                      storyTitle={player.story.title}
+                      ending={
+                        player.page.kind === "ending"
+                          ? { pageId: player.page.id, title: player.page.title }
+                          : undefined
+                      }
+                      media={player.media}
+                    />
+                  </div>
+                )}
                 {logOpen && (
                   <section className="log">
                     <div className="section-heading">
