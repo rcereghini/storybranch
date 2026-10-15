@@ -1,62 +1,123 @@
 import { useState } from "react";
 import type { SceneMedia } from "../../../packages/contracts/media";
+import {
+  canShareFiles,
+  copyLink,
+  endingLink,
+  shareClip,
+  shareLink,
+  storyLink,
+} from "./share";
+
+// On an ending page the panel leads with a shareable ending card; elsewhere
+// it shares the story. Links never contain the private playthrough ID.
 export function ShareStory({
   storyId,
+  storyTitle,
+  ending,
   media,
 }: {
   storyId: string;
+  storyTitle: string;
+  ending?: { pageId: string; title: string };
   media?: SceneMedia;
 }) {
   const [status, setStatus] = useState("");
-  // A public story link, never the private playthrough URL or its ID.
-  const url = new URL("/s/glass-harbor", location.origin).href;
-  if (storyId !== "glass-harbor") return null;
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setStatus("Story link copied.");
-    } catch {
-      setStatus(`Copy this story link: ${url}`);
-    }
-  };
-  const share = async () => {
-    if (!navigator.share) {
-      await copy();
-      return;
-    }
-    try {
-      await navigator.share({
-        title: "The Glass Harbor",
-        text: "A city of secrets. Which path would you take?",
-        url,
-      });
-      setStatus("Share sheet completed.");
-    } catch (e) {
-      if (!(e instanceof DOMException && e.name === "AbortError"))
-        setStatus("Sharing is unavailable here. Use Copy story link.");
-    }
-  };
+  const story = storyLink(storyId);
+  const endingUrl = ending ? endingLink(storyId, ending.pageId) : null;
+  const clip = media?.socialClip;
+  const fileSharing = !!clip && canShareFiles();
   return (
     <details className="share-story">
-      <summary>Share this adventure</summary>
-      <p>Invite someone to choose their own path.</p>
+      <summary>{ending ? "Share your ending" : "Share this adventure"}</summary>
+      {ending ? (
+        <div className="ending-card" aria-label="Ending share card">
+          <span className="ending-card-eyebrow">I REACHED AN ENDING</span>
+          <strong>{ending.title}</strong>
+          <span>in {storyTitle} · Which ending will you find?</span>
+        </div>
+      ) : (
+        <p>Invite someone to choose their own path.</p>
+      )}
       <div className="share-actions">
-        <button onClick={() => void share()}>Share story</button>
-        <button onClick={() => void copy()}>Copy story link</button>
-        {media?.socialClip && (
+        {ending && endingUrl && (
+          <>
+            <button
+              onClick={async () =>
+                setStatus(
+                  await shareLink(
+                    {
+                      title: `${ending.title} · ${storyTitle}`,
+                      text: `I reached “${ending.title}” in ${storyTitle}. Which ending will you find?`,
+                      url: endingUrl,
+                    },
+                    "Ending link",
+                  ),
+                )
+              }
+            >
+              Share ending
+            </button>
+            <button
+              onClick={async () =>
+                setStatus(await copyLink(endingUrl, "Ending link"))
+              }
+            >
+              Copy ending link
+            </button>
+          </>
+        )}
+        {!ending && (
+          <button
+            onClick={async () =>
+              setStatus(
+                await shareLink(
+                  {
+                    title: storyTitle,
+                    text: `${storyTitle}: which path would you take?`,
+                    url: story,
+                  },
+                  "Story link",
+                ),
+              )
+            }
+          >
+            Share story
+          </button>
+        )}
+        <button
+          onClick={async () => setStatus(await copyLink(story, "Story link"))}
+        >
+          Copy story link
+        </button>
+        {clip && fileSharing && (
+          <button
+            onClick={async () => {
+              const result = await shareClip(clip.src, storyTitle, story);
+              setStatus(
+                result ??
+                  "This browser can't share video. Download it instead.",
+              );
+            }}
+          >
+            Share teaser video
+          </button>
+        )}
+        {clip && (
           <a
             className="clip-download"
-            href={media.socialClip.src}
-            download="glass-harbor-vertical-preview.mp4"
+            href={clip.src}
+            download={`${storyId}-vertical-preview.mp4`}
           >
             Download vertical teaser · MP4
           </a>
         )}
       </div>
       <p className="muted">
-        Local preview: links work on this computer until the app is hosted. The
-        six-second teaser uses placeholder art with bell-and-water ambience;
-        social posting is manual.
+        Links open the story for anyone; your own save stays private.
+        {clip
+          ? " The teaser is a six-second vertical clip for social posts."
+          : ""}
       </p>
       <p role="status">{status}</p>
     </details>

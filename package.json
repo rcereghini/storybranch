@@ -13,7 +13,7 @@
     "build": "vite build && tsx scripts/metadata.ts",
     "build:vercel": "pnpm build && vite build --config vite.api.config.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/domain.test.ts tests/foundation.test.ts tests/api-client.test.ts tests/firebase-config.test.ts tests/authoring.test.ts tests/dashboard.test.ts",
+    "test": "vitest run tests/domain.test.ts tests/foundation.test.ts tests/api-client.test.ts tests/firebase-config.test.ts tests/authoring.test.ts tests/dashboard.test.ts tests/share-pages.test.ts",
     "test:studio": "tsx scripts/studio-check.ts",
     "test:integration": "vitest run tests/integration.test.ts",
     "test:browser": "tsx scripts/browser-check.ts",
