@@ -11,7 +11,7 @@ import {
   type Save,
   type Stats,
 } from "../../packages/contracts/index";
-import { start, transition } from "../../packages/domain/index";
+import { isResultPage, start, transition } from "../../packages/domain/index";
 import { resolveFixtureMedia } from "../../fixtures/media";
 import { ensurePlayerProfile } from "./player-profile";
 import { authoring } from "./authoring";
@@ -182,6 +182,8 @@ export async function handle(request: Request): Promise<Response> {
               saveSpots: [{ id: s.id, storyId: s.storyId, pageId: s.pageId }],
             },
             page,
+            // Quiz results share as "my result" rather than an ending.
+            result: isResultPage(story, page.id),
             media: resolveFixtureMedia(page.video ?? ""),
             branches,
             featuredId,

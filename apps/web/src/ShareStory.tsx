@@ -19,22 +19,36 @@ export function ShareStory({
 }: {
   storyId: string;
   storyTitle: string;
-  ending?: { pageId: string; title: string };
+  ending?: { pageId: string; title: string; result?: boolean };
   media?: SceneMedia;
 }) {
   const [status, setStatus] = useState("");
   const story = storyLink(storyId);
   const endingUrl = ending ? endingLink(storyId, ending.pageId) : null;
+  const what = ending?.result ? "Result link" : "Ending link";
   const clip = media?.socialClip;
   const fileSharing = !!clip && canShareFiles();
   return (
     <details className="share-story">
-      <summary>{ending ? "Share your ending" : "Share this adventure"}</summary>
+      <summary>
+        {ending?.result
+          ? "Share your result"
+          : ending
+            ? "Share your ending"
+            : "Share this adventure"}
+      </summary>
       {ending ? (
         <div className="ending-card" aria-label="Ending share card">
-          <span className="ending-card-eyebrow">I REACHED AN ENDING</span>
+          <span className="ending-card-eyebrow">
+            {ending.result ? "MY RESULT" : "I REACHED AN ENDING"}
+          </span>
           <strong>{ending.title}</strong>
-          <span>in {storyTitle} · Which ending will you find?</span>
+          <span>
+            in {storyTitle} ·{" "}
+            {ending.result
+              ? "What will you get?"
+              : "Which ending will you find?"}
+          </span>
         </div>
       ) : (
         <p>Invite someone to choose their own path.</p>
@@ -48,22 +62,22 @@ export function ShareStory({
                   await shareLink(
                     {
                       title: `${ending.title} · ${storyTitle}`,
-                      text: `I reached “${ending.title}” in ${storyTitle}. Which ending will you find?`,
+                      text: ending.result
+                        ? `I got “${ending.title}” in ${storyTitle}. What will you get?`
+                        : `I reached “${ending.title}” in ${storyTitle}. Which ending will you find?`,
                       url: endingUrl,
                     },
-                    "Ending link",
+                    what,
                   ),
                 )
               }
             >
-              Share ending
+              {ending.result ? "Share result" : "Share ending"}
             </button>
             <button
-              onClick={async () =>
-                setStatus(await copyLink(endingUrl, "Ending link"))
-              }
+              onClick={async () => setStatus(await copyLink(endingUrl, what))}
             >
-              Copy ending link
+              {ending.result ? "Copy result link" : "Copy ending link"}
             </button>
           </>
         )}

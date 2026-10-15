@@ -10,9 +10,10 @@ This is a requirement for all current and future types, including RPG turn-based
 | `nextPage, videoUrl → Video` | Video finished OR Next button click | One: Next page; both triggers use the same command |
 | `text/videoUrl, options[A,B,C] → Text/Video with Options` | Available option chosen | Multiple authored outputs; only the chosen A/B/C is followed |
 | `range, passPage, failPage → Dice Roll` | Roll persists a result; a separate Next button click confirms it | Two: Pass or Fail, selected from the stored result |
+| `text, results[score → resultPage] → Reveal` | Reveal button click | Two to twelve results; the server follows the result with the highest score, a tie going to the first listed |
 | Future battle configuration → RPG turn-based battle | Server-validated battle completion, then the type's documented confirmation event | Declared outcomes such as Win/Loss, using the same routing lifecycle |
 
-Concrete storage mapping: `text` is `transcript`, `videoUrl` is `video`, and `nextPage` is the one direct choice's `route.targetPageId`. Options are `choices` with conditions and routes. Dice range is 1–`sides`; `target` defines passing values, and `success.targetPageId`/`failure.targetPageId` are Pass/Fail. These aliases describe authoring intent, not duplicate persisted fields.
+Concrete storage mapping: `text` is `transcript`, `videoUrl` is `video`, and `nextPage` is the one direct choice's `route.targetPageId`. Options are `choices` with conditions and routes. Dice range is 1–`sides`; `target` defines passing values, and `success.targetPageId`/`failure.targetPageId` are Pass/Fail. A reveal's results are its one choice's `outcome.results`, each a namespaced `scoreId` and a route. These aliases describe authoring intent, not duplicate persisted fields.
 
 All types receive their authored configuration plus `PageInput` (page, story save context, user projection). `PageOutput` is an intent (`choiceId`, optionally `roll`/`continue`), not permission for the browser to set a result or destination. `Page` owns common output controls and dispatch; the pure domain engine and API select/persist the resulting route. Available options may depend on stats, keys/items or the latest persisted roll. Future battle outcomes must join these same authoritative condition/effect contracts.
 
@@ -39,18 +40,28 @@ Every renderer is wrapped by `Page`. It reads the Story context and emits a type
 | `video` | Local video, captions and transcript | One unconditional Next; zero at an ending |
 | `video-options` | Video and conditional choices | One selected available output |
 | `dice` | Sides, target, context | Roll stores/displays value; Next follows Pass/Fail |
+| `reveal` | Text and a list of results, each a score and an ending page | Reveal follows the highest-scoring result |
 
-All five types use the same Page parent, output controls, offline/busy handling, Story context and server command path. Linear video pages advance on completion or Next; option videos wait for a choice. The player pauses and hides the retained video element during text/dice pages, preserving playback authorization for a later video. Add a future battle renderer and validated battle outcome to this contract when implementing combat, not a simulated client-authoritative win button.
+All six types use the same Page parent, output controls, offline/busy handling, Story context and server command path. Linear video pages advance on completion or Next; option videos wait for a choice. The player pauses and hides the retained video element during text/dice pages, preserving playback authorization for a later video. Add a future battle renderer and validated battle outcome to this contract when implementing combat, not a simulated client-authoritative win button.
 
 Prototype dice default: uniform integer 1–N, pass on value >= target. The API injects Node crypto randomness into the pure transition function. A draw is reused during Firestore transaction retries; the existing idempotency receipt preserves the committed result for network retries. Roll increments the save revision and records `lastRoll` with `pending: true` while staying on the dice page. Rerolling that pending result is rejected. Next consumes the persisted outcome and clears pending while moving onward. Both steps are idempotent commands; reload between them preserves the result. `lastRoll` and the story event persist the result. Authored routes may award story-specific keys; later conditions can inspect those keys or the most recent roll from a named page (`kind: roll`). Older roll history remains in the log; only the most recent roll is available directly in conditions.
 
+## Quizzes: scores and the reveal page
+
+A personality quiz is ordinary pages. Each answer on a Text or Video with Options page carries a `score` effect (`{id, kind: "score", scoreId, delta}`) that adds points toward one result. Scores are namespaced to the story like keys and items, live in the save's `scores` map (0–999 each), and are never shown to the player. Saves made before quizzes existed have no `scores` map and count every score as zero.
+
+The `reveal` page has exactly one choice whose outcome is `{kind: "reveal", results}`, with no condition or cost. Clicking it sends only the choice ID; the server reads the persisted scores and moves to the result with the most points, a tie going to the result listed first. Validation rejects a reveal outcome on any other page type, a repeated `scoreId`, fewer than two results, or a result that is not an ending, because a result closes the quiz and is what the player shares.
+
+A result page is any ending a reveal can lead to (`isResultPage` in the domain). The player API returns `result: true` on those pages. The page then reads **YOUR RESULT**, the completion shell offers **Take the quiz again**, and the share panel becomes **Share your result** ("I got *The Keeper* in …"). Link previews for seeded quizzes use the same wording, and a shared result link tells the visitor a friend got that result.
+
 ## Mock stories
 
-Creators can now author these same five types through [Creator Studio](17-creator-studio.md). Private preview uses the shared Story/Page renderers and a disposable engine state; published play remains server-authoritative. Publication freezes a new edition without changing the input/output contracts below.
+Creators can now author these same six types through [Creator Studio](17-creator-studio.md). Private preview uses the shared Story/Page renderers and a disposable engine state; published play remains server-authoritative. Publication freezes a new edition without changing the input/output contracts below.
 
 - **The Clockwork Door:** linear text → key/stat-gated text options → linear video → text ending. Includes an alternate early ending.
 - **The Storm Signal:** video options → d20 check → pass/fail destinations; a saved success key unlocks the rescue route.
 - **The Glass Harbor:** explicit video page types, including its separate side-quest stories.
+- **What Kind of Explorer Are You?:** a personality quiz. Four text-options questions score four results, a reveal page picks one, and the results are three text endings and one video ending.
 
 Media is still animated placeholder footage with synthesized audio. New stories reuse the existing distinct clips.
 
@@ -61,3 +72,5 @@ The node-only model and implicit video fallback were removed. Fixtures publish `
 Run `pnpm seed` with emulators, then `pnpm dev:emulator`. For the shared project use `pnpm seed:firebase` with the configured server credential. Run `pnpm check`, `pnpm test:integration`, `pnpm test:pages` and `pnpm test:browser` against emulators. The page browser check covers desktop/mobile, mixed-media navigation and dice persistence after reload. Domain tests force both roll outcomes; API tests reject forged values and replay the same receipt.
 
 Verification: TypeScript/build and 23 unit/domain/fixture tests passed; 10 emulator integration tests passed (including roll idempotency, injected-value rejection, reroll rejection, saved-result continuation). Chrome exercised all five types at 1440px/390px, natural video completion and explicit Next, recommendation handoff, dice-result reload before Next, and the existing seven-width Glass Harbor flow including side quests, retry/stale/offline and both endings. Physical Safari/iPhone and real hosted authenticated flows remain unverified. Combat and achievement progression remain deferred.
+
+Quiz verification (October 15, 2026): TypeScript, build and 40 unit tests passed, including tie-breaking, saves without scores, reveal validation and result link previews. 13 emulator integration tests passed; the new one plays the quiz through the API, rejects a client-supplied destination and checks the persisted scores and `result` flag. `pnpm test:quiz` passed at 1440px and 390px, and the browser, pages, Studio, transition and auth checks passed on freshly seeded data. Not yet checked: the quiz on the live site and real link unfurls of a result.

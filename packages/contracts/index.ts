@@ -108,6 +108,15 @@ export const effectSchema = z.discriminatedUnion("kind", [
   z
     .object({ id, kind: z.literal("milestone"), milestoneId: namespaced })
     .strict(),
+  // Quiz points toward a result; only a reveal page reads them.
+  z
+    .object({
+      id,
+      kind: z.literal("score"),
+      scoreId: namespaced,
+      delta: z.number().int().min(-20).max(20),
+    })
+    .strict(),
 ]);
 const route = z
   .object({ targetPageId: id, effects: z.array(effectSchema).max(20) })
@@ -139,6 +148,17 @@ export const choiceSchema = z
           failure: route,
         })
         .strict(),
+      // The server follows the result with the most points; a tie goes to
+      // the first listed.
+      z
+        .object({
+          kind: z.literal("reveal"),
+          results: z
+            .array(z.object({ scoreId: namespaced, route }).strict())
+            .min(2)
+            .max(12),
+        })
+        .strict(),
     ]),
   })
   .strict();
@@ -154,6 +174,7 @@ export const pageSchema = z
       "video",
       "video-options",
       "dice",
+      "reveal",
     ]),
     video: z
       .string()
@@ -195,6 +216,8 @@ export type LocalState = {
   health: number;
   milestones: string[];
   appliedEntryEffects: string[];
+  // Absent on saves made before quizzes existed.
+  scores?: Record<string, number>;
 };
 export type Save = LocalState & {
   id: string;

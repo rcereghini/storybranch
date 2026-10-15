@@ -529,3 +529,42 @@ it("persists one server dice result across retries and rejects injected results"
     first.data.save.lastRoll.passed ? "signal" : "shelter",
   );
 });
+it("reveals a quiz result from server-held scores, not the client", async () => {
+  const started = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: "explorer-quiz" },
+  });
+  expect(started.status).toBe(200);
+  let s = started.data.save as Save;
+  for (const id of [
+    "map",
+    "storm-spark",
+    "stranger-tinkerer",
+    "treasure-spark",
+    "reveal-keeper",
+  ]) {
+    const r = await call(`/playthroughs/${s.id}/choices`, choice(s, id));
+    expect(r.status).toBe(200);
+    s = r.data.save;
+  }
+  expect(s.pageId).toBe("reveal");
+  expect(
+    (
+      await call(`/playthroughs/${s.id}/choices`, {
+        ...choice(s, "reveal"),
+        payload: { choiceId: "reveal", targetPageId: "keeper" },
+      })
+    ).status,
+  ).toBe(400);
+  const revealed = await call(
+    `/playthroughs/${s.id}/choices`,
+    choice(s, "reveal"),
+  );
+  expect(revealed.data.save.pageId).toBe("spark");
+  expect(revealed.data.save.scores).toMatchObject({
+    "explorer-quiz:spark": 2,
+    "explorer-quiz:keeper": 1,
+  });
+  const resumed = await call(`/playthroughs/${s.id}`);
+  expect(resumed.data).toMatchObject({ result: true, page: { id: "spark" } });
+});

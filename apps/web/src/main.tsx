@@ -29,6 +29,7 @@ type Player = {
   media?: SceneMedia;
   save: Save;
   page: Story["pages"][string];
+  result?: boolean;
   branches: Branch[];
   featuredId: string | null;
 };
@@ -532,21 +533,26 @@ function App() {
                         choose(output.choiceId, output.action)
                       }
                       page={player.page}
+                      result={player.result}
                       media={player.media}
                     >
                       <section className="choices" aria-label="Story choices">
                         {player.save.status === "completed" && (
                           <>
                             <p>
-                              This ending is saved in your story log. A new
-                              journey starts a separate save.
+                              {player.result
+                                ? "Your result is saved in your story log. Retaking the quiz starts a separate save."
+                                : "This ending is saved in your story log. A new journey starts a separate save."}
                             </p>
                             {!player.save.parentPlaythroughId && (
                               <button
                                 disabled={disabled}
                                 onClick={() => start()}
                               >
-                                Begin another journey <span>↗</span>
+                                {player.result
+                                  ? "Take the quiz again"
+                                  : "Begin another journey"}{" "}
+                                <span>↗</span>
                               </button>
                             )}
                             <button onClick={() => navigate("/adventures")}>
@@ -698,7 +704,11 @@ function App() {
                       storyTitle={player.story.title}
                       ending={
                         player.page.kind === "ending"
-                          ? { pageId: player.page.id, title: player.page.title }
+                          ? {
+                              pageId: player.page.id,
+                              title: player.page.title,
+                              result: player.result,
+                            }
                           : undefined
                       }
                       media={player.media}

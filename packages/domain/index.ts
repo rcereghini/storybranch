@@ -6,7 +6,33 @@ import {
   type Stats,
   type Condition,
   type Effect,
+  type Choice,
 } from "../contracts/index";
+// Every route a choice can take, whichever outcome the server selects.
+export const routesOf = (c: Choice) =>
+  c.outcome.kind === "direct"
+    ? [c.outcome.route]
+    : c.outcome.kind === "reveal"
+      ? c.outcome.results.map((r) => r.route)
+      : [c.outcome.success, c.outcome.failure];
+// A quiz result is a page a reveal page can send the player to.
+export const isResultPage = (story: Story, pageId: string) =>
+  Object.values(story.pages).some((p) =>
+    p.choices.some(
+      (c) =>
+        c.outcome.kind === "reveal" &&
+        c.outcome.results.some((r) => r.route.targetPageId === pageId),
+    ),
+  );
+// Highest score wins; a tie goes to the result listed first.
+function revealed(
+  results: Extract<Choice["outcome"], { kind: "reveal" }>["results"],
+  scores: Record<string, number>,
+) {
+  return results.reduce((best, r) =>
+    (scores[r.scoreId] ?? 0) > (scores[best.scoreId] ?? 0) ? r : best,
+  );
+}
 export const baseStats: Stats = {
   strength: 5,
   agility: 5,
@@ -65,6 +91,14 @@ function effects(s: Save, list: Effect[], once = false) {
         if (!s.milestones.includes(e.milestoneId))
           s.milestones.push(e.milestoneId);
         break;
+      case "score": {
+        s.scores ??= {};
+        s.scores[e.scoreId] = Math.max(
+          0,
+          Math.min(999, (s.scores[e.scoreId] ?? 0) + e.delta),
+        );
+        break;
+      }
     }
     if (once) s.appliedEntryEffects.push(e.id);
   }
@@ -101,6 +135,7 @@ export function start(
       health: 100,
       milestones: [],
       appliedEntryEffects: [],
+      scores: {},
       parentPlaythroughId: parent?.id ?? null,
       parentRevision: parent?.revision ?? null,
       updatedAt: now,
@@ -185,9 +220,11 @@ export function transition(
   const r =
     c.outcome.kind === "direct"
       ? c.outcome.route
-      : success
-        ? c.outcome.success
-        : c.outcome.failure;
+      : c.outcome.kind === "reveal"
+        ? revealed(c.outcome.results, input.scores ?? {}).route
+        : success
+          ? c.outcome.success
+          : c.outcome.failure;
   effects(s, r.effects);
   s.pageId = r.targetPageId;
   s.revision++;
@@ -240,27 +277,47 @@ export function validateStory(value: unknown): Story {
         n.choices[0].costs.length)
     )
       throw new Error("Dice page requires one roll output");
-    for (const choice of n.choices)
+    if (
+      pageType === "reveal" &&
+      (n.choices.length !== 1 ||
+        n.choices[0].outcome.kind !== "reveal" ||
+        n.choices[0].availableWhen ||
+        n.choices[0].costs.length)
+    )
+      throw new Error("Reveal page requires one reveal output");
+    for (const choice of n.choices) {
       if (
         choice.outcome.kind === "dice" &&
         (pageType !== "dice" || choice.outcome.target > choice.outcome.sides)
       )
         throw new Error("Invalid dice page or threshold");
+      if (choice.outcome.kind === "reveal") {
+        const { results } = choice.outcome;
+        if (pageType !== "reveal")
+          throw new Error("Only a reveal page can reveal a result");
+        if (new Set(results.map((r) => r.scoreId)).size !== results.length)
+          throw new Error("Each result needs its own score");
+        if (
+          results.some(
+            (r) => story.pages[r.route.targetPageId]?.kind === "scene",
+          )
+        )
+          throw new Error("A quiz result must be an ending");
+      }
+    }
     for (const e of n.entryEffects) {
       if (effectIds.has(e.id)) throw new Error("Duplicate entry effect ID");
       effectIds.add(e.id);
     }
     for (const c of n.choices)
-      for (const r of c.outcome.kind === "direct"
-        ? [c.outcome.route]
-        : [c.outcome.success, c.outcome.failure])
+      for (const r of routesOf(c))
         if (!story.pages[r.targetPageId]) throw new Error("Dangling route");
   }
   function checkNamespaces(v: unknown): void {
     if (!v || typeof v !== "object") return;
     for (const [k, x] of Object.entries(v)) {
       if (
-        ["keyId", "itemId", "milestoneId"].includes(k) &&
+        ["keyId", "itemId", "milestoneId", "scoreId"].includes(k) &&
         typeof x === "string" &&
         !x.startsWith(story.id + ":")
       )
@@ -274,10 +331,7 @@ export function validateStory(value: unknown): Story {
     if (seen.has(id)) return;
     seen.add(id);
     for (const c of story.pages[id].choices)
-      for (const r of c.outcome.kind === "direct"
-        ? [c.outcome.route]
-        : [c.outcome.success, c.outcome.failure])
-        visit(r.targetPageId);
+      for (const r of routesOf(c)) visit(r.targetPageId);
   }
   visit(story.entryPageId);
   if (!pages.some((n) => seen.has(n.id) && n.kind === "ending"))

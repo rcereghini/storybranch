@@ -1,4 +1,5 @@
 import type { Story } from "../packages/contracts/index";
+import { isResultPage } from "../packages/domain/index";
 
 // Link previews are static: crawlers read meta tags without running the app.
 export type ShareStory = {
@@ -87,16 +88,25 @@ export function sharePages(
     for (const page of Object.values(story.pages)) {
       if (page.kind !== "ending") continue;
       const path = `s/${story.id}/ending/${page.id}`;
+      // A quiz result reads "I got"; the app words its note to match.
+      const result = isResultPage(story, page.id);
       pages.push({
         path,
         html: withTags(
           tags(
             site,
             path,
-            `I reached “${page.title}” in ${story.title}`,
-            "Which ending will you find? Play free on Storybranch.",
+            result
+              ? `I got “${page.title}” in ${story.title}`
+              : `I reached “${page.title}” in ${story.title}`,
+            result
+              ? "What will you get? Take the quiz free on Storybranch."
+              : "Which ending will you find? Play free on Storybranch.",
             image,
-            { "storybranch:ending": page.title },
+            {
+              "storybranch:ending": page.title,
+              ...(result ? { "storybranch:result": "true" } : {}),
+            },
           ),
         ),
       });

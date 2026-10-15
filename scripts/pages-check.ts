@@ -28,8 +28,10 @@ try {
         .getByRole("button", { name: "Next page", exact: true })
         .click();
     await page.getByRole("heading", { name: "A new beginning" }).waitFor();
-    await page.getByRole("button", { name: /Try The Storm Signal/ }).waitFor();
-    await page.getByRole("button", { name: /Try The Storm Signal/ }).click();
+    // Endings recommend other stories; which ones depends on the catalogue.
+    await page.getByRole("button", { name: /^Try / }).first().waitFor();
+    await page.getByRole("button", { name: "Discover", exact: true }).click();
+    await page.getByRole("button", { name: /Play The Storm Signal/ }).click();
     await startPlayback(page);
     await page.getByRole("button", { name: "Skip to choices" }).click();
     await page.getByRole("button", { name: /Climb the mast/ }).click();
