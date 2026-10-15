@@ -155,9 +155,10 @@ export const pageSchema = z
       "video-options",
       "dice",
     ]),
+    // A shipped clip path, or `asset:<id>` for a creator's uploaded clip.
     video: z
       .string()
-      .regex(/^\/media\/[a-z0-9.-]+$/)
+      .regex(/^(\/media\/[a-z0-9.-]+|asset:[a-zA-Z0-9_-]{8,80})$/)
       .optional(),
     entryEffects: z.array(effectSchema).max(20),
     choices: z.array(choiceSchema).max(20),

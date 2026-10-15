@@ -12,9 +12,9 @@ import {
   type Stats,
 } from "../../packages/contracts/index";
 import { start, transition } from "../../packages/domain/index";
-import { resolveFixtureMedia } from "../../fixtures/media";
 import { ensurePlayerProfile } from "./player-profile";
 import { authoring } from "./authoring";
+import { pageMedia, uploads } from "./uploads";
 import { profileRoutes } from "./profile";
 import { version } from "./story-store";
 const json = (data: unknown, status = 200) =>
@@ -106,6 +106,8 @@ export async function handle(request: Request): Promise<Response> {
       );
     if (segments[1] === "studio")
       return json(await authoring(request, uid, segments, cursor, limit));
+    if (segments[1] === "uploads")
+      return json(await uploads(request, uid, segments));
     if (segments[1] === "profile" || segments[1] === "dashboard")
       return json(
         await profileRoutes(request, uid, segments, profile.data()!, tokenName),
@@ -182,7 +184,7 @@ export async function handle(request: Request): Promise<Response> {
               saveSpots: [{ id: s.id, storyId: s.storyId, pageId: s.pageId }],
             },
             page,
-            media: resolveFixtureMedia(page.video ?? ""),
+            media: await pageMedia(page.video),
             branches,
             featuredId,
           });
