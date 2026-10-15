@@ -10,6 +10,7 @@
     "dev": "tsx watch scripts/dev.ts",
     "dev:emulator": "tsx watch scripts/dev-emulator.ts",
     "seed:firebase": "tsx scripts/firebase-live.ts",
+    "migrate:layout": "tsx scripts/migrate-live.ts",
     "build": "vite build && tsx scripts/metadata.ts",
     "build:vercel": "pnpm build && vite build --config vite.api.config.ts",
     "typecheck": "tsc --noEmit",

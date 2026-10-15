@@ -29,16 +29,16 @@ it("builds download URLs the media contract accepts, live and local", () => {
   const live = downloadUrl(
     undefined,
     "storybranch-f77a3.firebasestorage.app",
-    "uploads/uid-1/clip-1",
+    "users/uid-1/clips/clip-1",
     token,
   );
   expect(live).toBe(
-    `https://firebasestorage.googleapis.com/v0/b/storybranch-f77a3.firebasestorage.app/o/uploads%2Fuid-1%2Fclip-1?alt=media&token=${token}`,
+    `https://firebasestorage.googleapis.com/v0/b/storybranch-f77a3.firebasestorage.app/o/users%2Fuid-1%2Fclips%2Fclip-1?alt=media&token=${token}`,
   );
   const local = downloadUrl(
     "127.0.0.1:9299",
     "demo-storybranch.appspot.com",
-    "uploads/u/c",
+    "users/u/clips/c",
     token,
   );
   for (const src of [live, local])

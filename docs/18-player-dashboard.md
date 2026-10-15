@@ -6,7 +6,7 @@ Signed-in players land on their dashboard at `/`. Signed-out visitors still see 
 
 | Section | Source |
 | --- | --- |
-| Profile header: banner, avatar, name, tagline, bio, favorite genres | `playerProfiles/{uid}` |
+| Profile header: banner, avatar, name, tagline, bio, favorite genres | `users/{uid}` |
 | Continue your story: the latest active save as a spotlight, then up to three more | Saves, with page titles from each save's pinned edition |
 | Your progress: totals and shared stats | Saves; profile stats |
 | What you're working toward: each catalogue story's status and endings found | Saves plus each story's published edition |
@@ -19,7 +19,7 @@ Progress is derived from saves by the pure `summarizeDashboard` (`packages/domai
 
 ## Profile customization
 
-`playerProfiles/{uid}` holds these presentation fields, all edited through **Customize profile** (Identity, Look and Interests tabs) with a live preview in the dashboard header:
+`users/{uid}` holds these presentation fields, all edited through **Customize profile** (Identity, Look and Interests tabs) with a live preview in the dashboard header:
 
 | Field | Values |
 | --- | --- |

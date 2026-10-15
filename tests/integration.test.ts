@@ -15,6 +15,7 @@ import { handle } from "../services/api/handler";
 import { ensurePlayerProfile } from "../services/api/player-profile";
 import type { Save } from "../packages/contracts/index";
 import { pageStories } from "../fixtures/page-stories";
+import { migrateLayout, OLD_ROOT } from "../scripts/migrate-layout";
 let tokens: Record<string, string> = {};
 let rules: RulesTestEnvironment;
 it("protects drafts and atomically publishes immutable editions with retry and stale checks", async () => {
@@ -136,7 +137,7 @@ it("protects drafts and atomically publishes immutable editions with retry and s
 });
 it("creates a live-style profile once without resetting stats or reactivating disabled users", async () => {
   const uid = `profile-${randomUUID()}`;
-  const ref = db.doc(`playerProfiles/${uid}`);
+  const ref = db.doc(`users/${uid}`);
   try {
     await Promise.all([
       ensurePlayerProfile(db, uid),
@@ -272,6 +273,9 @@ const begin = async () => {
   expect(r.status).toBe(200);
   return r.data.save as Save;
 };
+// Saves started by the default "player" account.
+const saveOf = (saveId: string) => `users/player/playthroughs/${saveId}`;
+const eventsOf = (saveId: string) => `${saveOf(saveId)}/events`;
 const choice = (s: Save, choiceId: string, key = randomUUID()) => ({
   idempotencyKey: key,
   expectedRevision: s.revision,
@@ -316,9 +320,10 @@ it("rejects unauthenticated, forged, disabled-account and cross-user access", as
   tokens.forged = "not-a-token";
   expect((await call("/playthroughs", undefined, "forged")).status).toBe(401);
   const s = await begin();
+  // Another player's save is not under their account, so it is not found.
   expect(
     (await call(`/playthroughs/${s.id}`, undefined, "progressed")).status,
-  ).toBe(403);
+  ).toBe(404);
   expect(
     (
       await call(
@@ -327,14 +332,14 @@ it("rejects unauthenticated, forged, disabled-account and cross-user access", as
         "progressed",
       )
     ).status,
-  ).toBe(403);
-  await db.doc("playerProfiles/progressed").update({ status: "disabled" });
+  ).toBe(404);
+  await db.doc("users/progressed").update({ status: "disabled" });
   try {
     expect((await call("/playthroughs", undefined, "progressed")).status).toBe(
       403,
     );
   } finally {
-    await db.doc("playerProfiles/progressed").update({ status: "active" });
+    await db.doc("users/progressed").update({ status: "active" });
   }
 });
 it("persists one transition and event on retries, conflicts on changed payload", async () => {
@@ -352,9 +357,7 @@ it("persists one transition and event on retries, conflicts on changed payload",
       })
     ).status,
   ).toBe(409);
-  expect((await db.collection(`playthroughs/${s.id}/events`).get()).size).toBe(
-    2,
-  );
+  expect((await db.collection(eventsOf(s.id)).get()).size).toBe(2);
   const resumed = await call(`/playthroughs/${s.id}`);
   expect(resumed.data.save.items["glass-harbor:token"]).toBe(1);
   expect(resumed.data.save.pageId).toBe("courier");
@@ -366,9 +369,7 @@ it("commits only one competing choice at the same revision", async () => {
     call(`/playthroughs/${s.id}/choices`, choice(s, "market")),
   ]);
   expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-  expect((await db.collection(`playthroughs/${s.id}/events`).get()).size).toBe(
-    2,
-  );
+  expect((await db.collection(eventsOf(s.id)).get()).size).toBe(2);
 });
 it("pins old saves when the published pointer changes", async () => {
   const s = await begin();
@@ -398,7 +399,7 @@ it("allows both branches, isolates child changes and returns current parent", as
   parent = (
     await call(`/playthroughs/${parent.id}/choices`, choice(parent, "market"))
   ).data.save;
-  const before = (await db.doc(`playthroughs/${parent.id}`).get()).data();
+  const before = (await db.doc(saveOf(parent.id)).get()).data();
   for (const branchId of ["bell-diver", "paper-moon"]) {
     const r = await call(`/playthroughs/${parent.id}/branches`, {
       idempotencyKey: randomUUID(),
@@ -416,9 +417,7 @@ it("allows both branches, isolates child changes and returns current parent", as
       ).status,
     ).toBe(200);
   }
-  expect((await db.doc(`playthroughs/${parent.id}`).get()).data()).toEqual(
-    before,
-  );
+  expect((await db.doc(saveOf(parent.id)).get()).data()).toEqual(before);
   await call(`/playthroughs/${parent.id}/choices`, choice(parent, "dock"));
   expect((await call(`/playthroughs/${parent.id}`)).data.save.pageId).toBe(
     "dock",
@@ -469,17 +468,20 @@ it("Firestore rules deny all authoritative writes and private cross-user reads",
   const own = rules.authenticatedContext("player").firestore();
   const other = rules.authenticatedContext("progressed").firestore();
   const anon = rules.unauthenticatedContext().firestore();
-  await assertSucceeds(getDoc(doc(own, `playthroughs/${s.id}`)));
-  await assertFails(getDoc(doc(other, `playthroughs/${s.id}`)));
-  await assertFails(getDoc(doc(anon, `playthroughs/${s.id}`)));
+  await assertSucceeds(getDoc(doc(own, saveOf(s.id))));
+  await assertSucceeds(getDoc(doc(own, "users/player")));
+  await assertFails(getDoc(doc(other, saveOf(s.id))));
+  await assertFails(getDoc(doc(other, "users/player")));
+  await assertFails(getDoc(doc(anon, saveOf(s.id))));
   for (const path of [
-    `playthroughs/${s.id}`,
-    "playerProfiles/player",
+    saveOf(s.id),
+    "users/player",
+    "users/player/receipts/forged",
+    "users/player/drafts/forged",
+    "users/player/clips/forged",
     "stories/glass-harbor/versions/pages-v1",
     "placements/harbor-market",
     "wallets/player",
-    "commandReceipts/forged",
-    "creatorDrafts/player/stories/forged",
   ])
     await assertFails(setDoc(doc(own, path), { forged: true }));
   await assertSucceeds(getDoc(doc(anon, "catalogue/glass-harbor")));
@@ -613,6 +615,7 @@ it("uploads a clip through Storage rules, verifies it and plays it once publishe
   expect((await call("/uploads", command)).data).toEqual(created.data);
   expect((await call("/uploads", { ...command, bytes: 5 })).status).toBe(409);
   const { asset, path } = created.data;
+  expect(path).toBe(`users/player/clips/${asset.id}`);
   expect(asset.status).toBe("pending");
   expect(asset.media).toBeUndefined();
   expect((await call(`/uploads/${asset.id}/complete`, {})).status).toBe(400);
@@ -622,7 +625,7 @@ it("uploads a clip through Storage rules, verifies it and plays it once publishe
   const meta = { contentType: "video/mp4" };
   await assertFails(uploadBytes(ref(other, path), bytes, meta));
   await assertFails(
-    uploadBytes(ref(own, `uploads/player/${randomUUID()}`), bytes, meta),
+    uploadBytes(ref(own, `users/player/clips/${randomUUID()}`), bytes, meta),
   );
   await assertFails(uploadBytes(ref(own, path), bytes.subarray(0, 100), meta));
   await assertFails(
@@ -634,7 +637,7 @@ it("uploads a clip through Storage rules, verifies it and plays it once publishe
 
   expect(
     (await call(`/uploads/${asset.id}/complete`, {}, "progressed")).status,
-  ).toBe(403);
+  ).toBe(404);
   const done = await call(`/uploads/${asset.id}/complete`, {});
   expect(done.status).toBe(200);
   expect(done.data.asset.status).toBe("ready");
@@ -667,9 +670,16 @@ it("uploads a clip through Storage rules, verifies it and plays it once publishe
   const storyId = `clip-${randomUUID()}`;
   const published = await draftAndPublish(storyId, video, "player");
   expect(published.status).toBe(200);
-  expect((await db.doc(`assets/${asset.id}`).get()).data()!.published).toBe(
-    true,
-  );
+  expect(
+    (await db.doc(`users/player/clips/${asset.id}`).get()).data()!.published,
+  ).toBe(true);
+  // The edition records the clip's file, so playback never reads the
+  // creator's private clip record.
+  expect(
+    (await db.doc(`stories/${storyId}/versions/edition-1`).get()).data()!.clips[
+      asset.id
+    ],
+  ).toMatchObject({ path, contentType: "video/mp4" });
   const started = await call(
     "/playthroughs",
     { idempotencyKey: randomUUID(), payload: { storyId } },
@@ -703,7 +713,9 @@ it("rejects and removes an upload that is not really a video", async () => {
     ),
   );
   expect((await call(`/uploads/${asset.id}/complete`, {})).status).toBe(400);
-  expect((await db.doc(`assets/${asset.id}`).get()).exists).toBe(false);
+  expect((await db.doc(`users/player/clips/${asset.id}`).get()).exists).toBe(
+    false,
+  );
   expect((await bucket.file(path).exists())[0]).toBe(false);
   expect(
     (
@@ -753,4 +765,67 @@ it("reveals a quiz result from server-held scores, not the client", async () => 
   });
   const resumed = await call(`/playthroughs/${s.id}`);
   expect(resumed.data).toMatchObject({ result: true, page: { id: "spark" } });
+});
+it("copies the old prefixed layout into per-user records without overwriting newer ones", async () => {
+  const old = (path: string) => db.doc(`${OLD_ROOT}/${path}`);
+  const uid = `mig-${randomUUID()}`;
+  const saveId = randomUUID();
+  const storyId = `mig-${randomUUID()}`;
+  const save = `users/${uid}/playthroughs/${saveId}`;
+  await old(`playerProfiles/${uid}`).set({ status: "active", stats: {} });
+  await old(`playthroughs/${saveId}`).set({
+    id: saveId,
+    playerUid: uid,
+    revision: 1,
+  });
+  await old(`playthroughs/${saveId}/events/00000001`).set({ at: 1 });
+  await old("commandReceipts/receipt-1").set({ actor: uid, at: 1000 });
+  await old(`creatorDrafts/${uid}/stories/${storyId}`).set({ revision: 1 });
+  await old(`stories/${storyId}`).set({ creatorUid: uid });
+  await old(`stories/${storyId}/versions/edition-1`).set({ ready: true });
+  await old(`catalogue/${storyId}`).set({ id: storyId });
+  try {
+    const dry = await migrateLayout(db, { apply: false });
+    expect(dry.unmapped).toEqual([]);
+    expect(dry.counts.playthroughs).toEqual({ create: 1 });
+    expect((await db.doc(`users/${uid}`).get()).exists).toBe(false);
+
+    await migrateLayout(db, { apply: true });
+    for (const path of [
+      `users/${uid}`,
+      save,
+      `${save}/events/00000001`,
+      `users/${uid}/drafts/${storyId}`,
+      `stories/${storyId}/versions/edition-1`,
+      `catalogue/${storyId}`,
+    ])
+      expect((await db.doc(path).get()).exists, path).toBe(true);
+    const receipt = (
+      await db.doc(`users/${uid}/receipts/receipt-1`).get()
+    ).data()!;
+    expect(receipt.expireAt.toMillis()).toBe(1000 + 30 * 24 * 60 * 60 * 1000);
+
+    const again = await migrateLayout(db, { apply: true });
+    expect(again.counts.playthroughs).toEqual({ same: 1 });
+    // The new code moved the save on: the copy keeps it.
+    await db.doc(save).update({ revision: 5 });
+    expect(
+      (await migrateLayout(db, { apply: true })).counts.playthroughs,
+    ).toEqual({ kept: 1 });
+    expect((await db.doc(save).get()).data()!.revision).toBe(5);
+    // The old layout moved further: the copy brings it forward.
+    await old(`playthroughs/${saveId}`).update({ revision: 9 });
+    await migrateLayout(db, { apply: true });
+    expect((await db.doc(save).get()).data()!.revision).toBe(9);
+    // Anything it cannot place blocks every write.
+    await old(`assets/${randomUUID()}`).set({ ownerUid: uid });
+    await old(`playthroughs/${saveId}`).update({ revision: 12 });
+    const blocked = await migrateLayout(db, { apply: true });
+    expect(blocked.unmapped).toHaveLength(1);
+    expect((await db.doc(save).get()).data()!.revision).toBe(9);
+  } finally {
+    for (const path of [OLD_ROOT, `users/${uid}`, `stories/${storyId}`])
+      await db.recursiveDelete(db.doc(path));
+    await db.doc(`catalogue/${storyId}`).delete();
+  }
 });

@@ -2,16 +2,15 @@ import { it, expect } from "vitest";
 import { backendConfig } from "../services/api/config";
 import { firebaseConfig } from "../fixtures/firebase-config";
 
-it("uses the requested shared project and isolates live collections", () => {
+it("uses the requested shared project and its bucket", () => {
   const config = backendConfig({});
   expect(config.mode).toBe("firebase");
   expect(config.projectId).toBe(firebaseConfig.projectId);
-  expect(config.prefix).toBe("storybranch/app/");
+  expect(config.bucket).toBe("storybranch-f77a3.firebasestorage.app");
 });
 it("requires explicit emulator mode and keeps it on demo projects", () => {
   const config = backendConfig({ STORYBRANCH_MODE: "emulator" });
   expect(config.projectId).toBe("demo-storybranch");
-  expect(config.prefix).toBe("");
   expect(
     backendConfig({
       STORYBRANCH_MODE: "emulator",
