@@ -132,7 +132,7 @@ export function ScenePlayer({
           muted={muted}
           playsInline
           preload="metadata"
-          poster={rendition?.poster ?? "/media/harbor.svg"}
+          poster={media ? rendition?.poster : "/media/harbor.svg"}
           onPlaying={() => {
             setBuffering(false);
             setWatching(true);
@@ -172,13 +172,15 @@ export function ScenePlayer({
             type={rendition?.type ?? "video/webm"}
             onError={fail}
           />
-          <track
-            kind="captions"
-            src={media?.captions ?? "/media/harbor.vtt"}
-            srcLang="en"
-            label="English"
-            default
-          />
+          {(!media || media.captions) && (
+            <track
+              kind="captions"
+              src={media?.captions ?? "/media/harbor.vtt"}
+              srcLang="en"
+              label="English"
+              default
+            />
+          )}
         </video>
         <canvas
           ref={frame}

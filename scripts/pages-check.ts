@@ -31,6 +31,7 @@ try {
     // Endings recommend other stories; which ones depends on the catalogue.
     await page.getByRole("button", { name: /^Try / }).first().waitFor();
     await page.getByRole("button", { name: "Discover", exact: true }).click();
+    await page.getByPlaceholder("Search stories").fill("Storm Signal");
     await page.getByRole("button", { name: /Play The Storm Signal/ }).click();
     await startPlayback(page);
     await page.getByRole("button", { name: "Skip to choices" }).click();
@@ -70,6 +71,10 @@ try {
       "Roll result must disappear after Next",
     );
     assert.equal(await page.getByText(/Last roll:/).count(), 0);
+    // Finish the story so the next width starts it fresh instead of resuming.
+    const leave = page.getByRole("button", { name: /Leave the relay/ });
+    if (await leave.count()) await leave.click();
+    await page.getByRole("heading", { name: "Safe until morning" }).waitFor();
     assert(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

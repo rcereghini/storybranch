@@ -20,6 +20,11 @@ import {
 import { sceneMedia, resolveFixtureMedia } from "../../../fixtures/media";
 import { Story } from "./Story";
 import { Page } from "./Page";
+import { ClipPicker } from "./ClipPicker";
+import {
+  assetIdOf,
+  type UploadListing,
+} from "../../../packages/contracts/media";
 
 const api = createApi(
   fetch,
@@ -175,6 +180,7 @@ export function Studio({
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const [listing, setListing] = useState<Listing | null>(null);
+  const [uploads, setUploads] = useState<UploadListing | null>(null);
   const [draft, setDraft] = useState<DraftRecord | null>(null);
   const [selected, setSelected] = useState("opening");
   const [dirty, setDirty] = useState(false);
@@ -230,7 +236,15 @@ export function Studio({
   };
   useEffect(() => {
     void work(() => loadList());
+    // Clip uploads are optional; Studio still works if this listing fails.
+    api<UploadListing>("/uploads").then(setUploads, () => {});
   }, []);
+  const mediaFor = (video: string | undefined) => {
+    const assetId = assetIdOf(video);
+    return assetId
+      ? uploads?.items.find((clip) => clip.id === assetId)?.media
+      : resolveFixtureMedia(video ?? "");
+  };
   const change = (story: StoryData) => {
     setDraft((d) => d && { ...d, story });
     setDirty(true);
@@ -566,7 +580,8 @@ export function Studio({
             </div>
             <p className="muted">
               Publish makes this story public in Discover. Only publish content
-              you have rights to share. Sample clips are placeholders.
+              you have rights to share. Sample clips are placeholders. Uploaded
+              clips become public when you publish a story that uses them.
             </p>
             <fieldset disabled={busy || !!retry}>
               <label>
@@ -674,22 +689,25 @@ export function Studio({
                     />
                   </label>
                   {page.pageType.startsWith("video") && (
-                    <label>
-                      Sample video
-                      <select
-                        aria-label="Sample video"
-                        value={page.video}
-                        onChange={(e) =>
-                          updatePage({ ...page, video: e.target.value })
-                        }
-                      >
-                        {media.map((m) => (
-                          <option key={m.landscape.src} value={m.landscape.src}>
-                            {m.landscape.src.split("/").at(-1)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <ClipPicker
+                      api={api}
+                      value={page.video}
+                      uploads={uploads}
+                      disabled={busy}
+                      onChange={(video) => updatePage({ ...page, video })}
+                      onUploaded={(asset) =>
+                        setUploads(
+                          (old) =>
+                            old && {
+                              ...old,
+                              items: [
+                                asset,
+                                ...old.items.filter((c) => c.id !== asset.id),
+                              ],
+                            },
+                        )
+                      }
+                    />
                   )}
                   {page.pageType !== "dice" && page.pageType !== "reveal" && (
                     <label>
@@ -1056,8 +1074,8 @@ export function Studio({
                   <Page
                     page={preview.story.pages[preview.save.pageId]}
                     result={isResultPage(preview.story, preview.save.pageId)}
-                    media={resolveFixtureMedia(
-                      preview.story.pages[preview.save.pageId].video ?? "",
+                    media={mediaFor(
+                      preview.story.pages[preview.save.pageId].video,
                     )}
                     disabled={false}
                     transitioning={false}

@@ -21,7 +21,9 @@ const child = spawn(
       ? "demo-storybranch-phone"
       : "demo-storybranch",
     "--only",
-    "auth,firestore",
+    process.env.STORYBRANCH_PHONE_PREVIEW === "1"
+      ? "auth,firestore"
+      : "auth,firestore,storage",
     ...(process.env.STORYBRANCH_PHONE_PREVIEW === "1"
       ? []
       : existsSync(".emulator-data/firebase-export-metadata.json")

@@ -958,6 +958,10 @@ hr {
 .studio textarea {
   resize: vertical;
 }
+.clip-status {
+  min-height: 1.5em;
+  margin: -8px 0 16px;
+}
 .studio-actions {
   display: flex;
   flex-wrap: wrap;

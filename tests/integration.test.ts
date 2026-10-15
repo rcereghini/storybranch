@@ -9,7 +9,8 @@ import {
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../services/api/firebase";
+import { getBytes, ref, uploadBytes } from "firebase/storage";
+import { bucket, db } from "../services/api/firebase";
 import { handle } from "../services/api/handler";
 import { ensurePlayerProfile } from "../services/api/player-profile";
 import type { Save } from "../packages/contracts/index";
@@ -300,6 +301,11 @@ beforeAll(async () => {
       port: 8080,
       rules: readFileSync("firebase/firestore.rules", "utf8"),
     },
+    storage: {
+      host: "127.0.0.1",
+      port: 9299,
+      rules: readFileSync("firebase/storage.rules", "utf8"),
+    },
   });
 });
 afterAll(async () => {
@@ -528,6 +534,186 @@ it("persists one server dice result across retries and rejects injected results"
   expect(continued.data.save.pageId).toBe(
     first.data.save.lastRoll.passed ? "signal" : "shelter",
   );
+});
+const clipBucket = "gs://demo-storybranch.appspot.com";
+const clipStory = (storyId: string, video: string) => ({
+  id: storyId,
+  versionId: "draft",
+  rulesetVersion: "prototype-1",
+  title: "Clip test",
+  entryPageId: "opening",
+  pages: {
+    opening: {
+      id: "opening",
+      title: "Opening",
+      transcript: "",
+      kind: "scene",
+      pageType: "video",
+      video,
+      entryEffects: [],
+      choices: [
+        {
+          id: "next",
+          label: "Continue",
+          unavailableDisplay: "locked",
+          costs: [],
+          outcome: {
+            kind: "direct",
+            route: { targetPageId: "ending", effects: [] },
+          },
+        },
+      ],
+    },
+    ending: {
+      id: "ending",
+      title: "The end",
+      transcript: "Done.",
+      kind: "ending",
+      pageType: "text",
+      entryEffects: [],
+      choices: [],
+    },
+  },
+});
+const draftAndPublish = async (storyId: string, video: string, who: string) => {
+  const saved = await call(
+    `/studio/${storyId}`,
+    {
+      idempotencyKey: randomUUID(),
+      expectedRevision: 0,
+      draft: { story: clipStory(storyId, video), description: "Clip test" },
+    },
+    who,
+  );
+  expect(saved.status).toBe(200);
+  return call(
+    `/studio/${storyId}/publish`,
+    {
+      idempotencyKey: randomUUID(),
+      expectedRevision: 1,
+      policyVersion: "creator-alpha-1",
+    },
+    who,
+  );
+};
+it("uploads a clip through Storage rules, verifies it and plays it once published", async () => {
+  const bytes = readFileSync(
+    "apps/web/public/media/harbor-landscape-audio-v1.mp4",
+  );
+  const command = {
+    idempotencyKey: randomUUID(),
+    fileName: "harbor.mp4",
+    contentType: "video/mp4",
+    bytes: bytes.length,
+    durationSeconds: 6,
+  };
+  expect((await call("/uploads", command, "none")).status).toBe(401);
+  const created = await call("/uploads", command);
+  expect(created.status).toBe(200);
+  expect((await call("/uploads", command)).data).toEqual(created.data);
+  expect((await call("/uploads", { ...command, bytes: 5 })).status).toBe(409);
+  const { asset, path } = created.data;
+  expect(asset.status).toBe("pending");
+  expect(asset.media).toBeUndefined();
+  expect((await call(`/uploads/${asset.id}/complete`, {})).status).toBe(400);
+
+  const own = rules.authenticatedContext("player").storage(clipBucket);
+  const other = rules.authenticatedContext("progressed").storage(clipBucket);
+  const meta = { contentType: "video/mp4" };
+  await assertFails(uploadBytes(ref(other, path), bytes, meta));
+  await assertFails(
+    uploadBytes(ref(own, `uploads/player/${randomUUID()}`), bytes, meta),
+  );
+  await assertFails(uploadBytes(ref(own, path), bytes.subarray(0, 100), meta));
+  await assertFails(
+    uploadBytes(ref(own, path), bytes, { contentType: "video/webm" }),
+  );
+  await assertSucceeds(uploadBytes(ref(own, path), bytes, meta));
+  await assertFails(uploadBytes(ref(own, path), bytes, meta));
+  await assertFails(getBytes(ref(own, path)));
+
+  expect(
+    (await call(`/uploads/${asset.id}/complete`, {}, "progressed")).status,
+  ).toBe(403);
+  const done = await call(`/uploads/${asset.id}/complete`, {});
+  expect(done.status).toBe(200);
+  expect(done.data.asset.status).toBe("ready");
+  expect((await call(`/uploads/${asset.id}/complete`, {})).data).toEqual(
+    done.data,
+  );
+  const src = done.data.asset.media.landscape.src;
+  const served = await fetch(src);
+  expect(served.status).toBe(200);
+  expect(Buffer.from(await served.arrayBuffer()).equals(bytes)).toBe(true);
+  expect(
+    (await fetch(src.replace(/token=.*/, `token=${randomUUID()}`))).status,
+  ).not.toBe(200);
+
+  const mine = await call("/uploads");
+  expect(mine.data.enabled).toBe(true);
+  expect(mine.data.items.map((c: { id: string }) => c.id)).toContain(asset.id);
+  const theirs = await call("/uploads", undefined, "progressed");
+  expect(theirs.data.items.map((c: { id: string }) => c.id)).not.toContain(
+    asset.id,
+  );
+
+  const video = `asset:${asset.id}`;
+  const borrowed = await draftAndPublish(
+    `clip-${randomUUID()}`,
+    video,
+    "progressed",
+  );
+  expect(borrowed.status).toBe(400);
+  const storyId = `clip-${randomUUID()}`;
+  const published = await draftAndPublish(storyId, video, "player");
+  expect(published.status).toBe(200);
+  expect((await db.doc(`assets/${asset.id}`).get()).data()!.published).toBe(
+    true,
+  );
+  const started = await call(
+    "/playthroughs",
+    { idempotencyKey: randomUUID(), payload: { storyId } },
+    "progressed",
+  );
+  const played = await call(
+    `/playthroughs/${started.data.save.id}`,
+    undefined,
+    "progressed",
+  );
+  expect(played.data.page.video).toBe(video);
+  expect(played.data.media).toEqual({
+    landscape: { src, type: "video/mp4" },
+  });
+});
+it("rejects and removes an upload that is not really a video", async () => {
+  const fake = Buffer.from("<html>this is not a video</html>");
+  const created = await call("/uploads", {
+    idempotencyKey: randomUUID(),
+    fileName: "clip.mp4",
+    contentType: "video/mp4",
+    bytes: fake.length,
+    durationSeconds: 5,
+  });
+  const { asset, path } = created.data;
+  await assertSucceeds(
+    uploadBytes(
+      ref(rules.authenticatedContext("player").storage(clipBucket), path),
+      fake,
+      { contentType: "video/mp4" },
+    ),
+  );
+  expect((await call(`/uploads/${asset.id}/complete`, {})).status).toBe(400);
+  expect((await db.doc(`assets/${asset.id}`).get()).exists).toBe(false);
+  expect((await bucket.file(path).exists())[0]).toBe(false);
+  expect(
+    (
+      await draftAndPublish(
+        `clip-${randomUUID()}`,
+        `asset:${asset.id}`,
+        "player",
+      )
+    ).status,
+  ).toBe(400);
 });
 it("reveals a quiz result from server-held scores, not the client", async () => {
   const started = await call("/playthroughs", {

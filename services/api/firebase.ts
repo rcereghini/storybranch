@@ -6,12 +6,15 @@ import {
 } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { backendConfig } from "./config";
 export const config = backendConfig(process.env);
 let credential;
 if (config.mode === "emulator") {
   process.env.FIRESTORE_EMULATOR_HOST = config.firestoreHost;
   process.env.FIREBASE_AUTH_EMULATOR_HOST = config.authHost;
+  if (config.storageHost)
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST = config.storageHost;
 } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
   let account;
   try {
@@ -43,3 +46,4 @@ export const db = {
   runTransaction: firestore.runTransaction.bind(firestore),
 };
 export const auth = getAuth(app);
+export const bucket = getStorage(app).bucket(config.bucket);
