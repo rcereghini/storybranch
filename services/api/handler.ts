@@ -54,8 +54,7 @@ export async function handle(request: Request): Promise<Response> {
   const correlationId = randomUUID();
   try {
     const url = new URL(request.url);
-    const path = url.pathname.replace("/.netlify/functions/api", "/api");
-    const segments = path.split("/").filter(Boolean);
+    const segments = url.pathname.split("/").filter(Boolean);
     for (const segment of segments) id.parse(segment);
     const cursor = url.searchParams.get("cursor");
     if (cursor) id.parse(cursor);

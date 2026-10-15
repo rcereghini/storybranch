@@ -1,10 +1,10 @@
 # Storybranch technical architecture
 
-Use a TypeScript domain layer shared by a responsive React web client and future native clients. Firebase provides identity and persisted data. Netlify hosts the web application and short request handlers. Expensive media work uses durable job records and asynchronous workers.
+Use a TypeScript domain layer shared by a responsive React web client and future native clients. Firebase provides identity and persisted data. Vercel hosts the web application and short request handlers. Expensive media work uses durable job records and asynchronous workers.
 
-All choices below are proposed implementation defaults except the user selected React, TypeScript, Firebase, and Netlify stack. Pin supported dependency versions when implementation begins.
+All choices below are proposed implementation defaults except the user selected React, TypeScript, Firebase, and Vercel stack. Pin supported dependency versions when implementation begins.
 
-Production currently runs on Vercel rather than Netlify (proposal P17 in the [decision register](10-decisions-and-open-questions.md)). The boundaries below apply to either host: read "Netlify" as the web host and its short request handlers, and check the chosen host's function limits before relying on them.
+Hosting moved from Netlify to Vercel on October 15, 2026 (C02 in the [decision register](10-decisions-and-open-questions.md)). Check Vercel's current function limits before relying on them.
 
 ## Application structure
 
@@ -16,16 +16,16 @@ packages/domain           Pure story, condition, combat, and progression rules
 packages/contracts        Runtime schemas, API types, and error contracts
 packages/api-client       Authenticated client commands and queries
 packages/design-tokens    Colors, spacing, typography, and motion tokens
-services/api              Netlify handlers and server authorization
+services/api              Vercel handlers and server authorization
 services/workers          Generation, asset ingestion, and reconciliation
 firebase                  Rules, indexes, emulator configuration, migrations
 fixtures                  Small stories and deterministic provider fixtures
 docs                      Product and technical specifications
 ```
 
-Start with React and a Vite-based build for the interactive application. Public story and library routes need server-rendered or generated metadata responses at the same canonical URLs for link previews. Select and verify the Netlify routing implementation in the foundation milestone rather than assuming a SPA rewrite solves crawler previews.
+Start with React and a Vite-based build for the interactive application. Public story and library routes need server-rendered or generated metadata responses at the same canonical URLs for link previews. Select and verify the Vercel routing implementation in the foundation milestone rather than assuming a SPA rewrite solves crawler previews.
 
-The domain package must not depend on React, DOM APIs, Firebase SDKs, Netlify request objects, or provider SDKs. Domain functions accept serializable state and commands and return results. The API imports those functions for authoritative execution; the client may use them for previews but cannot commit trusted results.
+The domain package must not depend on React, DOM APIs, Firebase SDKs, Vercel request objects, or provider SDKs. Domain functions accept serializable state and commands and return results. The API imports those functions for authoritative execution; the client may use them for previews but cannot commit trusted results.
 
 ## System flow
 
@@ -55,11 +55,11 @@ Client reads and owner draft edits can use Firebase SDKs with restrictive rules.
 
 Use a server transaction for each contested state transition. Firestore may retry a transaction; never call a video provider, payment processor, or send a notification inside its callback. Instead commit an outbox item with the state update and let a worker perform the external action. See the [transaction reference](https://firebase.google.com/docs/firestore/manage-data/transactions).
 
-## Netlify and worker boundaries
+## Vercel and worker boundaries
 
-Netlify serves the application, public metadata pages, and short command endpoints. A generation command returns a job ID quickly. Webhooks acknowledge after recording a durable inbox event; ingestion and accounting continue independently.
+Vercel serves the application, public metadata pages, and short command endpoints. A generation command returns a job ID quickly. Webhooks acknowledge after recording a durable inbox event; ingestion and accounting continue independently.
 
-Netlify documents a 15 minute maximum for background functions. Therefore provider waiting cannot rely on one long-running invocation. See [Background Functions](https://docs.netlify.com/build/functions/background-functions/). Proposed production worker infrastructure is a Firebase/Google Cloud worker with a durable managed task queue and scheduled reconciler, keeping web hosting on Netlify. Prototype polling can be simpler, but production must prove retries, leases, and recovery across process death. Verify the chosen queue's current configuration during implementation.
+Vercel functions have a bounded maximum duration that depends on the plan. Therefore provider waiting cannot rely on one long-running invocation. See [Vercel function duration](https://vercel.com/docs/functions/configuring-functions/duration). Proposed production worker infrastructure is a Firebase/Google Cloud worker with a durable managed task queue and scheduled reconciler, keeping web hosting on Vercel. Prototype polling can be simpler, but production must prove retries, leases, and recovery across process death. Verify the chosen queue's current configuration during implementation.
 
 A leased outbox dispatcher performs bounded work, extends or relinquishes its lease, and persists the next attempt time. Duplicate delivery is expected. Dead-letter jobs become visible operational incidents. Reconciliation scans indexed due jobs, compares provider and local status, and repairs stalled work without creating a new paid request.
 
@@ -79,7 +79,7 @@ Define interfaces for video playback, secure auth persistence, upload selection,
 
 ## Environments and delivery
 
-Use separate Firebase projects, storage, provider keys, and billing modes for development, staging, and production. Netlify previews must use staging or emulator-backed services, never production writes by default. Start local work with the Firebase emulator suite and a fake provider adapter.
+Use separate Firebase projects, storage, provider keys, and billing modes for development, staging, and production. Vercel previews must use staging or emulator-backed services, never production writes by default. Start local work with the Firebase emulator suite and a fake provider adapter.
 
 CI should typecheck, validate schemas and fixtures, test domain rules and transactions, exercise Firestore/Storage rules, and build the web application. Version migrations and index definitions belong in source control. Deploys must preserve compatibility with existing saves and in-flight jobs; destructive schema changes require a staged migration and rollback plan.
 

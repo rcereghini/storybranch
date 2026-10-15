@@ -2,7 +2,7 @@
 
 Storybranch is a working name for a video based interactive storytelling platform. Players discover and play adventures, creators build video story graphs, and the community adds side quests without replacing the original adventure.
 
-This repository contains a working M0 foundation and M1 local playable prototype, plus the product specifications. React/TypeScript now defaults to Firebase Authentication and Firestore project `storybranch-f77a3` locally and in production. Production runs on Vercel at https://www.storybranch.com; the Netlify configuration remains in the repo. Server credentials are required for that mode; explicit emulator mode remains credential-free. See [shared Firebase setup](docs/15-shared-firebase-setup.md). Implementation and verification notes: [M0/M1 delivery record](docs/12-local-prototype.md).
+This repository contains a working M0 foundation and M1 local playable prototype, plus the product specifications. React/TypeScript now defaults to Firebase Authentication and Firestore project `storybranch-f77a3` locally and in production. Production runs on Vercel at https://www.storybranch.com. Server credentials are required for that mode; explicit emulator mode remains credential-free. See [shared Firebase setup](docs/15-shared-firebase-setup.md). Implementation and verification notes: [M0/M1 delivery record](docs/12-local-prototype.md).
 
 The player now uses a landscape overlay on larger screens and an authored portrait rendition at ≤700px. Opening a story attempts audible playback automatically. If the browser requires a gesture, a large centered **Start story with sound** button appears. Saved choices reuse the same video element. Loading announcements do not move the video; the last frame covers clip loading, and custom controls replace the native timeline. Story controls fade during playback; pause, completion or **Skip to choices** restores them. If the browser blocks autoplay, **Play scene** provides a manual fallback. **Share this adventure** offers public story-link sharing/copying and a downloadable portrait MP4 teaser. Shared links use the address they were copied from, so production links point at https://www.storybranch.com. See [responsive video and sharing](docs/13-responsive-video-and-sharing.md) for the research, behavior and limits.
 
@@ -66,7 +66,7 @@ Browser checks use Google Chrome on every platform (`pnpm exec playwright instal
 
 `pnpm media:portrait` generates the separate 1080×1920 phone and social-teaser MP4 fixtures using H.264-capable Chrome. Normal setup uses the included files. Use new rendition IDs for future media changes. Social upload acceptance and physical-device share sheets have not been tested; this is a local teaser download, not an automatic posting integration.
 
-The production bundle is in `dist/`. `netlify.toml` defines static hosting, generated story/creator metadata, and API function routing; `vercel.json` does the same on Vercel, which serves production (see [Vercel setup](docs/15-shared-firebase-setup.md#vercel)). The default deployment uses `storybranch-f77a3` and requires server-only Firebase credentials, Firestore setup and sample content seeding. See [shared Firebase setup](docs/15-shared-firebase-setup.md). Moderation, broader production hardening and live end-to-end verification remain outstanding.
+The production bundle is in `dist/`. `vercel.json` defines static hosting, generated story/creator metadata, and API function routing (see [Vercel setup](docs/15-shared-firebase-setup.md#vercel)). The default deployment uses `storybranch-f77a3` and requires server-only Firebase credentials, Firestore setup and sample content seeding. See [shared Firebase setup](docs/15-shared-firebase-setup.md). Moderation, broader production hardening and live end-to-end verification remain outstanding.
 
 If `pnpm` is not on PATH, run `corepack enable`; `package.json` pins pnpm 11.25.0. If a corporate TLS certificate prevents downloads, enable the trusted OS certificate store with `$env:NODE_USE_SYSTEM_CA='1'`; do not disable TLS verification. Java 21 can be installed normally; `.tools/` is not source-controlled.
 
@@ -76,7 +76,7 @@ If `pnpm` is not on PATH, run `corepack enable`; `package.json` pins pnpm 11.25.
 - `packages/domain`: deterministic engine; no React, Firebase, browser or Node imports.
 - `packages/contracts`: bounded runtime schemas, serializable state and command types.
 - `packages/api-client`: injected transport/token adapter; `packages/design-tokens`: shared visual tokens.
-- `services/api`: token verification, ownership checks, Firestore transactions and receipts; `services/functions`: Netlify adapter; `api/index.js`: Vercel entry that re-exports the bundled handler.
+- `services/api`: token verification, ownership checks, Firestore transactions and receipts; `services/functions`: hosted entry that reports missing server credentials; `api/index.js`: Vercel entry that re-exports the bundled handler.
 - `firebase`: deny-by-default rules and the exact save-list index; `fixtures`: immutable sample stories.
 - `scripts`, `tests`: emulator setup, seed, metadata, media generation and verification.
 
@@ -89,7 +89,7 @@ Read [Product requirements](docs/01-product-requirements.md), [Game and communit
 | [Product requirements](docs/01-product-requirements.md) | Vision, confirmed requirements, scope, and success measures |
 | [Game and community rules](docs/02-game-and-community-rules.md) | Stats, keys, progression, combat, side quests, featured placements, and trades |
 | [Experience and interface](docs/03-experience-and-interface.md) | Screens, navigation, player flow, authoring, accessibility, and visual direction |
-| [Technical architecture](docs/04-technical-architecture.md) | React and TypeScript, Firebase, Netlify, asynchronous work, and native portability |
+| [Technical architecture](docs/04-technical-architecture.md) | React and TypeScript, Firebase, Vercel, asynchronous work, and native portability |
 | [Data and API contracts](docs/05-data-and-api-contracts.md) | Entities, permissions, commands, versioning, and concurrency |
 | [Video generation and economy](docs/06-video-generation-and-economy.md) | Provider integration, credits, jobs, failure recovery, and commercial assumptions |
 | [Safety and operations](docs/07-safety-and-operations.md) | Content controls, security, observability, backups, and service budgets |
@@ -100,7 +100,7 @@ Read [Product requirements](docs/01-product-requirements.md), [Game and communit
 | [M0/M1 delivery record](docs/12-local-prototype.md) | What the first local slice delivered, its API and verification evidence |
 | [Responsive video and sharing](docs/13-responsive-video-and-sharing.md) | Landscape/portrait player, teaser video and share links |
 | [Phone playback preview](docs/14-phone-playback-preview.md) | Private HTTPS tunnel for testing on a real phone |
-| [Shared Firebase setup](docs/15-shared-firebase-setup.md) | Live Firebase project, credentials, Netlify and Vercel hosting |
+| [Shared Firebase setup](docs/15-shared-firebase-setup.md) | Live Firebase project, credentials and Vercel hosting |
 | [Story and Page model](docs/16-story-pages.md) | Current page-type contract; read before changing stories, pages or routing |
 | [Creator Studio](docs/17-creator-studio.md) | Drafts, preview, publishing and the publisher allowlist |
 | [Player dashboard](docs/18-player-dashboard.md) | Dashboard home, profile customization and progress summary |

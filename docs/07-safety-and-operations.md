@@ -32,7 +32,7 @@ Measure API errors and latency, transaction contention, stuck jobs, outbox age, 
 
 Proposed beta targets, to validate with load tests: p95 committed gameplay commands below 1.5 seconds excluding media loading, successful resume after refresh in all acceptance scenarios, and all unresolved generation jobs surfaced for reconciliation within 15 minutes. Provider completion time is measured separately and is not promised by these targets.
 
-Budget alerts should cover Firebase reads/writes, storage, media egress, Netlify usage, and provider spend. Pause new generation when configured spend ceilings are reached. Catalogue browsing and purchased asset access should degrade independently of provider outages.
+Budget alerts should cover Firebase reads/writes, storage, media egress, Vercel usage, and provider spend. Pause new generation when configured spend ceilings are reached. Catalogue browsing and purchased asset access should degrade independently of provider outages.
 
 ## Recovery procedures
 

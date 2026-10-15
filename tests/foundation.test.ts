@@ -25,7 +25,7 @@ it("keeps portable packages free of platform dependencies", () => {
   for (const dir of ["packages/domain", "packages/contracts"])
     for (const file of readdirSync(dir)) {
       const source = readFileSync(`${dir}/${file}`, "utf8");
-      expect(source).not.toMatch(/from ['"](?:react|firebase|node:|@netlify)/);
+      expect(source).not.toMatch(/from ['"](?:react|firebase|node:)/);
       expect(source).not.toMatch(/\b(?:window|document|localStorage|fetch)\b/);
     }
 });

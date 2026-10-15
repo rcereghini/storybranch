@@ -6,7 +6,7 @@ October 12 update: [responsive video and sharing](13-responsive-video-and-sharin
 
 ## Delivered
 
-M0: strict TypeScript, React/Vite, pure domain/contracts boundaries, runtime validation, lockfile, Firebase emulator environment, restrictive rules, Netlify function/rewrite structure, generated metadata for `/s/glass-harbor` (including optional slugs) and `/u/storybranch`, and a CI workflow. Foundation type, schema, boundary and build checks passed before M1 implementation began. Generated HTML contains title and Open Graph description without JavaScript. Actual Netlify deployment has not been verified.
+M0: strict TypeScript, React/Vite, pure domain/contracts boundaries, runtime validation, lockfile, Firebase emulator environment, restrictive rules, hosted function/rewrite structure (originally Netlify, now Vercel), generated metadata for `/s/glass-harbor` (including optional slugs) and `/u/storybranch`, and a CI workflow. Foundation type, schema, boundary and build checks passed before M1 implementation began. Generated HTML contains title and Open Graph description without JavaScript. Netlify was never deployed; production later moved to Vercel.
 
 M1: public catalogue, email/password emulator login, The Glass Harbor, deterministic stat and key checks, two endings, persisted server-authorized choices, save/resume, append-only paginated story log, loading/error/offline/stale states, local video, poster, captions, and complete scene transcripts. The guard encounter uses authored choices. Combat is still M5.
 
@@ -52,7 +52,7 @@ Errors use `{error:{code,message,correlationId}}`. Invalid schemas return 400, m
 - Headless installed Chrome completed sign-in, actual video playback, a locked pass, courier grant, reload/resume, both side quests, return, simultaneous-tab stale state, offline blocking, both endings, log and responsive screenshots. Added coverage loses a response after commit then retries the same key, exercises missing-video transcript fallback/retry, and activates a choice by keyboard. No page exceptions or horizontal overflow at 1440px and 390px.
 - Emulator export and actual process restart/import passed: all 28 saved states compared byte-equivalent after canonical serialization, with 62 receipts and 7 authentication identities preserved. Reseeding also preserved existing editions and profiles. Browser reload and separate-tab persistence are verified. `scripts/persistence-check.ts capture` and then `scripts/persistence-check.ts` support repeating this check across a restart; do not mutate data between capture/export/compare.
 
-No physical phone, Safari/Firefox, screen reader, hosted Netlify routing/function, staging/production Firebase, production backup restore, Storage emulator, live generation, payments or hosted CI run was verified. Storage has deny-all rules and no enabled upload surface. Emulator tests do not prove production IAM, index deployment, rate limits or operational readiness.
+No physical phone, Safari/Firefox, screen reader, hosted routing/function, staging/production Firebase, production backup restore, Storage emulator, live generation, payments or hosted CI run was verified. Storage has deny-all rules and no enabled upload surface. Emulator tests do not prove production IAM, index deployment, rate limits or operational readiness.
 
 ## Next boundaries
 
