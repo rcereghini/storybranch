@@ -1,6 +1,6 @@
-# Shared Firebase setup: local and Netlify
+# Shared Firebase setup: local, Netlify and Vercel
 
-The default browser and API configuration targets `storybranch-f77a3`. `pnpm dev` and the normal Netlify build use this same project. Local and hosted play therefore share accounts and saves. Emulators remain available explicitly with `pnpm dev:emulator`; the optional phone tunnel remains an isolated disposable emulator preview.
+The default browser and API configuration targets `storybranch-f77a3`. `pnpm dev` and the Netlify and Vercel builds use this same project. Local and hosted play therefore share accounts and saves. Emulators remain available explicitly with `pnpm dev:emulator`; the optional phone tunnel remains an isolated disposable emulator preview.
 
 The web config in `fixtures/firebase-config.ts` is public. Analytics is not initialized. Admin credentials are server-only and must never use a `VITE_` prefix or be committed.
 
@@ -9,7 +9,7 @@ The web config in `fixtures/firebase-config.ts` is public. Analytics is not init
 For project `storybranch-f77a3`:
 
 1. Enable Authentication > Sign-in method > Email/Password. Players can create an email/password account in the app or sign in with an existing account. Enable Google as a second provider and choose the project support email to activate Continue with Google. Do not create the public emulator demo passwords in the live project.
-2. Include `storybranch.com`, your Netlify site hostname, and `localhost` in Authentication > Settings > Authorized domains as appropriate.
+2. Include `storybranch.com`, `www.storybranch.com`, `storybranch-alpha.vercel.app`, any Netlify site hostname, and `localhost` in Authentication > Settings > Authorized domains as appropriate.
 3. Ensure a `(default)` Firestore database exists. Records are stored under `storybranch/app/...`, keeping them separate from pre-existing top-level collections. Authentication users are shared at the project level.
 4. Protect `storybranch/{document=**}` against all client reads/writes. The app uses the server API, not the client Firestore SDK. Admin SDK access uses IAM and bypasses Firestore client rules. If this project has another app, inspect and merge its rules; do not replace them with the emulator rules. A permissive overlapping wildcard rule can override a restrictive match, so check that no other rule grants client writes here.
 5. Add the composite collection index for `playthroughs`: `playerUid` ascending, `updatedAt` descending, collection scope (as described in `firebase/firestore.indexes.json`). Do not overwrite other indexes in a reused project.
@@ -69,4 +69,4 @@ Configuration tests reject invalid modes, non-loopback emulators and mixed live/
 
 Google sign-in uses a user-triggered popup; blocked or cancelled popups leave the form open with recovery guidance. The isolated phone tunnel supports email signup but not Google OAuth. Production Google OAuth and physical-device popup behavior require manual verification.
 
-Authentication update verification: typecheck, production build, 20 unit/domain tests and 9 emulator integration tests passed. Chrome at 390px verified password mismatch handling, email registration, session persistence after reload, new-player save creation, sign-out/sign-in/resume, and opening/cancelling the Google emulator popup. Run `pnpm test:auth` with the emulator dev server. A real Google account consent flow was not performed. Live sample content was seeded and the local function successfully read the live catalogue; the last hosted check still returned the missing-credential response.
+Authentication update verification: typecheck, production build, 20 unit/domain tests and 9 emulator integration tests passed. Chrome at 390px verified password mismatch handling, email registration, session persistence after reload, new-player save creation, sign-out/sign-in/resume, and opening/cancelling the Google emulator popup. Run `pnpm test:auth` with the emulator dev server. A real Google account consent flow was not performed. Live sample content was seeded and the local function successfully read the live catalogue; Since October 14, 2026 Vercel production has credentials and serves the live catalogue.

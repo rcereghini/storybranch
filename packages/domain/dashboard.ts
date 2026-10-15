@@ -185,6 +185,7 @@ export function summarizeDashboard(
       .map((s) => ({
         saveId: s.id,
         storyId: s.storyId,
+        pageId: s.pageId,
         title: titleOf(s),
         pageTitle: pageTitleOf(s),
         at: s.updatedAt,

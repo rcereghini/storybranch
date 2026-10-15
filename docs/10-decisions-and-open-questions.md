@@ -45,6 +45,8 @@ Implementation default for C12: 16:9 desktop, 9:16 mobile at ≤700 CSS pixels, 
 | P13 | Firebase Storage for media; durable Google Cloud worker/queue for production jobs | Complements Firebase data and Netlify hosting without long-lived web requests |
 | P14 | Account required to save/play persistently; public story detail and catalogue can be browsed anonymously | Keeps discovery shareable and authoritative saves simple |
 | P15 | No nested community branches or multiplayer in v1 | Bounds state and provenance complexity |
+| P16 | Signed-in players land on a dashboard; the catalogue moves to Discover | Built October 14, 2026. Changes C07 (catalogue as logged-in home), so it needs explicit confirmation or reverting |
+| P17 | Production hosting on Vercel; Netlify configuration kept | Live since October 14, 2026 at www.storybranch.com. Changes C02 (Netlify hosting); confirm whether Netlify is retired |
 
 ## Decisions required before the relevant feature launches
 
@@ -66,6 +68,10 @@ Implementation default for C12: 16:9 desktop, 9:16 mobile at ≤700 CSS pixels, 
 | What geographic availability and native billing approach apply? | Web release first; native policy review at M7 | Paid distribution |
 | Which platform achievements grant account XP and how are they reviewed? | Curated reward catalogue for beta | Public account progression |
 | What budgets, expected concurrency, retention, and recovery targets are acceptable? | Measure staging costs and validate proposed operational targets | Production rollout |
+
+## Product direction (October 14, 2026)
+
+The working plan for AI-generated clips lives in the Claude Doc "Storybranch: AI clips idea vs. our plan": hand-make one AI-clip story before building in-app generation, fix sharing, trial a personality-quiz template, then implement [generation and credits](06-video-generation-and-economy.md). Clip length (6–12 seconds or 30) and whether to pursue business uses such as trainings and ads are open questions. Hand-made clips need Studio uploads, which are not built yet.
 
 ## Change procedure
 

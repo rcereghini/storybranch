@@ -6,6 +6,8 @@ The interface should feel like a cinematic game library with a readable RPG laye
 
 Desktop navigation: Discover, My Adventures, Create, and Profile, with search and credit balance nearby. On mobile, use a four destination bottom navigation and place detailed account controls in Profile. The authenticated landing route is Discover. Returning players see a Continue playing row near the top of the catalogue.
 
+October 14, 2026 implementation: signed-in players land on a dashboard (continue playing, progress, recommendations, endings) and the catalogue moved to Discover. Navigation is Dashboard, Discover, My adventures and Create; profile editing lives on the dashboard. This is proposal P16 in the [decision register](10-decisions-and-open-questions.md) and awaits confirmation because it changes C07. See [Player dashboard](18-player-dashboard.md).
+
 Catalogue rows include Featured stories, New adventures, Short sessions, genre rows, and Community side quests. Story cards show poster, title, creator, approximate duration, content rating, and community status. Duration is an authored estimate or observed range because branching paths differ. Use explicit Play and Resume actions on the detail screen. Do not autoplay sound while browsing.
 
 The first catalogue supports title prefix search and genre, rating, language, and duration filters. Full-text relevance and recommendations are later features, not capabilities assumed from the database. Empty rows collapse; a new account receives a useful editorial selection.
@@ -20,7 +22,7 @@ Use stable links `/s/{storyId}/{optionalSlug}` and `/u/{publicHandle}`. The ID r
 
 The October 12, 2026 player direction uses landscape 16:9 on larger screens and authored portrait 9:16 renditions at small breakpoints (prototype: 700 CSS pixels and below). Narration and choice buttons overlay the paused scene on a dark gradient: two columns on desktop, stacked on mobile. Opening the player offers Start story with sound, called directly from the tap. After that, committing a choice attempts playback automatically on the same video element. Playing fades the decision overlay and surrounding story controls while preserving native playback controls and captions; pause, end, or Skip to choices restores the interface. If browser autoplay policy blocks playback, show Play scene without treating it as a broken clip. Full transcripts and collapsible character details remain outside the frame. Layout may expand for long text rather than clip controls. Never crop essential content to force portrait playback; when no portrait rendition exists, contain the original video.
 
-Social clip distribution favors a separate 9:16 MP4 export with authored captions/hooks inside placement-specific safe zones. The interactive overlay is not burned into the scene file. A teaser should invite viewers into the story; it must not imply that rendered choices are tappable on another platform. The prototype offers a silent six-second portrait teaser download and a public story link; no social publishing integration or user-generated clip editor is implemented. See [media direction and evidence](13-responsive-video-and-sharing.md).
+Social clip distribution favors a separate 9:16 MP4 export with authored captions/hooks inside placement-specific safe zones. The interactive overlay is not burned into the scene file. A teaser should invite viewers into the story; it must not imply that rendered choices are tappable on another platform. The prototype offers a six-second portrait teaser download with synthesized ambience and a public story link; no social publishing integration or user-generated clip editor is implemented. See [media direction and evidence](13-responsive-video-and-sharing.md).
 
 The persistent player chrome shows story title, chapter or scene label, saved status, and a Story log control. A child playthrough adds a clear Side quest label and Return to main adventure action. Returning does not require completing or abandoning the side quest.
 
@@ -32,7 +34,7 @@ Video end reveals or emphasizes choices, but accessibility controls allow users 
 
 ## Creator workspace
 
-Use a desktop graph canvas with an outline alternative, scene inspector, video preview, and validation panel. Node types are Scene, Combat, and Ending. A branch location is a property of a Scene; it is not a separate kind of save state. Creation begins from a small starter graph with an opening, a choice, two routes, and endings.
+Use a desktop graph canvas with an outline alternative, scene inspector, video preview, and validation panel. The original design named Scene, Combat and Ending nodes; Creator Studio now authors the five page types in [Story and Page model](16-story-pages.md), and combat is still deferred. A branch location is a property of a Scene; it is not a separate kind of save state. Creation begins from a small starter graph with an opening, a choice, two routes, and endings.
 
 The inspector edits title, transcript/captions, uploaded or generated media, choices, conditions, effects, and checkpoint settings. A condition builder offers stat/key/item fields and operators. A test player can simulate starting stat profiles and keys without editing the real account.
 

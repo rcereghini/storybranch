@@ -12,6 +12,7 @@ import { auth } from "./firebase";
 import { Avatar, avatars } from "./avatars";
 import { ProfileEditor, draftOf, type ProfileDraft } from "./ProfileEditor";
 import { StoryCover } from "./StoryCover";
+import { endingLink, shareLink } from "./share";
 import { accents } from "./theme";
 
 const api = createApi(
@@ -77,6 +78,7 @@ export function Dashboard({
   );
   const [loadError, setLoadError] = useState("");
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
+  const [shareStatus, setShareStatus] = useState("");
   const load = async () => {
     setLoadError("");
     try {
@@ -484,9 +486,35 @@ export function Dashboard({
                         {new Date(ending.at).toLocaleDateString()}
                       </small>
                     </span>
+                    {/* Side-quest endings have no public story page. */}
+                    {summary.stories.some(
+                      (s) => s.storyId === ending.storyId,
+                    ) && (
+                      <button
+                        className="ghost share-ending"
+                        aria-label={`Share ${ending.pageTitle}`}
+                        onClick={async () =>
+                          setShareStatus(
+                            await shareLink(
+                              {
+                                title: `${ending.pageTitle} · ${ending.title}`,
+                                text: `I reached “${ending.pageTitle}” in ${ending.title}. Which ending will you find?`,
+                                url: endingLink(ending.storyId, ending.pageId),
+                              },
+                              "Ending link",
+                            ),
+                          )
+                        }
+                      >
+                        Share
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
+              <p className="muted" role="status">
+                {shareStatus}
+              </p>
             </section>
           )}
         </div>

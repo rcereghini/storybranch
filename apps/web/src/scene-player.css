@@ -262,6 +262,34 @@
 .clip-download:hover {
   background: #2a3a36;
 }
+/* Looks like the link preview a friend will see. */
+.ending-card {
+  display: grid;
+  gap: 4px;
+  max-width: 460px;
+  margin: 14px 0;
+  padding: 18px 20px;
+  border: 1px solid #c9b1e955;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0%, #c9b1e926, transparent 60%), var(--panel);
+}
+.ending-card-eyebrow {
+  font:
+    11px/1.6 Consolas,
+    monospace;
+  letter-spacing: 2px;
+  color: var(--violet);
+}
+.ending-card strong {
+  font:
+    400 26px/1.2 Georgia,
+    serif;
+}
+.ending-card span:last-child {
+  color: var(--muted);
+  font-size: 13px;
+}
 @media (max-width: 1000px) and (min-width: 701px) {
   .scene-overlay {
     gap: 24px;

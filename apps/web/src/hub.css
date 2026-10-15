@@ -1046,6 +1046,32 @@ header .sign-in:hover:not(:disabled) {
   flex-wrap: wrap;
   gap: 10px;
 }
+.story-detail > :is(.shared-ending, .empty-state, .placeholder-block) {
+  grid-column: 1 / -1;
+}
+.detail-title {
+  margin: 0;
+  font: 400 clamp(34px, 4.4vw, 54px) / 1.05 var(--font-display);
+}
+.shared-ending {
+  margin: 0;
+  padding: 14px 20px;
+  border: 1px solid #c9b1e955;
+  border-radius: var(--radius-md);
+  background: #c9b1e912;
+  font-size: 16px;
+}
+.shared-ending strong {
+  color: var(--violet);
+  font: 400 20px/1.3 var(--font-display);
+}
+.ending-badges .share-ending {
+  margin-left: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+}
 
 /* My adventures */
 .adventures-page {

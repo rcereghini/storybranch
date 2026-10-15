@@ -147,6 +147,7 @@ export type ContinueEntry = {
 export type EndingEntry = {
   saveId: string;
   storyId: string;
+  pageId: string;
   title: string;
   pageTitle: string;
   at: number;

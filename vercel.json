@@ -5,7 +5,15 @@
   "framework": null,
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api" },
-    { "source": "/s/glass-harbor/:path*", "destination": "/s/glass-harbor/index.html" },
+    {
+      "source": "/s/:story/ending/:page",
+      "destination": "/s/:story/ending/:page/index.html"
+    },
+    { "source": "/s/:story", "destination": "/s/:story/index.html" },
+    {
+      "source": "/s/glass-harbor/:path*",
+      "destination": "/s/glass-harbor/index.html"
+    },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

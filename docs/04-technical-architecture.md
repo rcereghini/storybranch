@@ -4,6 +4,8 @@ Use a TypeScript domain layer shared by a responsive React web client and future
 
 All choices below are proposed implementation defaults except the user selected React, TypeScript, Firebase, and Netlify stack. Pin supported dependency versions when implementation begins.
 
+Production currently runs on Vercel rather than Netlify (proposal P17 in the [decision register](10-decisions-and-open-questions.md)). The boundaries below apply to either host: read "Netlify" as the web host and its short request handlers, and check the chosen host's function limits before relying on them.
+
 ## Application structure
 
 The current player uses `Story` context and a shared `Page` parent for text, text/options, video, video/options and dice. The portable graph is `Story.pages`; see [Story and Page model](16-story-pages.md) for contracts, state ownership and prototype format changes.
