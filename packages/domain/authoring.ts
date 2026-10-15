@@ -1,5 +1,5 @@
 import { type Story, GameError } from "../contracts/index";
-import { validateStory } from "./index";
+import { routesOf, validateStory } from "./index";
 
 // Structural graph safety is shared by authoring clients and publication.
 export function validatePublication(input: unknown): Story {
@@ -9,9 +9,7 @@ export function validatePublication(input: unknown): Story {
     const reached = new Set<string>();
     const destinations = (pageId: string) =>
       story.pages[pageId].choices.flatMap((c) =>
-        c.outcome.kind === "direct"
-          ? [c.outcome.route.targetPageId]
-          : [c.outcome.success.targetPageId, c.outcome.failure.targetPageId],
+        routesOf(c).map((r) => r.targetPageId),
       );
     const visit = (pageId: string) => {
       if (reached.has(pageId)) return;

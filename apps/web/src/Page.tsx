@@ -14,8 +14,10 @@ export function Page({
   onOutput,
   disabled,
   transitioning,
+  result,
 }: {
   page: StoryPage;
+  result?: boolean;
   media?: SceneMedia;
   children: ReactNode;
   onPlaybackChange: (playing: boolean) => void;
@@ -42,7 +44,9 @@ export function Page({
           ? "YOUR STORY, REMEMBERED"
           : type === "dice"
             ? "TEST YOUR LUCK"
-            : "WHAT WILL YOU DO?"}
+            : type === "reveal"
+              ? "YOUR ANSWERS ARE IN"
+              : "WHAT WILL YOU DO?"}
       </p>
       {page.choices.map((output, i) => {
         const locked =
@@ -110,7 +114,13 @@ export function Page({
       {!video && (
         <section className="reading-page">
           <p className="eyebrow">
-            {type === "dice" ? "DICE ROLL" : "STORY PAGE"}
+            {type === "dice"
+              ? "DICE ROLL"
+              : type === "reveal"
+                ? "QUIZ"
+                : result
+                  ? "YOUR RESULT"
+                  : "STORY PAGE"}
           </p>
           <h1 ref={heading} tabIndex={-1}>
             {page.title}

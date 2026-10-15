@@ -56,6 +56,9 @@ export function Discover({
           .querySelector('meta[name="storybranch:ending"]')
           ?.getAttribute("content") ?? "")
       : null;
+  const sharedResult = !!document.querySelector(
+    'meta[name="storybranch:result"]',
+  );
   const detailEntry = catalogue.find((c) => c.id === detailId);
   const featured = !detail || detailId === "glass-harbor";
   const genres = useMemo(
@@ -138,7 +141,12 @@ export function Discover({
         <section className="story-detail" id="story-detail">
           {sharedEnding !== null && (
             <p className="shared-ending" role="note">
-              {sharedEnding ? (
+              {sharedEnding && sharedResult ? (
+                <>
+                  <span>A friend got</span> <strong>{sharedEnding}</strong>
+                  <span>. What will you get?</span>
+                </>
+              ) : sharedEnding ? (
                 <>
                   <span>A friend reached</span> <strong>{sharedEnding}</strong>
                   <span>. Which ending will you find?</span>

@@ -11,7 +11,12 @@ import {
 } from "../../../packages/contracts/index";
 import { type DraftRecord } from "../../../packages/contracts/authoring";
 import { validatePublication } from "../../../packages/domain/authoring";
-import { baseStats, start, transition } from "../../../packages/domain/index";
+import {
+  baseStats,
+  isResultPage,
+  start,
+  transition,
+} from "../../../packages/domain/index";
 import { sceneMedia, resolveFixtureMedia } from "../../../fixtures/media";
 import { Story } from "./Story";
 import { Page } from "./Page";
@@ -43,6 +48,118 @@ const makePage = (id: string): StoryPage => ({
   choices: [choice()],
 });
 const media = Object.values(sceneMedia);
+const shortId = () => crypto.randomUUID().slice(0, 8);
+const ending = (id: string, title: string, transcript: string): StoryPage => ({
+  ...makePage(id),
+  title,
+  transcript,
+  kind: "ending",
+  choices: [],
+});
+type Results = Extract<Choice["outcome"], { kind: "reveal" }>["results"];
+const result = (storyId: string, pageId: string): Results[number] => ({
+  scoreId: `${storyId}:${pageId}`,
+  route: route(pageId),
+});
+const revealChoice = (results: Results): Choice => ({
+  ...choice(),
+  label: "Reveal my result",
+  outcome: { kind: "reveal", results },
+});
+// An answer counts toward at most one result, through a score effect.
+const scoreOf = (c: Choice) =>
+  c.outcome.kind === "direct"
+    ? c.outcome.route.effects.find((e) => e.kind === "score")?.scoreId
+    : undefined;
+const countToward = (c: Choice, scoreId?: string): Choice =>
+  c.outcome.kind !== "direct"
+    ? c
+    : {
+        ...c,
+        outcome: {
+          kind: "direct",
+          route: {
+            ...c.outcome.route,
+            effects: [
+              ...c.outcome.route.effects.filter((e) => e.kind !== "score"),
+              ...(scoreId
+                ? [
+                    {
+                      id: `score-${c.id}`,
+                      kind: "score" as const,
+                      scoreId,
+                      delta: 1,
+                    },
+                  ]
+                : []),
+            ],
+          },
+        },
+      };
+// A starter quiz: two questions whose answers each add a point toward one of
+// three results, then a reveal page that shows the winning result.
+function quizTemplate(id: string): StoryData {
+  const results = ["result-a", "result-b", "result-c"];
+  const names = ["The Explorer", "The Builder", "The Dreamer"];
+  const question = (
+    pageId: string,
+    title: string,
+    labels: string[],
+    target: string,
+  ): StoryPage => ({
+    ...makePage(pageId),
+    title,
+    transcript: "Pick the answer that fits you best.",
+    pageType: "text-options",
+    choices: labels.map((label, i) =>
+      countToward({ ...choice(target), label }, `${id}:${results[i]}`),
+    ),
+  });
+  return {
+    id,
+    versionId: "draft",
+    rulesetVersion: "prototype-1",
+    title: "Untitled quiz",
+    entryPageId: "opening",
+    pages: {
+      opening: {
+        ...makePage("opening"),
+        title: "Opening",
+        transcript: "Answer a few questions to find out which one you are.",
+        choices: [{ ...choice("question-1"), label: "Start the quiz" }],
+      },
+      "question-1": question(
+        "question-1",
+        "Question 1",
+        ["Go somewhere new", "Make something", "Daydream"],
+        "question-2",
+      ),
+      "question-2": question(
+        "question-2",
+        "Question 2",
+        ["A map", "A toolbox", "A notebook"],
+        "reveal",
+      ),
+      reveal: {
+        ...makePage("reveal"),
+        title: "Your answers are in",
+        transcript: "Ready to see your result?",
+        pageType: "reveal",
+        choices: [revealChoice(results.map((r) => result(id, r)))],
+      },
+      ...Object.fromEntries(
+        results.map((r, i) => [
+          r,
+          ending(
+            r,
+            names[i],
+            "Describe this result and what it says about you.",
+          ),
+        ]),
+      ),
+    },
+  };
+}
 type Listing = {
   items: {
     id: string;
@@ -169,28 +286,30 @@ export function Studio({
       setPreview(null);
       setRetry(null);
     });
-  const create = () => {
+  const create = (quiz = false) => {
     const id = `story-${crypto.randomUUID()}`;
     setDraft({
       revision: 0,
       publishedVersionId: null,
       description: "",
-      story: {
-        id,
-        versionId: "draft",
-        rulesetVersion: "prototype-1",
-        title: "Untitled story",
-        entryPageId: "opening",
-        pages: {
-          opening: { ...makePage("opening"), title: "Opening" },
-          ending: {
-            ...makePage("ending"),
-            title: "The end",
-            kind: "ending",
-            choices: [],
+      story: quiz
+        ? quizTemplate(id)
+        : {
+            id,
+            versionId: "draft",
+            rulesetVersion: "prototype-1",
+            title: "Untitled story",
+            entryPageId: "opening",
+            pages: {
+              opening: { ...makePage("opening"), title: "Opening" },
+              ending: {
+                ...makePage("ending"),
+                title: "The end",
+                kind: "ending",
+                choices: [],
+              },
+            },
           },
-        },
-      },
     });
     setSelected("opening");
     setDirty(true);
@@ -198,7 +317,31 @@ export function Studio({
     setPreview(null);
   };
   const setType = (type: StoryPage["pageType"]) => {
-    if (!page) return;
+    if (!page || !draft) return;
+    const { video: _, ...rest } = page;
+    if (type === "reveal") {
+      // A reveal needs at least two results; start with two new endings.
+      const ids = [`result-${shortId()}`, `result-${shortId()}`];
+      change({
+        ...draft.story,
+        pages: {
+          ...draft.story.pages,
+          ...Object.fromEntries(
+            ids.map((r, i) => [
+              r,
+              ending(r, `Result ${i + 1}`, "Describe this result."),
+            ]),
+          ),
+          [page.id]: {
+            ...rest,
+            pageType: type,
+            kind: "scene",
+            choices: [revealChoice(ids.map((r) => result(draft.story.id, r)))],
+          },
+        },
+      });
+      return;
+    }
     const c = choice();
     if (type === "dice") {
       c.label = "Roll d20";
@@ -210,7 +353,6 @@ export function Studio({
         failure: route("ending"),
       };
     }
-    const { video: _, ...rest } = page;
     updatePage({
       ...rest,
       pageType: type,
@@ -240,6 +382,14 @@ export function Studio({
       </select>
     </label>
   );
+  // Results come from the story's reveal pages, named by their page titles.
+  const quizResults = draft
+    ? Object.values(draft.story.pages).flatMap((p) =>
+        p.choices.flatMap((c) =>
+          c.outcome.kind === "reveal" ? c.outcome.results : [],
+        ),
+      )
+    : [];
   const editChoice = (index: number, c: Choice) =>
     page &&
     updatePage({
@@ -253,9 +403,17 @@ export function Studio({
           <p className="eyebrow">CREATOR STUDIO · ALPHA</p>
           <h1>Build your next world.</h1>
         </div>
-        <button disabled={busy || dirty || !!retry} onClick={create}>
-          New story
-        </button>
+        <div className="studio-actions">
+          <button disabled={busy || dirty || !!retry} onClick={() => create()}>
+            New story
+          </button>
+          <button
+            disabled={busy || dirty || !!retry}
+            onClick={() => create(true)}
+          >
+            New quiz
+          </button>
+        </div>
       </div>
       <p>
         Save a private draft, connect its pages, preview the journey, then
@@ -512,6 +670,7 @@ export function Studio({
                         "video",
                         "video-options",
                         "dice",
+                        "reveal",
                       ].map((t) => (
                         <option key={t}>{t}</option>
                       ))}
@@ -550,7 +709,7 @@ export function Studio({
                       }
                     />
                   )}
-                  {page.pageType !== "dice" && (
+                  {page.pageType !== "dice" && page.pageType !== "reveal" && (
                     <label>
                       <input
                         type="checkbox"
@@ -670,9 +829,115 @@ export function Studio({
                               }),
                           )}
                         </>
+                      ) : c.outcome.kind === "reveal" ? (
+                        <>
+                          <p>
+                            Players see the result their answers counted toward
+                            most. A tie goes to the result listed first.
+                          </p>
+                          {c.outcome.results.map((r, j, results) => (
+                            <div className="studio-actions" key={r.scoreId}>
+                              {targetSelect(
+                                `Result ${j + 1} page`,
+                                r.route.targetPageId,
+                                (target) =>
+                                  editChoice(i, {
+                                    ...c,
+                                    outcome: {
+                                      kind: "reveal",
+                                      results: results.map((x, k) =>
+                                        k === j
+                                          ? { ...x, route: route(target) }
+                                          : x,
+                                      ),
+                                    },
+                                  }),
+                              )}
+                              {results.length > 2 && (
+                                <button
+                                  onClick={() =>
+                                    editChoice(i, {
+                                      ...c,
+                                      outcome: {
+                                        kind: "reveal",
+                                        results: results.filter(
+                                          (_, k) => k !== j,
+                                        ),
+                                      },
+                                    })
+                                  }
+                                >
+                                  Remove result {j + 1}
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button
+                            disabled={
+                              c.outcome.results.length >= 12 ||
+                              Object.keys(draft.story.pages).length >= 80
+                            }
+                            onClick={() => {
+                              if (c.outcome.kind !== "reveal") return;
+                              const id = `result-${shortId()}`;
+                              change({
+                                ...draft.story,
+                                pages: {
+                                  ...draft.story.pages,
+                                  [id]: ending(
+                                    id,
+                                    `Result ${c.outcome.results.length + 1}`,
+                                    "Describe this result.",
+                                  ),
+                                  [page.id]: {
+                                    ...page,
+                                    choices: [
+                                      {
+                                        ...c,
+                                        outcome: {
+                                          kind: "reveal",
+                                          results: [
+                                            ...c.outcome.results,
+                                            result(draft.story.id, id),
+                                          ],
+                                        },
+                                      },
+                                    ],
+                                  },
+                                },
+                              });
+                            }}
+                          >
+                            Add result
+                          </button>
+                        </>
                       ) : (
                         <p>Stat check configured in advanced outputs.</p>
                       )}
+                      {c.outcome.kind === "direct" &&
+                        quizResults.length > 0 && (
+                          <label>
+                            Counts toward
+                            <select
+                              aria-label={`Option ${i + 1} counts toward`}
+                              value={scoreOf(c) ?? ""}
+                              onChange={(e) =>
+                                editChoice(
+                                  i,
+                                  countToward(c, e.target.value || undefined),
+                                )
+                              }
+                            >
+                              <option value="">No result</option>
+                              {quizResults.map((r) => (
+                                <option key={r.scoreId} value={r.scoreId}>
+                                  {draft.story.pages[r.route.targetPageId]
+                                    ?.title ?? r.route.targetPageId}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                       {page.pageType.endsWith("options") && (
                         <button
                           onClick={() =>
@@ -808,6 +1073,7 @@ export function Studio({
                 >
                   <Page
                     page={preview.story.pages[preview.save.pageId]}
+                    result={isResultPage(preview.story, preview.save.pageId)}
                     media={mediaFor(
                       preview.story.pages[preview.save.pageId].video,
                     )}
