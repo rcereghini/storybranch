@@ -12,7 +12,7 @@ Supported types are Text, Text with Options, Video, Video with Options, and Dice
 
 The existing emulator setup works without new services: `pnpm emulators`, `pnpm seed`, `pnpm dev:emulator`. Active emulator accounts can create and publish. Hosted/shared-Firebase accounts can create private drafts and preview; public publishing is restricted to an explicit creator allowlist during this alpha.
 
-Set server-only `STORYBRANCH_PUBLISHER_UIDS` to a comma-separated list of Firebase Authentication user IDs. Studio displays the signed-in user's publisher ID when publishing is unavailable. For local shared Firebase, put the variable in ignored `.env.local` and restart `pnpm dev`. On Netlify set it for Functions and redeploy. Do not use an email address or a `VITE_` variable. Firebase web configuration is unchanged. This is a prototype access policy, not a finished moderation or creator-verification system.
+Set server-only `STORYBRANCH_PUBLISHER_UIDS` to a comma-separated list of Firebase Authentication user IDs. Studio displays the signed-in user's publisher ID when publishing is unavailable. For local shared Firebase, put the variable in ignored `.env.local` and restart `pnpm dev`. On Netlify set it for Functions; on Vercel set it for Production and Preview. Redeploy after changing it. Do not use an email address or a `VITE_` variable. Firebase web configuration is unchanged. This is a prototype access policy, not a finished moderation or creator-verification system.
 
 ## Contracts and persistence
 
