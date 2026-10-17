@@ -1,3 +1,4 @@
+import { Button } from "./ui";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { StoryPage, PageOutput } from "../../../packages/contracts/index";
 import { evaluate } from "../../../packages/domain/index";
@@ -9,6 +10,8 @@ import { useStory } from "./Story";
 export function Page({
   page,
   media,
+  nextMedia,
+  image,
   children,
   onPlaybackChange,
   onOutput,
@@ -19,6 +22,8 @@ export function Page({
   page: StoryPage;
   result?: boolean;
   media?: SceneMedia;
+  nextMedia?: SceneMedia;
+  image?: string;
   children: ReactNode;
   onPlaybackChange: (playing: boolean) => void;
   onOutput: (output: PageOutput) => void;
@@ -26,6 +31,35 @@ export function Page({
   transitioning: boolean;
 }) {
   const { save } = useStory();
+  useEffect(() => {
+    // Warm only one deterministic next clip. Save-data users skip speculation.
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean } }
+    ).connection;
+    if (!nextMedia || connection?.saveData) return;
+    const preload = document.createElement("video");
+    preload.preload = "auto";
+    preload.muted = true;
+    preload.src =
+      (matchMedia("(max-width: 700px)").matches
+        ? nextMedia.portrait
+        : undefined
+      )?.src ?? nextMedia.landscape.src;
+    preload.load();
+    return () => {
+      preload.removeAttribute("src");
+      preload.load();
+    };
+  }, [nextMedia?.landscape.src, nextMedia?.portrait?.src]);
+  const emitted = useRef(false);
+  useEffect(() => {
+    if (!disabled) emitted.current = false;
+  }, [disabled, save.id, save.revision]);
+  const emit = (output: PageOutput) => {
+    if (disabled || emitted.current) return;
+    emitted.current = true;
+    onOutput(output);
+  };
   const heading = useRef<HTMLHeadingElement>(null);
   const type = page.pageType;
   const video = type === "video" || type === "video-options";
@@ -53,11 +87,11 @@ export function Page({
           !!output.availableWhen && !evaluate(output.availableWhen, save);
         if (locked && output.unavailableDisplay === "hidden") return null;
         return (
-          <button
+          <Button
             key={output.id}
             disabled={disabled || locked}
             onClick={() =>
-              onOutput({
+              emit({
                 choiceId: output.id,
                 ...(type === "dice"
                   ? ({ action: rolled ? "continue" : "roll" } as const)
@@ -73,7 +107,7 @@ export function Page({
               {output.hint && <small>{output.hint}</small>}
             </span>
             <span>{locked ? "Locked" : "↗"}</span>
-          </button>
+          </Button>
         );
       })}
       {children}
@@ -92,17 +126,28 @@ export function Page({
     <article className={`story-page page-${type}`} data-page-type={type}>
       {lastVideo.current && (
         <div hidden={!video}>
+          {/* Both video types share this retained player. Completion callbacks
+              distinguish linear playback from explicit option selection. */}
           <ScenePlayer
             pending={transitioning}
             sceneId={lastVideo.current.sceneId}
             page={lastVideo.current.page}
             media={lastVideo.current.media}
+            poster={image}
             active={video}
             onComplete={
-              video && type === "video" && page.choices.length === 1
+              video &&
+              type === "video" &&
+              page.videoAdvance !== "continue" &&
+              page.choices.length === 1
                 ? () => {
-                    if (!disabled) onOutput({ choiceId: page.choices[0].id });
+                    emit({ choiceId: page.choices[0].id });
                   }
+                : undefined
+            }
+            onNext={
+              video && type === "video" && page.choices.length === 1
+                ? () => emit({ choiceId: page.choices[0].id })
                 : undefined
             }
             onPlaybackChange={onPlaybackChange}
@@ -112,7 +157,7 @@ export function Page({
         </div>
       )}
       {!video && (
-        <section className="reading-page">
+        <section key={`${save.id}-${page.id}`} className="reading-page">
           <p className="eyebrow">
             {type === "dice"
               ? "DICE ROLL"
@@ -125,6 +170,7 @@ export function Page({
           <h1 ref={heading} tabIndex={-1}>
             {page.title}
           </h1>
+          {image && <img className="page-photo" src={image} alt="" />}
           <p className="page-copy">{page.transcript}</p>
           {type === "dice" && (
             <div

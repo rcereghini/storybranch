@@ -1,10 +1,26 @@
 import { z } from "zod";
 import { id, storySchema } from "./index";
+export const pagePositionsSchema = z
+  .record(
+    id,
+    z
+      .object({
+        x: z.number().finite().min(0).max(50000),
+        y: z.number().finite().min(0).max(50000),
+      })
+      .strict(),
+  )
+  .refine(
+    (positions) => Object.keys(positions).length <= 80,
+    "At most 80 page positions.",
+  );
+export type PagePositions = z.infer<typeof pagePositionsSchema>;
 
 export const draftSchema = z
   .object({
     story: storySchema,
     description: z.string().max(500),
+    pagePositions: pagePositionsSchema.optional(),
   })
   .strict()
   .superRefine((draft, ctx) => {

@@ -12,7 +12,7 @@ import {
 import { resolveFixtureMedia } from "../../fixtures/media";
 import { db, bucket, config } from "./firebase";
 import { publisherAllowed } from "./creator-access";
-import { downloadUrl, sniffVideo } from "./video-check";
+import { downloadUrl, sniffAsset } from "./video-check";
 
 // Clips live at uploads/{uid}/{assetId}. The browser uploads straight to
 // Storage; Storage rules accept only a pending asset this API created for the
@@ -28,7 +28,8 @@ function access(uid: string) {
 }
 
 export function assetMedia(asset: DocumentData): SceneMedia | undefined {
-  if (asset.status !== "ready") return undefined;
+  if (asset.status !== "ready" || !asset.contentType.startsWith("video/"))
+    return undefined;
   return {
     landscape: {
       src: downloadUrl(
@@ -42,7 +43,7 @@ export function assetMedia(asset: DocumentData): SceneMedia | undefined {
   };
 }
 
-function view(id: string, asset: DocumentData): ClipAsset {
+export function assetView(id: string, asset: DocumentData): ClipAsset {
   return {
     id,
     fileName: asset.fileName,
@@ -52,7 +53,18 @@ function view(id: string, asset: DocumentData): ClipAsset {
     status: asset.status,
     published: asset.published,
     createdAt: asset.createdAt,
-    ...(asset.status === "ready" ? { media: assetMedia(asset) } : {}),
+    ...(asset.status === "ready"
+      ? asset.contentType.startsWith("video/")
+        ? { media: assetMedia(asset) }
+        : {
+            url: downloadUrl(
+              config.storageHost,
+              config.bucket,
+              asset.path,
+              asset.token,
+            ),
+          }
+      : {}),
   };
 }
 
@@ -62,6 +74,15 @@ export async function pageMedia(video: string | undefined) {
   if (!assetId) return resolveFixtureMedia(video ?? "");
   const asset = await db.doc(`assets/${assetId}`).get();
   return asset.exists ? assetMedia(asset.data()!) : undefined;
+}
+
+export async function pageImage(image: string | undefined) {
+  const assetId = assetIdOf(image);
+  if (!assetId) return undefined;
+  const asset = (await db.doc(`assets/${assetId}`).get()).data();
+  return asset?.status === "ready" && asset.contentType.startsWith("image/")
+    ? downloadUrl(config.storageHost, config.bucket, asset.path, asset.token)
+    : undefined;
 }
 
 export async function uploads(
@@ -80,7 +101,7 @@ export async function uploads(
       enabled: !reason,
       reason,
       items: records.docs
-        .map((d) => view(d.id, d.data()))
+        .map((d) => assetView(d.id, d.data()))
         .sort((a, b) => b.createdAt - a.createdAt),
     };
     return listing;
@@ -145,7 +166,7 @@ async function create(request: Request, uid: string) {
     token: randomUUID(),
     createdAt: Date.now(),
   };
-  const result = { asset: view(assetId, asset), path: asset.path };
+  const result = { asset: assetView(assetId, asset), path: asset.path };
   await db.runTransaction(async (tx) => {
     const again = await tx.get(receipt);
     if (again.exists) return;
@@ -168,7 +189,7 @@ async function complete(uid: string, assetId: string) {
   const asset = snapshot.data()!;
   if (asset.ownerUid !== uid)
     throw new GameError("FORBIDDEN", "This clip belongs to another creator.");
-  if (asset.status === "ready") return { asset: view(assetId, asset) };
+  if (asset.status === "ready") return { asset: assetView(assetId, asset) };
   const file = bucket.file(asset.path);
   const [exists] = await file.exists();
   if (!exists)
@@ -181,13 +202,13 @@ async function complete(uid: string, assetId: string) {
   if (
     Number(metadata.size) !== asset.bytes ||
     metadata.contentType !== asset.contentType ||
-    sniffVideo(new Uint8Array(head)) !== asset.contentType
+    sniffAsset(new Uint8Array(head)) !== asset.contentType
   ) {
     await file.delete({ ignoreNotFound: true });
     await ref.delete();
     throw new GameError(
       "VALIDATION_FAILED",
-      "That file is not a playable MP4 or WebM video. Choose another file.",
+      "That file does not match its declared image or video format. Choose another file.",
     );
   }
   await file.setMetadata({
@@ -199,5 +220,5 @@ async function complete(uid: string, assetId: string) {
       tx.update(ref, { status: "ready", readyAt: Date.now() });
     return { ...current, status: "ready" };
   });
-  return { asset: view(assetId, ready) };
+  return { asset: assetView(assetId, ready) };
 }

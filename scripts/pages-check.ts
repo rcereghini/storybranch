@@ -15,7 +15,8 @@ try {
       .getByRole("button", { name: "Sign in ↗" })
       .click();
     await page.getByRole("dialog").waitFor({ state: "hidden" });
-    await page.getByRole("button", { name: /Play The Clockwork Door/ }).click();
+    await page.goto("http://127.0.0.1:5173/s/clockwork-door");
+    await page.getByRole("button", { name: "Start a new journey" }).click();
     await page.getByRole("heading", { name: "A letter at midnight" }).waitFor();
     assert.equal(await page.locator("video:visible").count(), 0);
     await page.getByRole("button", { name: /Continue/ }).click();
@@ -31,8 +32,8 @@ try {
     // Endings recommend other stories; which ones depends on the catalogue.
     await page.getByRole("button", { name: /^Try / }).first().waitFor();
     await page.getByRole("button", { name: "Discover", exact: true }).click();
-    await page.getByPlaceholder("Search stories").fill("Storm Signal");
-    await page.getByRole("button", { name: /Play The Storm Signal/ }).click();
+    await page.goto("http://127.0.0.1:5173/s/storm-signal");
+    await page.getByRole("button", { name: "Start a new journey" }).click();
     await startPlayback(page);
     await page.getByRole("button", { name: "Skip to choices" }).click();
     await page.getByRole("button", { name: /Climb the mast/ }).click();

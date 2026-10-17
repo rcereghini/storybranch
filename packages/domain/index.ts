@@ -258,6 +258,10 @@ export function validateStory(value: unknown): Story {
     if (n.kind === "ending" && n.choices.length)
       throw new Error("Ending has choices");
     const pageType = n.pageType;
+    if (n.videoAdvance && pageType !== "video")
+      throw new Error(
+        "Only linear video pages can configure automatic advance.",
+      );
     if (pageType.startsWith("video") && !n.video)
       throw new Error("Video page requires media");
     if (

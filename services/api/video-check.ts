@@ -1,4 +1,14 @@
 // Checks a file's leading bytes rather than trusting its declared type.
+export function sniffAsset(head: Uint8Array) {
+  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff)
+    return "image/jpeg";
+  if ([137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => head[i] === v))
+    return "image/png";
+  const text = String.fromCharCode(...head);
+  if (text.startsWith("RIFF") && text.slice(8, 12) === "WEBP")
+    return "image/webp";
+  return sniffVideo(head);
+}
 export function sniffVideo(
   head: Uint8Array,
 ): "video/mp4" | "video/webm" | null {

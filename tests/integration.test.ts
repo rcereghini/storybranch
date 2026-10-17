@@ -1,5 +1,5 @@
 import "./emulator-env";
-import { beforeAll, afterAll, it, expect } from "vitest";
+import { beforeAll, afterAll, it, expect, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
@@ -15,8 +15,212 @@ import { handle } from "../services/api/handler";
 import { ensurePlayerProfile } from "../services/api/player-profile";
 import type { Save } from "../packages/contracts/index";
 import { pageStories } from "../fixtures/page-stories";
+import { contentOf, placePage } from "../packages/contracts/page-library";
 let tokens: Record<string, string> = {};
 let rules: RulesTestEnvironment;
+it("gates paid generation, preserves request receipts, and protects job ownership", async () => {
+  const originalKey = process.env.FAL_KEY,
+    originalAllow = process.env.STORYBRANCH_GENERATOR_UIDS;
+  const realFetch = globalThis.fetch;
+  let submissions = 0;
+  let succeed = false;
+  const spy = vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "https://test.fal.media/result.png")
+        return new Response(
+          Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aYx8AAAAASUVORK5CYII=",
+            "base64",
+          ),
+        );
+      if (!url.startsWith("https://queue.fal.run/"))
+        return realFetch(input, init);
+      if (init?.method === "POST") {
+        submissions++;
+        return Response.json({
+          request_id: "test-job",
+          status_url: "https://queue.fal.run/test/status",
+          response_url: "https://queue.fal.run/test/result",
+        });
+      }
+      if (succeed && url.endsWith("/result"))
+        return Response.json({
+          images: [{ url: "https://test.fal.media/result.png" }],
+        });
+      return Response.json({
+        status: "COMPLETED",
+        ...(succeed ? {} : { error: "Test provider rejected prompt" }),
+      });
+    });
+  try {
+    delete process.env.FAL_KEY;
+    expect((await call("/generation")).data.enabled).toBe(false);
+    const command = {
+      idempotencyKey: randomUUID(),
+      kind: "image",
+      prompt: "A quiet harbor",
+    };
+    expect((await call("/generation", command)).status).toBe(403);
+    process.env.FAL_KEY = "test-key-not-real";
+    process.env.STORYBRANCH_GENERATOR_UIDS = "player";
+    expect((await call("/generation", command, "progressed")).status).toBe(403);
+    expect(
+      (await call("/generation", { ...command, referenceId: "not-owned" }))
+        .status,
+    ).toBe(400);
+    const first = await call("/generation", command);
+    expect(first.status).toBe(200);
+    expect(first.data.status).toBe("queued");
+    expect((await call("/generation", command)).data.id).toBe(first.data.id);
+    expect(submissions).toBe(1);
+    expect(
+      (await call("/generation", { ...command, prompt: "Different" })).status,
+    ).toBe(409);
+    expect(
+      (await call(`/generation/${first.data.id}`, {}, "progressed")).status,
+    ).toBe(404);
+    expect((await call(`/generation/${first.data.id}`, {})).data.status).toBe(
+      "failed",
+    );
+    expect((await call("/generation", command)).data.status).toBe("failed");
+    expect(submissions).toBe(1);
+    succeed = true;
+    const success = await call("/generation", {
+      ...command,
+      idempotencyKey: randomUUID(),
+    });
+    const completed = await call(`/generation/${success.data.id}`, {});
+    expect(completed.data.status).toBe("ready");
+    expect(completed.data.asset.contentType).toBe("image/png");
+    expect(
+      (await call(`/generation/${success.data.id}`, {})).data.asset.id,
+    ).toBe(completed.data.asset.id);
+    const stored = (
+      await db.doc(`assets/${completed.data.asset.id}`).get()
+    ).data()!;
+    expect(stored.ownerUid).toBe("player");
+    expect(stored.published).toBe(false);
+    expect((await bucket.file(stored.path).exists())[0]).toBe(true);
+    expect(submissions).toBe(2);
+  } finally {
+    spy.mockRestore();
+    if (originalKey === undefined) delete process.env.FAL_KEY;
+    else process.env.FAL_KEY = originalKey;
+    if (originalAllow === undefined)
+      delete process.env.STORYBRANCH_GENERATOR_UIDS;
+    else process.env.STORYBRANCH_GENERATOR_UIDS = originalAllow;
+  }
+});
+it("pins reusable page revisions, protects sharing, and rejects forged library content", async () => {
+  const pageId = randomUUID();
+  const source = Object.values(pageStories[0].pages).find(
+    (p) => p.pageType === "video",
+  )!;
+  const content = { ...contentOf(source), videoAdvance: "continue" as const };
+  const command = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    content,
+  };
+  const created = await call(`/pages/${pageId}`, command);
+  expect(created.status).toBe(200);
+  expect((await call(`/pages/${pageId}`, command)).data).toEqual(created.data);
+  expect(
+    (
+      await call(`/pages/${pageId}`, {
+        ...command,
+        content: { ...content, title: "changed" },
+      })
+    ).status,
+  ).toBe(409);
+  expect((await call(`/pages/${pageId}`, command, "progressed")).status).toBe(
+    403,
+  );
+  expect(
+    (await call(`/shared-pages/${pageId}/1`, undefined, "none")).status,
+  ).toBe(404);
+  const sharing = { idempotencyKey: randomUUID(), revision: 1 };
+  expect(
+    (await call(`/pages/${pageId}/share`, sharing, "progressed")).status,
+  ).toBe(403);
+  expect((await call(`/pages/${pageId}/share`, sharing)).status).toBe(200);
+  expect(
+    (await call(`/shared-pages/${pageId}/1`, undefined, "none")).data.content,
+  ).toEqual(content);
+  const newer = await call(`/pages/${pageId}`, {
+    ...command,
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    content: { ...content, title: "New revision" },
+  });
+  expect(newer.data.revision).toBe(2);
+  expect(
+    (await call(`/shared-pages/${pageId}/1`, undefined, "none")).data.content
+      .title,
+  ).toBe(content.title);
+  expect(
+    (await call(`/shared-pages/${pageId}/2`, undefined, "none")).status,
+  ).toBe(404);
+  const storyId = `library-${randomUUID()}`;
+  const story = {
+    id: storyId,
+    versionId: "draft",
+    rulesetVersion: "prototype-1",
+    title: "Shared content",
+    entryPageId: "opening",
+    pages: {
+      opening: placePage(created.data, "opening", "end"),
+      end: {
+        id: "end",
+        title: "End",
+        transcript: "",
+        pageType: "text",
+        kind: "ending",
+        choices: [],
+        entryEffects: [],
+      },
+    },
+  };
+  expect(
+    (
+      await call(`/studio/${storyId}`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        draft: { story, description: "" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`/studio/${storyId}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  story.pages.opening.title = "Forged library content";
+  expect(
+    (
+      await call(`/studio/${storyId}`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: { story, description: "" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`/studio/${storyId}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(400);
+});
 it("protects drafts and atomically publishes immutable editions with retry and stale checks", async () => {
   const storyId = `author-${randomUUID()}`;
   const story = JSON.parse(
@@ -26,11 +230,16 @@ it("protects drafts and atomically publishes immutable editions with retry and s
   const saveDraft = {
     idempotencyKey: randomUUID(),
     expectedRevision: 0,
-    draft: { story, description: "Creator test" },
+    draft: {
+      story,
+      description: "Creator test",
+      pagePositions: { [story.entryPageId]: { x: 120, y: 240 } },
+    },
   };
   expect((await call(path, saveDraft, "none")).status).toBe(401);
   const created = await call(path, saveDraft);
   expect(created.status).toBe(200);
+  expect(created.data.pagePositions).toEqual(saveDraft.draft.pagePositions);
   expect((await call(path, saveDraft)).data).toEqual(created.data);
   expect(
     (
@@ -64,6 +273,7 @@ it("protects drafts and atomically publishes immutable editions with retry and s
   const oldVersion = (
     await db.doc(`stories/${storyId}/versions/edition-1`).get()
   ).data();
+  expect(oldVersion).not.toHaveProperty("pagePositions");
   const edit = {
     ...saveDraft,
     idempotencyKey: randomUUID(),
@@ -684,6 +894,86 @@ it("uploads a clip through Storage rules, verifies it and plays it once publishe
   expect(played.data.media).toEqual({
     landscape: { src, type: "video/mp4" },
   });
+});
+it("reuses a photo across pages while protecting ownership and media kind", async () => {
+  const bytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aYx8AAAAASUVORK5CYII=",
+    "base64",
+  );
+  const created = await call("/uploads", {
+    idempotencyKey: randomUUID(),
+    fileName: "photo.png",
+    contentType: "image/png",
+    bytes: bytes.length,
+    durationSeconds: 0,
+  });
+  expect(created.status).toBe(200);
+  const { asset, path } = created.data;
+  await assertFails(
+    uploadBytes(
+      ref(rules.authenticatedContext("progressed").storage(clipBucket), path),
+      bytes,
+      { contentType: "image/png" },
+    ),
+  );
+  await assertSucceeds(
+    uploadBytes(
+      ref(rules.authenticatedContext("player").storage(clipBucket), path),
+      bytes,
+      { contentType: "image/png" },
+    ),
+  );
+  const done = await call(`/uploads/${asset.id}/complete`, {});
+  expect(done.status).toBe(200);
+  expect(done.data.asset.media).toBeUndefined();
+  expect((await fetch(done.data.asset.url)).status).toBe(200);
+  const content = {
+    title: "Photo page",
+    transcript: "A photograph",
+    pageType: "text",
+    image: `asset:${asset.id}`,
+    outputs: [{ id: "next", label: "Continue" }],
+  };
+  for (let i = 0; i < 2; i++) {
+    const pageId = randomUUID();
+    expect(
+      (
+        await call(`/pages/${pageId}`, {
+          idempotencyKey: randomUUID(),
+          expectedRevision: 0,
+          content,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(`/pages/${pageId}/share`, {
+          idempotencyKey: randomUUID(),
+          revision: 1,
+        })
+      ).status,
+    ).toBe(200);
+    const shared = await call(`/shared-pages/${pageId}/1`, undefined, "none");
+    expect(shared.data.image).toBe(done.data.asset.url);
+  }
+  expect(
+    (
+      await call(
+        `/pages/${randomUUID()}`,
+        { idempotencyKey: randomUUID(), expectedRevision: 0, content },
+        "progressed",
+      )
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await call(`/pages/${randomUUID()}`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        content: { ...content, pageType: "video", video: `asset:${asset.id}` },
+      })
+    ).status,
+  ).toBe(400);
 });
 it("rejects and removes an upload that is not really a video", async () => {
   const fake = Buffer.from("<html>this is not a video</html>");

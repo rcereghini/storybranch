@@ -30,6 +30,32 @@ try {
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await page.getByText("Draft saved privately.", { exact: false }).waitFor();
     await page.reload();
+    await page.waitForFunction(
+      () => !document.querySelector(".loading-overlay"),
+    );
+    while (
+      !(await page.getByRole("button", { name: new RegExp(title) }).count()) &&
+      (await page
+        .getByRole("button", { name: "More drafts", exact: true })
+        .count())
+    ) {
+      const count = await page.locator(".studio-draft-card").count();
+      const nextPage = page.waitForResponse(
+        (r) =>
+          r.request().method() === "GET" &&
+          r.url().includes("/api/studio?cursor="),
+      );
+      await page
+        .getByRole("button", { name: "More drafts", exact: true })
+        .click();
+      const data = await (await nextPage).json();
+      await page.waitForFunction(
+        (expected) =>
+          document.querySelectorAll(".studio-draft-card").length >= expected,
+        count + data.items.length,
+      );
+      if (!data.nextCursor) break;
+    }
     await page.getByRole("button", { name: new RegExp(title) }).click();
     assert.equal(
       await page.getByLabel("Page type", { exact: true }).inputValue(),
@@ -58,7 +84,9 @@ try {
         exact: false,
       })
       .waitFor();
-    await page.locator(".loading-overlay").waitFor({ state: "hidden" });
+    await page.waitForFunction(
+      () => !document.querySelector(".loading-overlay"),
+    );
     await page.screenshot({
       path: `test-results/studio-${width}.png`,
       fullPage: true,
@@ -130,7 +158,7 @@ try {
     .getByRole("button", { name: "Publish edition", exact: true })
     .click();
   await page.getByText("Published edition-1.", { exact: false }).waitFor();
-  await page.locator(".loading-overlay").waitFor({ state: "hidden" });
+  await page.waitForFunction(() => !document.querySelector(".loading-overlay"));
   await page.getByRole("button", { name: "Play published story" }).click();
   await storageSource(".scene-player");
   assert.deepEqual(errors, []);

@@ -20,7 +20,7 @@ const heading = async (name: string) => {
       "true"
     )
       await page
-        .getByRole("button", { name: "Skip to choices", exact: true })
+        .getByRole("button", { name: "Pause video", exact: true })
         .click();
   }
   await page.getByRole("heading", { name, exact: true }).waitFor();

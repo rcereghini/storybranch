@@ -11,6 +11,7 @@ import { resolveFixtureMedia } from "../../fixtures/media";
 import { assetIdOf } from "../../packages/contracts/media";
 import { db, config } from "./firebase";
 import { publisherAllowed } from "./creator-access";
+import { contentOf } from "../../packages/contracts/page-library";
 
 export async function authoring(
   request: Request,
@@ -120,11 +121,50 @@ export async function authoring(
       const story = validatePublication({ ...old.story, versionId });
       const clips = [];
       for (const page of Object.values(story.pages)) {
+        if (page.sourcePage) {
+          const root = (
+            await tx.get(db.doc(`pageLibrary/${page.sourcePage.id}`))
+          ).data();
+          const source = (
+            await tx.get(
+              db.doc(
+                `pageLibrary/${page.sourcePage.id}/revisions/${page.sourcePage.revision}`,
+              ),
+            )
+          ).data();
+          if (
+            root?.ownerUid !== uid ||
+            !source ||
+            JSON.stringify(contentOf(page)) !== JSON.stringify(source.content)
+          )
+            throw new GameError(
+              "VALIDATION_FAILED",
+              `${page.title}: the linked page revision does not match. Save it to the library again.`,
+            );
+        }
+        if (page.image) {
+          const image = db.doc(`assets/${assetIdOf(page.image)}`);
+          const asset = (await tx.get(image)).data();
+          if (
+            asset?.ownerUid !== uid ||
+            asset.status !== "ready" ||
+            !asset.contentType.startsWith("image/")
+          )
+            throw new GameError(
+              "VALIDATION_FAILED",
+              `${page.title}: choose one of your finished photos.`,
+            );
+          clips.push(image);
+        }
         const assetId = assetIdOf(page.video);
         if (assetId) {
           const clip = db.doc(`assets/${assetId}`);
           const asset = (await tx.get(clip)).data();
-          if (asset?.ownerUid !== uid || asset.status !== "ready")
+          if (
+            asset?.ownerUid !== uid ||
+            asset.status !== "ready" ||
+            !asset.contentType.startsWith("video/")
+          )
             throw new GameError(
               "VALIDATION_FAILED",
               `${page.title}: choose one of your finished uploads or a sample clip.`,
