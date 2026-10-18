@@ -20,7 +20,9 @@ const api = createServer(async (req, res) => {
           ? 250000
           : req.url?.startsWith("/api/pages")
             ? 30000
-            : 4096)
+            : req.url?.startsWith("/api/copilot")
+              ? 12000
+              : 4096)
       ) {
         res.writeHead(400, { "Content-Type": "application/json" }).end(
           JSON.stringify({
@@ -44,7 +46,11 @@ const api = createServer(async (req, res) => {
       }),
     );
     res.writeHead(response.status, Object.fromEntries(response.headers));
-    res.end(await response.text());
+    // Pass streamed replies (Copilot) through as they arrive.
+    const reader = response.body?.getReader();
+    for (let part = await reader?.read(); part && !part.done; part = await reader!.read())
+      res.write(part.value);
+    res.end();
   } catch {
     res.writeHead(503).end("Local API unavailable");
   }

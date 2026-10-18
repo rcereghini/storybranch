@@ -20,6 +20,7 @@ try {
   }
   if (!ready) throw new Error("Web server did not start.");
   await import("./browser-check");
+  await import("./copilot-check");
 } finally {
   server.kill();
 }

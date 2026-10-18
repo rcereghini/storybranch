@@ -9,6 +9,7 @@ import { Timestamp } from "firebase-admin/firestore";
 //   users/{uid}/drafts/{storyId}             private Studio draft
 //   users/{uid}/clips/{clipId}               uploaded or generated clip/photo
 //   users/{uid}/receipts/{hash}              command idempotency, expires
+//   users/{uid}/copilot/{threadId}           Copilot conversation
 //   stories/{storyId}/versions/{v}/pages/{p} immutable published editions
 //   catalogue/{storyId}, branches/{id}, placements/{locationId}
 //   pageLibrary/{pageId}/revisions/{r}       reusable pages (shareable)
@@ -26,6 +27,8 @@ export const clips = (uid: string) => `users/${uid}/clips`;
 export const clip = (uid: string, clipId: string) =>
   `users/${uid}/clips/${clipId}`;
 export const clipFile = clip;
+export const copilotThread = (uid: string, threadId: string) =>
+  `users/${uid}/copilot/${threadId}`;
 
 // Receipts only answer retries of the same command, so a TTL policy on the
 // receipts collection group deletes them after expireAt.

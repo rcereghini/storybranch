@@ -1153,7 +1153,8 @@ header .sign-in:hover:not(:disabled) {
 /* The header stays on one row down to 801px; drop what it can spare. */
 @media (min-width: 801px) and (max-width: 1100px) {
   header .alpha,
-  .account-name {
+  .account-name,
+  .copilot-toggle-label {
     display: none;
   }
   .account-chip {

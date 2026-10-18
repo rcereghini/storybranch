@@ -17,6 +17,7 @@ import { authoring } from "./authoring";
 import { pageMedia, pageImage, uploads } from "./uploads";
 import { pageLibrary, sharedPage } from "./page-library";
 import { generation } from "./generation";
+import { copilot } from "./copilot";
 import { profileRoutes } from "./profile";
 import { edition } from "./story-store";
 import * as paths from "./paths";
@@ -114,6 +115,9 @@ export async function handle(request: Request): Promise<Response> {
       return json(await uploads(request, uid, segments));
     if (segments[1] === "generation")
       return json(await generation(request, uid, segments));
+    // Streams its reply, so it builds its own response.
+    if (segments[1] === "copilot")
+      return await copilot(request, uid, segments);
     if (segments[1] === "pages")
       return json(await pageLibrary(request, uid, segments, cursor, limit));
     if (segments[1] === "profile" || segments[1] === "dashboard")

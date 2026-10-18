@@ -1,0 +1,155 @@
+/* Copilot drawer: fixed over the page so it never shifts page layout. */
+.copilot {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  width: min(400px, 100vw);
+  /* Undo the global aside card styles. */
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+.copilot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 0 12px 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.copilot-head > div {
+  display: flex;
+  gap: 4px;
+}
+.copilot-ghost {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+}
+.copilot-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.copilot-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 20px;
+}
+.copilot-line {
+  max-width: 88%;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.copilot-user {
+  align-self: flex-end;
+  background: var(--surface-3);
+}
+.copilot-assistant {
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.copilot-hello p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.copilot-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.copilot-suggestions button {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+}
+.copilot-suggestions button:hover {
+  border-color: var(--accent);
+}
+.copilot-status {
+  min-height: 40px;
+  padding: 10px 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.copilot-error {
+  color: var(--text);
+}
+.copilot-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: underline;
+}
+.copilot-compose {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+}
+.copilot-compose textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 14px/1.4 var(--font-ui);
+}
+.copilot-compose button {
+  align-self: flex-end;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.copilot-compose button:disabled {
+  opacity: 0.5;
+}
+header .copilot-toggle {
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+header .copilot-toggle[aria-expanded="true"] {
+  border-color: var(--accent);
+}

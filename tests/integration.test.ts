@@ -1,6 +1,6 @@
 import "./emulator-env";
 import { beforeAll, afterAll, it, expect, vi } from "vitest";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
   initializeTestEnvironment,
@@ -12,6 +12,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getBytes, ref, uploadBytes } from "firebase/storage";
 import { bucket, db } from "../services/api/firebase";
 import { handle } from "../services/api/handler";
+import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
 import { ensurePlayerProfile } from "../services/api/player-profile";
 import type { Save } from "../packages/contracts/index";
 import { pageStories } from "../fixtures/page-stories";
@@ -1118,5 +1119,163 @@ it("copies the old prefixed layout into per-user records without overwriting new
     for (const path of [OLD_ROOT, `users/${uid}`, `stories/${storyId}`])
       await db.recursiveDelete(db.doc(path));
     await db.doc(`catalogue/${storyId}`).delete();
+  }
+});
+
+it("answers through Copilot with the user's own data, retries safely and enforces limits", async () => {
+  const originalKey = process.env.ANTHROPIC_API_KEY;
+  const thread = `t-${randomUUID()}`;
+  const post = async (body: unknown, who = "player", threadId = thread) => {
+    const r = await handle(
+      new Request(`http://localhost/api/copilot/threads/${threadId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokens[who]}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+    const text = await r.text();
+    return {
+      status: r.status,
+      events: r.ok
+        ? text.trim().split("\n").map((line) => JSON.parse(line))
+        : [],
+      error: r.ok ? null : JSON.parse(text).error,
+    };
+  };
+  const command = (text: string, key = randomUUID()) => ({
+    idempotencyKey: key,
+    text,
+    context: { path: "/" },
+  });
+  const message = (content: unknown[], stop: string) =>
+    ({
+      id: `msg_${randomUUID()}`,
+      type: "message",
+      role: "assistant",
+      model: "claude-opus-5-5",
+      content,
+      stop_reason: stop,
+      stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 1 },
+    }) as unknown as Awaited<ReturnType<CopilotModel>>;
+  let requests: Parameters<CopilotModel>[0][] = [];
+  let script: Array<() => Awaited<ReturnType<CopilotModel>>> = [];
+  setCopilotModel(async (request, onText) => {
+    requests.push(structuredClone(request));
+    const next = script.shift()!();
+    for (const block of next.content)
+      if (block.type === "text") onText(block.text);
+    return next;
+  });
+  try {
+    delete process.env.ANTHROPIC_API_KEY;
+    expect((await post(command("Hi"))).status).toBe(403);
+    expect((await call("/copilot")).data).toEqual({ enabled: false });
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    expect((await call("/copilot")).data).toEqual({ enabled: true });
+
+    // A tool round: open Studio, list drafts, try a play route, then reply.
+    script = [
+      () =>
+        message(
+          [
+            { type: "tool_use", id: "tu_1", name: "navigate", input: { path: "/studio" } },
+            { type: "tool_use", id: "tu_2", name: "list_my_drafts", input: {} },
+            { type: "tool_use", id: "tu_3", name: "navigate", input: { path: "/play/abc" } },
+          ],
+          "tool_use",
+        ),
+      () => message([{ type: "text", text: "Opening Studio." }], "end_turn"),
+    ];
+    const key = randomUUID();
+    const first = await post(command("Take me to my drafts", key));
+    expect(first.status).toBe(200);
+    expect(first.events).toEqual([
+      { type: "tool", name: "navigate" },
+      { type: "action", action: { kind: "navigate", path: "/studio" } },
+      { type: "tool", name: "list_my_drafts" },
+      { type: "tool", name: "navigate" },
+      { type: "text", text: "Opening Studio." },
+      { type: "done" },
+    ]);
+    // The second turn saw every tool result; the play route was refused.
+    const results = requests[1].messages.at(-1)!.content as Array<{
+      tool_use_id: string;
+      is_error?: boolean;
+      content: string;
+    }>;
+    expect(results.map((r) => r.tool_use_id)).toEqual(["tu_1", "tu_2", "tu_3"]);
+    expect(results[2].is_error).toBe(true);
+    expect(Array.isArray(JSON.parse(results[1].content))).toBe(true);
+    expect(JSON.stringify(requests[0].messages[0])).toContain(
+      "<context>The user is on /.</context>",
+    );
+
+    // A retry replays the stored reply without calling the model again.
+    const calls = requests.length;
+    const again = await post(command("Take me to my drafts", key));
+    expect(again.events).toEqual([
+      { type: "text", text: "Opening Studio." },
+      { type: "action", action: { kind: "navigate", path: "/studio" } },
+      { type: "done" },
+    ]);
+    expect(requests.length).toBe(calls);
+    expect((await post(command("Something else", key))).status).toBe(409);
+
+    // The visible transcript has no context block or tool traffic.
+    const view = await call(`/copilot/threads/${thread}`);
+    expect(view.data.messages).toEqual([
+      { role: "user", text: "Take me to my drafts" },
+      { role: "assistant", text: "Opening Studio." },
+    ]);
+    expect(
+      (await call(`/copilot/threads/${thread}`, undefined, "progressed")).data
+        .messages,
+    ).toEqual([]);
+
+    // History is append-only: the next turn resends the earlier turns intact.
+    script = [() => message([{ type: "text", text: "Sure." }], "end_turn")];
+    await post(command("Thanks"));
+    expect(requests.at(-1)!.messages.slice(0, 4)).toEqual(
+      [...requests[1].messages, { role: "assistant", content: [{ type: "text", text: "Opening Studio." }] }].slice(0, 4),
+    );
+
+    // A model failure commits nothing, so the same key can be retried.
+    const failing = randomUUID();
+    script = [
+      () => {
+        throw new Error("provider down");
+      },
+    ];
+    const failed = await post(command("Hello?", failing));
+    expect(failed.events.at(-1)).toMatchObject({ type: "error", code: "UNAVAILABLE" });
+    script = [() => message([{ type: "text", text: "Back now." }], "end_turn")];
+    expect((await post(command("Hello?", failing))).events.at(-1)).toEqual({
+      type: "done",
+    });
+
+    // Validation, thread cap and daily quota.
+    expect((await post(command("x".repeat(2001)))).status).toBe(400);
+    const full = `t-${randomUUID()}`;
+    await db.doc(`users/player/copilot/${full}`).set({ history: "[]", turns: 40 });
+    expect((await post(command("More"), "player", full)).error.message).toMatch(
+      /conversation is full/,
+    );
+    const day = Math.floor(Date.now() / 86400000);
+    const quota = db.doc(
+      `copilotQuotas/${createHash("sha256").update("progressed").digest("hex")}-${day}`,
+    );
+    await quota.set({ count: 100 });
+    expect(
+      (await post(command("Hi"), "progressed", `t-${randomUUID()}`)).error.message,
+    ).toMatch(/Daily Copilot limit/);
+    await quota.delete();
+  } finally {
+    setCopilotModel(null);
+    if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalKey;
   }
 });

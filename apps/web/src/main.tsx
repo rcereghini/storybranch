@@ -20,6 +20,8 @@ import { Discover, type CatalogueEntry } from "./Discover";
 import { Adventures } from "./Adventures";
 import { Avatar } from "./avatars";
 import { accents } from "./theme";
+import { Copilot } from "./Copilot";
+import { copilotAvailable } from "../../../packages/contracts/copilot";
 import "./hub.css";
 const api = createApi(fetch, async () =>
   auth.currentUser ? auth.currentUser.getIdToken() : null,
@@ -69,9 +71,18 @@ function App() {
     [catalogueReady, setCatalogueReady] = useState(false),
     [studioDirty, setStudioDirty] = useState(false),
     [loadedKey, setLoadedKey] = useState<string | null>(null),
+    [copilotOpen, setCopilotOpen] = useState(false),
+    [copilotEnabled, setCopilotEnabled] = useState(false),
     [profile, setProfile] = useState<PlayerProfile | null>(null);
   // Identifies what the latest refresh() must load: this page for this user.
   const loadKey = `${path}|${user?.uid ?? ""}`;
+  useEffect(() => {
+    setCopilotEnabled(false);
+    if (!user) return;
+    api<{ enabled: boolean }>("/copilot")
+      .then((r) => setCopilotEnabled(r.enabled))
+      .catch(() => {});
+  }, [user]);
   const navigate = (p: string) => {
     if (
       p !== path &&
@@ -387,6 +398,16 @@ function App() {
         </nav>
         {user ? (
           <div className="account">
+            {copilotEnabled && copilotAvailable(path) && (
+              <button
+                className="copilot-toggle"
+                aria-expanded={copilotOpen}
+                aria-label="Copilot"
+                onClick={() => setCopilotOpen((open) => !open)}
+              >
+                ✦<span className="copilot-toggle-label"> Copilot</span>
+              </button>
+            )}
             <button
               className="account-chip"
               aria-label="Open your dashboard"
@@ -837,6 +858,15 @@ function App() {
         <span>Made of moments. Shaped by you.</span>
         <span>STORYBRANCH · CREATOR ALPHA</span>
       </footer>
+      {copilotOpen && copilotEnabled && user && copilotAvailable(path) && (
+        <Copilot
+          key={user.uid}
+          uid={user.uid}
+          path={path}
+          navigate={navigate}
+          onClose={() => setCopilotOpen(false)}
+        />
+      )}
       {login && (
         <div className="modal-backdrop">
           <section
