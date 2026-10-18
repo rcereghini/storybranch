@@ -1,5 +1,105 @@
 .scene-player {
   min-width: 0;
+  position: relative;
+}
+.player-exit {
+  display: none;
+}
+.scene-player > .notice {
+  position: absolute;
+  bottom: 76px;
+  left: 16px;
+  right: 16px;
+  z-index: 4;
+}
+.page-photo {
+  display: block;
+  max-height: 40dvh;
+  max-width: 100%;
+  margin: 0 auto 24px;
+  object-fit: contain;
+}
+main.immersive-player {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  min-height: calc(100dvh - 64px);
+}
+.immersive-header {
+  min-height: 64px;
+  padding-block: 8px;
+}
+.immersive-player .player-heading {
+  padding: 12px 24px;
+}
+.immersive-player .player-series {
+  display: none;
+}
+.immersive-player .player-grid {
+  padding: 0;
+  gap: 0;
+}
+.immersive-player .scene-stage {
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  height: calc(100dvh - 180px);
+  min-height: 420px;
+}
+.immersive-player .scene-stage:before {
+  aspect-ratio: auto;
+}
+.immersive-player .scene-toolbar {
+  max-width: none;
+  padding: 12px 24px;
+}
+.immersive-player .reading-page {
+  min-height: calc(100dvh - 180px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.immersive-player :is(.character-panel, .transcript, .community) {
+  margin-inline: 24px;
+}
+.reading-page {
+  animation: page-arrive 220ms ease-out;
+}
+@keyframes page-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 700px) {
+  .immersive-header nav {
+    display: none;
+  }
+  .immersive-header .player-exit {
+    display: inline-flex;
+  }
+  .immersive-header :is(.account, .sign-in) {
+    display: none;
+  }
+  .immersive-player .scene-stage {
+    height: calc(100svh - 170px);
+    min-height: 450px;
+  }
+  .immersive-player .scene-toolbar {
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  .immersive-player .scene-overlay {
+    padding-inline: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reading-page {
+    animation: none;
+  }
 }
 .scene-start {
   position: absolute;

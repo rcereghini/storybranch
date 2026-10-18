@@ -1,0 +1,265 @@
+.studio-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 24px;
+}
+.studio-story-settings {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.studio .studio-story-settings label {
+  margin: 0;
+}
+.studio-story-settings textarea {
+  height: 76px;
+}
+.story-graph {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.graph-heading {
+  padding: 24px 24px 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.graph-heading h2 {
+  margin: 4px 0 8px;
+  font-size: 28px;
+}
+.graph-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.graph-count {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.studio .graph-toolbar select {
+  width: auto;
+  margin: 0;
+  padding: 9px;
+  font-size: 13px;
+}
+.graph-toolbar button {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.graph-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.graph-link-status {
+  min-height: 64px;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.graph-link-status button {
+  white-space: nowrap;
+  font-size: 12px;
+}
+.graph-viewport {
+  height: 610px;
+  max-height: 75dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background-color: #0b1618;
+  background-image: radial-gradient(#3b5150 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.graph-canvas {
+  position: relative;
+  transform-origin: top left;
+}
+.graph-wires {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #668d87;
+}
+.graph-wires > path {
+  fill: none;
+  stroke: #668d87;
+  stroke-width: 2;
+}
+.graph-wires > path.selected {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.graph-card {
+  position: absolute;
+  border: 1px solid #4b6660;
+  border-radius: 12px;
+  background: #182724;
+  box-shadow: 0 8px 24px #0003;
+}
+.graph-card.is-selected {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px #a4dfc533,
+    0 8px 24px #0003;
+}
+.graph-card.is-target {
+  border-style: dashed;
+}
+.graph-card button {
+  min-height: 0;
+  font: inherit;
+  color: inherit;
+  border-radius: 0;
+  margin: 0;
+  box-shadow: none;
+}
+.graph-card .graph-drag {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid #385148;
+  border-radius: 12px 12px 0 0;
+  background: #233c34;
+  color: var(--accent);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.graph-drag:active {
+  cursor: grabbing;
+}
+.graph-card .graph-card-title {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  height: 82px;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  gap: 5px;
+}
+.graph-card-title strong {
+  font-size: 16px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.graph-card-title span {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.graph-outputs > button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-top: 1px solid #30473e;
+  background: transparent;
+  font-size: 12px;
+  gap: 8px;
+}
+.graph-outputs button > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.graph-outputs small {
+  max-width: 90px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 10px;
+}
+.graph-outputs i {
+  color: var(--accent);
+  font-size: 11px;
+  font-style: normal;
+}
+.graph-outputs > p {
+  margin: 0;
+  height: 34px;
+  padding: 8px 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.graph-outputs button[aria-pressed="true"] {
+  background: #355847;
+}
+.studio-page-inspector {
+  max-height: 850px;
+  overflow: auto;
+}
+.studio-page-inspector legend {
+  padding: 0 10px;
+  color: var(--accent);
+  font-size: 14px;
+}
+@media (min-width: 1200px) {
+  .studio-workspace {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+  }
+  .studio-page-inspector {
+    max-height: 850px;
+  }
+}
+@media (max-width: 760px) {
+  .graph-heading,
+  .graph-toolbar,
+  .graph-link-status {
+    padding-inline: 14px;
+  }
+  .graph-heading {
+    flex-wrap: wrap;
+  }
+  .graph-viewport {
+    height: 520px;
+  }
+  .studio-page-inspector {
+    max-height: none;
+  }
+}
+@media (max-width: 760px) {
+  .studio-story-settings {
+    grid-template-columns: 1fr;
+  }
+}

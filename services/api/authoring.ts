@@ -13,6 +13,7 @@ import { db, config } from "./firebase";
 import * as paths from "./paths";
 import { publishedClip } from "./uploads";
 import { publisherAllowed } from "./creator-access";
+import { contentOf } from "../../packages/contracts/page-library";
 
 export async function authoring(
   request: Request,
@@ -118,16 +119,49 @@ export async function authoring(
       if (!old) throw new GameError("NOT_FOUND", "Save your draft first.");
       const versionId = `edition-${old.revision}`;
       const story = validatePublication({ ...old.story, versionId });
-      // Only the publisher's own finished clips; the edition records each
-      // clip's file so players never read the creator's clip records.
+      // Only the publisher's own finished clips and photos; the edition records
+      // each file so players never read the creator's clip records.
       const clips = new Map<string, DocumentReference>();
       const published: Record<string, PublishedClip> = {};
       for (const page of Object.values(story.pages)) {
+        if (page.sourcePage) {
+          const root = (
+            await tx.get(db.doc(`pageLibrary/${page.sourcePage.id}`))
+          ).data();
+          const source = (
+            await tx.get(
+              db.doc(
+                `pageLibrary/${page.sourcePage.id}/revisions/${page.sourcePage.revision}`,
+              ),
+            )
+          ).data();
+          if (
+            root?.ownerUid !== uid ||
+            !source ||
+            JSON.stringify(contentOf(page)) !== JSON.stringify(source.content)
+          )
+            throw new GameError(
+              "VALIDATION_FAILED",
+              `${page.title}: the linked page revision does not match. Save it to the library again.`,
+            );
+        }
+        const imageId = assetIdOf(page.image);
+        if (imageId) {
+          const image = db.doc(paths.clip(uid, imageId));
+          const asset = (await tx.get(image)).data();
+          if (asset?.status !== "ready" || !asset.contentType.startsWith("image/"))
+            throw new GameError(
+              "VALIDATION_FAILED",
+              `${page.title}: choose one of your finished photos.`,
+            );
+          clips.set(imageId, image);
+          published[imageId] = publishedClip(asset);
+        }
         const assetId = assetIdOf(page.video);
         if (assetId) {
           const clip = db.doc(paths.clip(uid, assetId));
           const asset = (await tx.get(clip)).data();
-          if (asset?.status !== "ready")
+          if (asset?.status !== "ready" || !asset.contentType.startsWith("video/"))
             throw new GameError(
               "VALIDATION_FAILED",
               `${page.title}: choose one of your finished uploads or a sample clip.`,

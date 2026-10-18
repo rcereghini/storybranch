@@ -1,3 +1,4 @@
+import { Button } from "./ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Story } from "../../../packages/contracts/index";
 import type { SceneMedia } from "../../../packages/contracts/media";
@@ -6,20 +7,24 @@ type Props = {
   sceneId: string;
   page: Story["pages"][string];
   media?: SceneMedia;
+  poster?: string;
   children: ReactNode;
   onPlaybackChange: (playing: boolean) => void;
   active?: boolean;
   onComplete?: () => void;
+  onNext?: () => void;
   pending?: boolean;
 };
 export function ScenePlayer({
   sceneId,
   page,
   media,
+  poster,
   children,
   onPlaybackChange,
   active: visible = true,
   onComplete,
+  onNext,
   pending = false,
 }: Props) {
   const [portrait, setPortrait] = useState(
@@ -131,8 +136,8 @@ export function ScenePlayer({
           controls={false}
           muted={muted}
           playsInline
-          preload="metadata"
-          poster={media ? rendition?.poster : "/media/harbor.svg"}
+          preload="auto"
+          poster={poster ?? (media ? rendition?.poster : "/media/harbor.svg")}
           onPlaying={() => {
             setBuffering(false);
             setWatching(true);
@@ -188,15 +193,15 @@ export function ScenePlayer({
           aria-hidden="true"
         />
         {blocked && (
-          <button
+          <Button
             className="scene-start primary"
             onClick={() => void play()}
             disabled={failed}
           >
             Start story with sound
-          </button>
+          </Button>
         )}
-        <span className="scene-film-label">STORYBRANCH · PLACEHOLDER FILM</span>
+        <span className="scene-film-label">STORYBRANCH</span>
         <div
           className="scene-overlay"
           aria-hidden={
@@ -217,41 +222,45 @@ export function ScenePlayer({
         </div>
       </div>
       <div className="scene-toolbar">
-        <button
+        <Button
           onClick={() => {
-            const stage = video.current?.parentElement;
+            const stage = video.current?.closest(".scene-player");
             if (document.fullscreenElement) void document.exitFullscreen();
             else void stage?.requestFullscreen?.().catch(() => {});
           }}
         >
           Fullscreen
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => (watching ? skip() : void play())}
           disabled={failed || buffering || pending}
         >
           {watching ? "Pause video" : "Play video"}
-        </button>
-        <button aria-pressed={muted} onClick={() => setMuted(!muted)}>
+        </Button>
+        <Button aria-pressed={muted} onClick={() => setMuted(!muted)}>
           {muted ? "Unmute" : "Mute"}
-        </button>
-        <button aria-pressed={captions} onClick={() => setCaptions(!captions)}>
+        </Button>
+        <Button aria-pressed={captions} onClick={() => setCaptions(!captions)}>
           Captions
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() =>
-            watching ? (onComplete ? onComplete() : skip()) : void play()
+            watching ? (onNext ? onNext() : skip()) : void play()
           }
-          disabled={failed}
+          disabled={failed || pending}
         >
           {watching
-            ? onComplete
-              ? "Next page"
-              : "Skip to choices"
+            ? onNext
+              ? page.videoAdvance === "continue"
+                ? "Continue"
+                : "Next page"
+              : page.kind === "ending"
+                ? "Skip to ending"
+                : "Skip to choices"
             : blocked
               ? "Play scene"
               : "Watch scene"}
-        </button>
+        </Button>
         <span aria-live="polite">
           {watching
             ? buffering
@@ -279,14 +288,14 @@ export function ScenePlayer({
       {failed && (
         <div className="notice" role="status">
           The clip couldn’t load. Read the transcript and choose your path.
-          <button
+          <Button
             onClick={() => {
               setFailed(false);
               setRetry((r) => r + 1);
             }}
           >
             Retry video
-          </button>
+          </Button>
         </div>
       )}
       <details className="transcript" id="scene-transcript">

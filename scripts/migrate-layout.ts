@@ -49,7 +49,15 @@ function place(
   owners: Map<string, string>,
 ): { path: string; kind: string; data: DocumentData } | null {
   const s = doc.path.split("/");
-  const shared = ["stories", "catalogue", "branches", "placements"];
+  const shared = [
+    "stories",
+    "catalogue",
+    "branches",
+    "placements",
+    "pageLibrary",
+    "generationJobs",
+    "generationQuotas",
+  ];
   if (shared.includes(s[0]))
     return { path: doc.path, kind: s[0], data: doc.data };
   if (s[0] === "playerProfiles" && s.length === 2)

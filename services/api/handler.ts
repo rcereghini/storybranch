@@ -14,7 +14,9 @@ import {
 import { isResultPage, start, transition } from "../../packages/domain/index";
 import { ensurePlayerProfile } from "./player-profile";
 import { authoring } from "./authoring";
-import { pageMedia, uploads } from "./uploads";
+import { pageMedia, pageImage, uploads } from "./uploads";
+import { pageLibrary, sharedPage } from "./page-library";
+import { generation } from "./generation";
 import { profileRoutes } from "./profile";
 import { edition } from "./story-store";
 import * as paths from "./paths";
@@ -70,6 +72,12 @@ export async function handle(request: Request): Promise<Response> {
         nextCursor: docs.size === limit ? docs.docs.at(-1)!.id : null,
       });
     }
+    if (
+      request.method === "GET" &&
+      segments[1] === "shared-pages" &&
+      segments.length === 4
+    )
+      return json(await sharedPage(segments[2], segments[3]));
     const token = request.headers
       .get("authorization")
       ?.match(/^Bearer (.+)$/)?.[1];
@@ -104,6 +112,10 @@ export async function handle(request: Request): Promise<Response> {
       return json(await authoring(request, uid, segments, cursor, limit));
     if (segments[1] === "uploads")
       return json(await uploads(request, uid, segments));
+    if (segments[1] === "generation")
+      return json(await generation(request, uid, segments));
+    if (segments[1] === "pages")
+      return json(await pageLibrary(request, uid, segments, cursor, limit));
     if (segments[1] === "profile" || segments[1] === "dashboard")
       return json(
         await profileRoutes(request, uid, segments, profile.data()!, tokenName),
@@ -151,6 +163,12 @@ export async function handle(request: Request): Promise<Response> {
             edition(tx, s.storyId, s.versionId),
           );
           const page = story.pages[s.pageId];
+          const next =
+            page.choices.length === 1 &&
+            !page.choices[0].availableWhen &&
+            page.choices[0].outcome.kind === "direct"
+              ? story.pages[page.choices[0].outcome.route.targetPageId]
+              : undefined;
           let branches: unknown[] = [];
           let featuredId: string | null = null;
           if (page.branchLocation) {
@@ -182,6 +200,10 @@ export async function handle(request: Request): Promise<Response> {
             // Quiz results share as "my result" rather than an ending.
             result: isResultPage(story, page.id),
             media: pageMedia(page.video, clips),
+            nextMedia: next?.pageType.startsWith("video")
+              ? pageMedia(next.video, clips)
+              : undefined,
+            image: pageImage(page.image, clips),
             branches,
             featuredId,
           });

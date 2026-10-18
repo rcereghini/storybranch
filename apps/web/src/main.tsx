@@ -8,6 +8,8 @@ import type { Save, Story } from "../../../packages/contracts/index";
 import "./style.css";
 import { Page } from "./Page";
 import { Studio } from "./Studio";
+import { AssetLibrary } from "./Library";
+import { SharedPage } from "./SharedPage";
 import { Story as StoryContainer } from "./Story";
 import type { StoryUser } from "../../../packages/contracts/index";
 import { ShareStory } from "./ShareStory";
@@ -27,6 +29,8 @@ type Player = {
   story: { id: string; title: string; versionId: string };
   user: StoryUser;
   media?: SceneMedia;
+  nextMedia?: SceneMedia;
+  image?: string;
   save: Save;
   page: Story["pages"][string];
   result?: boolean;
@@ -320,7 +324,13 @@ function App() {
   );
   return (
     <>
-      <header>
+      <header
+        className={
+          path.startsWith("/play/") || path.startsWith("/p/")
+            ? "immersive-header"
+            : undefined
+        }
+      >
         <a
           className="brand"
           href="/"
@@ -332,6 +342,11 @@ function App() {
           <span className="brand-mark">⌘</span> storybranch
           <span className="alpha">LOCAL ALPHA</span>
         </a>
+        {(path.startsWith("/play/") || path.startsWith("/p/")) && (
+          <button className="player-exit" onClick={() => navigate("/discover")}>
+            Discover
+          </button>
+        )}
         <nav aria-label="Main">
           {user && (
             <button
@@ -362,6 +377,12 @@ function App() {
             onClick={() => navigate("/studio")}
           >
             Create
+          </button>
+          <button
+            className={path === "/assets" || path.startsWith("/assets/") ? "nav-active" : ""}
+            onClick={() => navigate("/assets")}
+          >
+            Assets
           </button>
         </nav>
         {user ? (
@@ -405,7 +426,7 @@ function App() {
         )}
       </header>
       <main
-        className={playing ? "playback-active" : undefined}
+        className={`${playing ? "playback-active" : ""} ${path.startsWith("/play/") || path.startsWith("/p/") ? "immersive-player" : ""}`}
         aria-busy={busy}
       >
         <div aria-live="polite" className="app-notices">
@@ -462,7 +483,18 @@ function App() {
             </div>
           )}
         </div>
-        {path === "/studio" ? (
+        {path.startsWith("/p/") ? (
+          <SharedPage key={path} path={path} />
+        ) : path === "/assets" || path.startsWith("/assets/") ? (
+          user ? (
+            <AssetLibrary key={user.uid} api={api} path={path} navigate={navigate} uid={user.uid} />
+          ) : (
+            <section className="empty">
+              <h1>Your asset library</h1>
+              <button onClick={() => setLogin(true)}>Sign in to upload</button>
+            </section>
+          )
+        ) : path === "/studio" ? (
           user ? (
             <Studio
               key={user.uid}
@@ -535,6 +567,8 @@ function App() {
                       page={player.page}
                       result={player.result}
                       media={player.media}
+                      nextMedia={player.nextMedia}
+                      image={player.image}
                     >
                       <section className="choices" aria-label="Story choices">
                         {player.save.status === "completed" && (

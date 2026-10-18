@@ -7,10 +7,12 @@ import { Timestamp } from "firebase-admin/firestore";
 //   users/{uid}                              profile (stats, display fields)
 //   users/{uid}/playthroughs/{saveId}        save; events/{revision} below it
 //   users/{uid}/drafts/{storyId}             private Studio draft
-//   users/{uid}/clips/{clipId}               uploaded clip record
+//   users/{uid}/clips/{clipId}               uploaded or generated clip/photo
 //   users/{uid}/receipts/{hash}              command idempotency, expires
 //   stories/{storyId}/versions/{v}/pages/{p} immutable published editions
 //   catalogue/{storyId}, branches/{id}, placements/{locationId}
+//   pageLibrary/{pageId}/revisions/{r}       reusable pages (shareable)
+//   generationJobs/{id}, generationQuotas/{id}
 //
 // Storage mirrors it: an uploaded clip's file is users/{uid}/clips/{clipId}.
 export const user = (uid: string) => `users/${uid}`;

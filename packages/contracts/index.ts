@@ -176,6 +176,15 @@ export const pageSchema = z
       "dice",
       "reveal",
     ]),
+    videoAdvance: z.enum(["auto", "continue"]).optional(),
+    image: z
+      .string()
+      .regex(/^asset:[a-zA-Z0-9_-]{8,80}$/)
+      .optional(),
+    sourcePage: z
+      .object({ id, revision: z.number().int().positive() })
+      .strict()
+      .optional(),
     // A shipped clip path, or `asset:<id>` for a creator's uploaded clip.
     video: z
       .string()

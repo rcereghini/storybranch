@@ -13,7 +13,9 @@ service firebase.storage {
         && resource == null
         && request.auth.uid == uid
         && request.resource.size <= 100 * 1024 * 1024
-        && request.resource.contentType.matches('video/(mp4|webm)')
+        && (request.resource.contentType.matches('video/(mp4|webm)')
+          || (request.resource.contentType.matches('image/(jpeg|png|webp)')
+            && request.resource.size <= 10 * 1024 * 1024))
         && clip(uid, clipId).status == 'pending'
         && clip(uid, clipId).bytes == request.resource.size
         && clip(uid, clipId).contentType == request.resource.contentType;

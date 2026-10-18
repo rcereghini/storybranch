@@ -10,11 +10,12 @@ import {
   type PublishedClip,
   type SceneMedia,
   type UploadListing,
+  type videoTypes,
 } from "../../packages/contracts/media";
 import { resolveFixtureMedia } from "../../fixtures/media";
 import { db, bucket, config } from "./firebase";
 import { publisherAllowed } from "./creator-access";
-import { downloadUrl, sniffVideo } from "./video-check";
+import { downloadUrl, sniffAsset } from "./video-check";
 
 // A clip's record is users/{uid}/clips/{assetId} and its file sits at the
 // same path in Storage. The browser uploads straight to Storage; Storage rules
@@ -30,12 +31,17 @@ function access(uid: string) {
   return null;
 }
 
-const clipMedia = (clip: PublishedClip): SceneMedia => ({
-  landscape: {
-    src: downloadUrl(config.storageHost, config.bucket, clip.path, clip.token),
-    type: clip.contentType,
-  },
-});
+const fileUrl = (file: PublishedClip) =>
+  downloadUrl(config.storageHost, config.bucket, file.path, file.token);
+const clipMedia = (clip: PublishedClip): SceneMedia | undefined =>
+  clip.contentType.startsWith("video/")
+    ? {
+        landscape: {
+          src: fileUrl(clip),
+          type: clip.contentType as (typeof videoTypes)[number],
+        },
+      }
+    : undefined;
 export const assetMedia = (asset: DocumentData) =>
   asset.status === "ready" ? clipMedia(asset as PublishedClip) : undefined;
 export const publishedClip = (asset: DocumentData): PublishedClip => ({
@@ -44,7 +50,7 @@ export const publishedClip = (asset: DocumentData): PublishedClip => ({
   contentType: asset.contentType,
 });
 
-function view(id: string, asset: DocumentData): ClipAsset {
+export function assetView(id: string, asset: DocumentData): ClipAsset {
   return {
     id,
     fileName: asset.fileName,
@@ -54,12 +60,16 @@ function view(id: string, asset: DocumentData): ClipAsset {
     status: asset.status,
     published: asset.published,
     createdAt: asset.createdAt,
-    ...(asset.status === "ready" ? { media: assetMedia(asset) } : {}),
+    ...(asset.status === "ready"
+      ? asset.contentType.startsWith("video/")
+        ? { media: assetMedia(asset) }
+        : { url: fileUrl(asset as PublishedClip) }
+      : {}),
   };
 }
 
-// Media for a page in a published edition: a shipped clip or an uploaded clip
-// the edition recorded when it was published.
+// Media for a page in a published edition (or a shared library page): a
+// shipped clip or an uploaded file recorded when it was published.
 export function pageMedia(
   video: string | undefined,
   clips: Record<string, PublishedClip>,
@@ -67,6 +77,14 @@ export function pageMedia(
   const assetId = assetIdOf(video);
   if (!assetId) return resolveFixtureMedia(video ?? "");
   return clips[assetId] ? clipMedia(clips[assetId]) : undefined;
+}
+
+export function pageImage(
+  image: string | undefined,
+  clips: Record<string, PublishedClip>,
+) {
+  const file = clips[assetIdOf(image) ?? ""];
+  return file?.contentType.startsWith("image/") ? fileUrl(file) : undefined;
 }
 
 export async function uploads(
@@ -84,7 +102,7 @@ export async function uploads(
       enabled: !reason,
       reason,
       items: records.docs
-        .map((d) => view(d.id, d.data()))
+        .map((d) => assetView(d.id, d.data()))
         .sort((a, b) => b.createdAt - a.createdAt),
     };
     return listing;
@@ -143,7 +161,7 @@ async function create(request: Request, uid: string) {
     token: randomUUID(),
     createdAt: Date.now(),
   };
-  const result = { asset: view(assetId, asset), path: asset.path };
+  const result = { asset: assetView(assetId, asset), path: asset.path };
   await db.runTransaction(async (tx) => {
     const again = await tx.get(receipt);
     if (again.exists) return;
@@ -170,7 +188,7 @@ async function complete(uid: string, assetId: string) {
   const snapshot = await ref.get();
   if (!snapshot.exists) throw new GameError("NOT_FOUND", "Clip not found.");
   const asset = snapshot.data()!;
-  if (asset.status === "ready") return { asset: view(assetId, asset) };
+  if (asset.status === "ready") return { asset: assetView(assetId, asset) };
   const file = bucket.file(asset.path);
   const [exists] = await file.exists();
   if (!exists)
@@ -183,13 +201,13 @@ async function complete(uid: string, assetId: string) {
   if (
     Number(metadata.size) !== asset.bytes ||
     metadata.contentType !== asset.contentType ||
-    sniffVideo(new Uint8Array(head)) !== asset.contentType
+    sniffAsset(new Uint8Array(head)) !== asset.contentType
   ) {
     await file.delete({ ignoreNotFound: true });
     await ref.delete();
     throw new GameError(
       "VALIDATION_FAILED",
-      "That file is not a playable MP4 or WebM video. Choose another file.",
+      "That file does not match its declared image or video format. Choose another file.",
     );
   }
   await file.setMetadata({
@@ -201,5 +219,5 @@ async function complete(uid: string, assetId: string) {
       tx.update(ref, { status: "ready", readyAt: Date.now() });
     return { ...current, status: "ready" };
   });
-  return { asset: view(assetId, ready) };
+  return { asset: assetView(assetId, ready) };
 }

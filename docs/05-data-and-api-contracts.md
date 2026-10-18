@@ -31,7 +31,7 @@ Current implementation contract: stories store `entryPageId` and immutable `vers
 | `wallets/{uid}` | available credits, reserved credits, revision, account lock | Server only; owner reads |
 | `wallets/{uid}/ledger/{entryId}` | operation ID, deltaAvailable, deltaReserved, reason, job/payment reference, price version | Append-only server writes; owner reads |
 | `generationJobs/{jobId}` | owner, quote, normalized input, provider request ID, state, reservation ID, output asset ID, lease, attempts | Server writes; owner reads safe projection |
-| `users/{uid}/clips/{clipId}` (uploads); `assets/{assetId}` (generated media) | owner, storage key, readiness, media attributes, captions, provenance, retention references | Server controlled readiness; access by entitlement/reference |
+| `users/{uid}/clips/{clipId}` (uploaded and generated videos and photos) | owner, storage key, readiness, media attributes, captions, provenance, retention references | Server controlled readiness; access by entitlement/reference |
 | `users/{uid}/receipts/{receiptId}` | actor, idempotency key, request hash, status, result, expiry | Server only; scoped API result; deleted by TTL |
 | `outbox/{id}` and `inbox/{id}` | event kind, payload reference, dedupe key, lease, status, due time | Server only |
 | `moderationCases/{id}` | target, report, evidence references, decision, audit | Restricted moderators |
