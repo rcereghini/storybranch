@@ -104,6 +104,8 @@ Read [Product requirements](docs/01-product-requirements.md), [Game and communit
 | [Story and Page model](docs/16-story-pages.md) | Current page-type contract; read before changing stories, pages or routing |
 | [Creator Studio](docs/17-creator-studio.md) | Drafts, preview, publishing and publishing access |
 | [Player dashboard](docs/18-player-dashboard.md) | Dashboard home, profile customization and progress summary |
+| [Copilot](docs/19-copilot.md) | In-app chat assistant: phases, contract, limits and the video model test |
+| [Admin dashboard](docs/20-admin.md) | Admins, managing accounts and stories, audit log |
 
 ## How to use these documents
 

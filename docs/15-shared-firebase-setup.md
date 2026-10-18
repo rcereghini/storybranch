@@ -72,17 +72,18 @@ Until October 2026 the live project kept everything under `storybranch/app/...` 
 
 ## Account access
 
-Publishing, uploads and page sharing, AI generation, and Copilot are each turned on per account by a flag on the profile: `users/{uid}.features` with `publish`, `generate` and `copilot`. A missing flag means no access. The API reads the profile on every request anyway, so a change applies on the account's next request with no redeploy. Players can read their own profile but cannot change these flags: the profile API accepts only presentation fields and Firestore rules deny client writes.
+Publishing, uploads and page sharing, AI generation, Copilot and the admin dashboard are each turned on per account by a flag on the profile: `users/{uid}.features` with `publish`, `generate`, `copilot` and `admin`. `admin` implies all the others (see `20-admin.md`); admins can also change flags from the dashboard's Users tab. A missing flag means no access. The API reads the profile on every request anyway, so a change applies on the account's next request with no redeploy. Players can read their own profile but cannot change these flags: the profile API accepts only presentation fields and Firestore rules deny client writes.
 
 Manage flags with the local server credential:
 
 ```sh
 pnpm features list                                  # every profile and its features
 pnpm features grant someone@example.com publish copilot
+pnpm features grant someone@example.com admin
 pnpm features revoke someone@example.com generate
 ```
 
-The account must have signed in once (that creates its profile). `generate` and `copilot` also need `FAL_KEY` and `ANTHROPIC_API_KEY` on the deployment; the app only shows a feature the account can actually use. Emulator accounts, seeded or created locally, get every feature; `STORYBRANCH_MODE=emulator pnpm features ...` changes them. These flags are an alpha access policy, not a finished moderation, verification or billing system; paid plans would add entitlements alongside them.
+The account must have signed up; a profile is created for it if it has never opened the app. `generate` and `copilot` also need `FAL_KEY` and `ANTHROPIC_API_KEY` on the deployment; the app only shows a feature the account can actually use. Emulator accounts, seeded or created locally, get every feature except admin, and the seeded `player` account is the local admin; `STORYBRANCH_MODE=emulator pnpm features ...` changes them. These flags are an alpha access policy, not a finished moderation, verification or billing system; paid plans would add entitlements alongside them.
 
 ## Vercel
 

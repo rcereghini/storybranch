@@ -201,12 +201,17 @@ export async function authoring(
       result = { ...old, publishedVersionId: versionId };
       tx.set(ref, result);
       tx.update(root, { publishedVersionId: versionId });
-      tx.set(db.doc(`catalogue/${storyId}`), {
-        id: storyId,
-        title: story.title,
-        description: old.description,
-        publishedVersionId: versionId,
-      });
+      // Merge keeps an admin's hidden flag across republishing.
+      tx.set(
+        db.doc(`catalogue/${storyId}`),
+        {
+          id: storyId,
+          title: story.title,
+          description: old.description,
+          publishedVersionId: versionId,
+        },
+        { merge: true },
+      );
     }
     tx.create(receipt, {
       actor: uid,

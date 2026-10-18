@@ -3,7 +3,7 @@ import { baseStats } from "../../packages/domain/index";
 import type { Features } from "../../packages/contracts/profile";
 import { user } from "./paths";
 // A new live account has no feature flags; local emulator accounts are
-// created with every feature so development needs no setup.
+// created with every member feature so development needs no setup.
 export async function ensurePlayerProfile(
   db: Pick<Firestore, "doc" | "runTransaction">,
   uid: string,

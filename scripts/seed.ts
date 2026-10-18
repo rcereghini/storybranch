@@ -5,7 +5,7 @@ import { user } from "../services/api/paths";
 import { stories, branches, catalogue } from "../fixtures/stories";
 import { pageStories, pageCatalogue } from "../fixtures/page-stories";
 import { baseStats } from "../packages/domain/index";
-import { allFeatures } from "../packages/contracts/profile";
+import { allFeatures, memberFeatures } from "../packages/contracts/profile";
 async function fixture(path: string, data: Record<string, unknown>) {
   const ref = db.doc(path);
   if (config.mode === "emulator") {
@@ -76,10 +76,15 @@ if (config.mode === "emulator") {
         stats: { ...baseStats, agility },
         rulesetVersion: "prototype-1",
         status: "active",
-        features: allFeatures,
+        features: uid === "player" ? allFeatures : memberFeatures,
       });
-    // Local accounts from before feature flags get every feature too.
-    else await ref.set({ features: allFeatures }, { merge: true });
+    // Local accounts from before feature flags get them too; player is the
+    // local admin.
+    else
+      await ref.set(
+        { features: uid === "player" ? allFeatures : memberFeatures },
+        { merge: true },
+      );
   }
   console.log(
     "Local fixtures ready. player@storybranch.test / HarborDemo123! (agility 5); progressed@storybranch.test (agility 8).",

@@ -19,6 +19,8 @@ export type CatalogueOutline = {
   genre: string;
   duration: string;
   versionId: string;
+  // Hidden by an admin: kept for players who started it, never recommended.
+  hidden?: boolean;
 };
 // A story-log event, tagged with the save it belongs to.
 export type ActivityEvent = { saveId: string; label: string; at: number };
@@ -74,30 +76,33 @@ export function summarizeDashboard(
     endingsByStory.set(s.storyId, found);
   }
 
-  const stories: StoryProgress[] = catalogue.map((c) => {
-    const published = outlines.get(outlineKey(c.id, c.versionId));
-    const endings = Object.entries(published?.pages ?? {})
-      .filter(([, page]) => page.kind === "ending")
-      .map(([pageId]) => pageId);
-    const found = endingsByStory.get(c.id) ?? new Set<string>();
-    const own = main.filter((s) => s.storyId === c.id);
-    const active = own.find((s) => s.status === "active");
-    return {
-      storyId: c.id,
-      title: c.title,
-      description: c.description,
-      genre: c.genre,
-      duration: c.duration,
-      status: active
-        ? "in-progress"
-        : own.some((s) => s.status === "completed")
-          ? "completed"
-          : "not-started",
-      activeSaveId: active?.id ?? null,
-      endingsFound: endings.filter((pageId) => found.has(pageId)).length,
-      endingsTotal: endings.length,
-    };
-  });
+  const hidden = new Set(catalogue.filter((c) => c.hidden).map((c) => c.id));
+  const stories: StoryProgress[] = catalogue
+    .filter((c) => !c.hidden || main.some((s) => s.storyId === c.id))
+    .map((c) => {
+      const published = outlines.get(outlineKey(c.id, c.versionId));
+      const endings = Object.entries(published?.pages ?? {})
+        .filter(([, page]) => page.kind === "ending")
+        .map(([pageId]) => pageId);
+      const found = endingsByStory.get(c.id) ?? new Set<string>();
+      const own = main.filter((s) => s.storyId === c.id);
+      const active = own.find((s) => s.status === "active");
+      return {
+        storyId: c.id,
+        title: c.title,
+        description: c.description,
+        genre: c.genre,
+        duration: c.duration,
+        status: active
+          ? "in-progress"
+          : own.some((s) => s.status === "completed")
+            ? "completed"
+            : "not-started",
+        activeSaveId: active?.id ?? null,
+        endingsFound: endings.filter((pageId) => found.has(pageId)).length,
+        endingsTotal: endings.length,
+      };
+    });
 
   // Unplayed stories first (favorite genres leading), then finished stories
   // that still hide endings.
@@ -106,10 +111,13 @@ export function summarizeDashboard(
     return genre && favorites.includes(genre) ? genre : null;
   };
   const fresh = stories
-    .filter((s) => s.status === "not-started")
+    .filter((s) => s.status === "not-started" && !hidden.has(s.storyId))
     .sort((a, b) => Number(!!liked(b)) - Number(!!liked(a)));
   const unfinished = stories.filter(
-    (s) => s.status === "completed" && s.endingsFound < s.endingsTotal,
+    (s) =>
+      s.status === "completed" &&
+      s.endingsFound < s.endingsTotal &&
+      !hidden.has(s.storyId),
   );
   const recommendations: Recommendation[] = [...fresh, ...unfinished]
     .slice(0, 3)

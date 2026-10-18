@@ -100,12 +100,19 @@ export type ProfileUpdate = z.infer<typeof profileUpdateSchema>;
 
 // Per-account access to gated features, stored on the profile as
 // users/{uid}.features. Only the server and scripts/features.ts write it;
-// a missing flag means no access.
-export const featureIds = ["publish", "generate", "copilot"] as const;
+// a missing flag means no access. "admin" opens the admin dashboard and
+// implies every other feature.
+export const featureIds = ["publish", "generate", "copilot", "admin"] as const;
 export const featureId = z.enum(featureIds);
 export type FeatureId = z.infer<typeof featureId>;
 export type Features = Record<FeatureId, boolean>;
-export const accountFeatures = (data: { features?: unknown } | undefined) => {
+export const allFeatures = Object.fromEntries(
+  featureIds.map((feature) => [feature, true]),
+) as Features;
+// Every feature except admin: what local emulator accounts start with.
+export const memberFeatures: Features = { ...allFeatures, admin: false };
+// The flags as stored: only an exact true counts.
+export const storedFeatures = (data: { features?: unknown } | undefined) => {
   const stored =
     data?.features && typeof data.features === "object"
       ? (data.features as Record<string, unknown>)
@@ -114,9 +121,11 @@ export const accountFeatures = (data: { features?: unknown } | undefined) => {
     featureIds.map((feature) => [feature, stored[feature] === true]),
   ) as Features;
 };
-export const allFeatures = Object.fromEntries(
-  featureIds.map((feature) => [feature, true]),
-) as Features;
+// What the account may use: its flags, with admin implying all of them.
+export const accountFeatures = (data: { features?: unknown } | undefined) => {
+  const stored = storedFeatures(data);
+  return stored.admin ? allFeatures : stored;
+};
 
 // What the signed-in player sees about themselves; never another player.
 export type PlayerProfile = {

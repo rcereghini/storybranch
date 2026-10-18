@@ -81,6 +81,7 @@ export async function profileRoutes(
       duration: typeof c.duration === "string" ? c.duration : "",
       // Seeded entries name versionId; Studio publications publishedVersionId.
       versionId: c.versionId ?? c.publishedVersionId,
+      hidden: c.hidden === true,
     }));
 
   const editions = new Map<string, [string, string]>();

@@ -21,6 +21,7 @@ try {
   if (!ready) throw new Error("Web server did not start.");
   await import("./browser-check");
   await import("./copilot-check");
+  await import("./admin-check");
 } finally {
   server.kill();
 }

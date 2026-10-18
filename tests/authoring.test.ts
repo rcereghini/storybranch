@@ -6,15 +6,16 @@ import {
   accountFeatures,
   allFeatures,
   profileUpdateSchema,
+  storedFeatures,
 } from "../packages/contracts/profile";
 it("grants a feature only when the profile flag is exactly true", () => {
-  const none = { publish: false, generate: false, copilot: false };
+  const none = { publish: false, generate: false, copilot: false, admin: false };
   expect(accountFeatures(undefined)).toEqual(none);
   expect(accountFeatures({})).toEqual(none);
   expect(accountFeatures({ features: "publish" })).toEqual(none);
   expect(
     accountFeatures({
-      features: { publish: "true", generate: 1, copilot: null, admin: true },
+      features: { publish: "true", generate: 1, copilot: null, admin: "yes", root: true },
     }),
   ).toEqual(none);
   expect(accountFeatures({ features: { publish: true } })).toEqual({
@@ -22,6 +23,16 @@ it("grants a feature only when the profile flag is exactly true", () => {
     publish: true,
   });
   expect(accountFeatures({ features: allFeatures })).toEqual(allFeatures);
+});
+it("gives admins every feature while keeping their stored flags as set", () => {
+  const admin = { features: { admin: true, copilot: false } };
+  expect(accountFeatures(admin)).toEqual(allFeatures);
+  expect(storedFeatures(admin)).toEqual({
+    publish: false,
+    generate: false,
+    copilot: false,
+    admin: true,
+  });
 });
 it("never lets a player set their own feature flags", () => {
   expect(

@@ -15,13 +15,14 @@ import { isResultPage, start, transition } from "../../packages/domain/index";
 import { ensurePlayerProfile } from "./player-profile";
 import {
   accountFeatures,
-  allFeatures,
+  memberFeatures,
 } from "../../packages/contracts/profile";
 import { authoring } from "./authoring";
 import { pageMedia, pageImage, uploads } from "./uploads";
 import { pageLibrary, sharedPage } from "./page-library";
 import { generation } from "./generation";
 import { copilot } from "./copilot";
+import { admin } from "./admin";
 import { profileRoutes } from "./profile";
 import { edition } from "./story-store";
 import * as paths from "./paths";
@@ -73,7 +74,8 @@ export async function handle(request: Request): Promise<Response> {
       if (cursor) q = q.startAfter(cursor);
       const docs = await q.get();
       return json({
-        items: docs.docs.map((d) => d.data()),
+        // Stories an admin hid stay out of Discover.
+        items: docs.docs.map((d) => d.data()).filter((s) => s.hidden !== true),
         nextCursor: docs.size === limit ? docs.docs.at(-1)!.id : null,
       });
     }
@@ -107,7 +109,7 @@ export async function handle(request: Request): Promise<Response> {
     await ensurePlayerProfile(
       db,
       uid,
-      config.mode === "emulator" ? allFeatures : undefined,
+      config.mode === "emulator" ? memberFeatures : undefined,
     );
     const profile = await profileRef.get();
     if (!profile.exists || profile.data()!.status !== "active")
@@ -127,6 +129,8 @@ export async function handle(request: Request): Promise<Response> {
       return json(await uploads(request, uid, segments, features));
     if (segments[1] === "generation")
       return json(await generation(request, uid, segments, features));
+    if (segments[1] === "admin")
+      return json(await admin(request, uid, segments, features));
     // Streams its reply, so it builds its own response.
     if (segments[1] === "copilot")
       return await copilot(request, uid, segments, features);
@@ -277,11 +281,15 @@ export async function handle(request: Request): Promise<Response> {
       let event: Record<string, unknown>;
       if (kind === "start") {
         const c = startSchema.parse(command);
-        if (!(await tx.get(db.doc(`catalogue/${c.payload.storyId}`))).exists)
+        const listing = await tx.get(db.doc(`catalogue/${c.payload.storyId}`));
+        if (!listing.exists)
           throw new GameError(
             "FORBIDDEN",
             "Side quests must start from their branch location.",
           );
+        // A hidden story takes no new players; existing saves keep playing.
+        if (listing.data()!.hidden === true)
+          throw new GameError("FORBIDDEN", "This story isn't available right now.");
         const latest = await tx.get(db.doc(`stories/${c.payload.storyId}`));
         const v = c.payload.versionId ?? latest.data()?.publishedVersionId;
         if (!v) throw new GameError("NOT_FOUND", "Story not found.");

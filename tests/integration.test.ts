@@ -15,13 +15,14 @@ import { handle } from "../services/api/handler";
 import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
 import { ensurePlayerProfile } from "../services/api/player-profile";
 import type { Save } from "../packages/contracts/index";
-import type { FeatureId } from "../packages/contracts/profile";
+import { memberFeatures, type FeatureId } from "../packages/contracts/profile";
 import { pageStories } from "../fixtures/page-stories";
 import { migrateLayout, OLD_ROOT } from "../scripts/migrate-layout";
 import { contentOf, placePage } from "../packages/contracts/page-library";
 let tokens: Record<string, string> = {};
 let rules: RulesTestEnvironment;
-// Seeded accounts start with every feature; tests switch one off and back.
+// Seeded accounts: player is the local admin, the rest are members with
+// every other feature. Tests switch a member's flag off and back.
 const setFeature = (uid: string, feature: FeatureId, on: boolean) =>
   db.doc(`users/${uid}`).update({ [`features.${feature}`]: on });
 it("gates paid generation, preserves request receipts, and protects job ownership", async () => {
@@ -1179,10 +1180,11 @@ it("answers through Copilot with the user's own data, retries safely and enforce
     expect((await call("/profile")).data.features.copilot).toBe(false);
     process.env.ANTHROPIC_API_KEY = "test-key";
     expect((await call("/profile")).data.features.copilot).toBe(true);
-    await setFeature("player", "copilot", false);
-    expect((await post(command("Hi"))).status).toBe(403);
-    expect((await call("/profile")).data.features.copilot).toBe(false);
-    await setFeature("player", "copilot", true);
+    // player is the local admin, so the flag is checked on a member.
+    await setFeature("progressed", "copilot", false);
+    expect((await post(command("Hi"), "progressed", `t-${randomUUID()}`)).status).toBe(403);
+    expect((await call("/profile", undefined, "progressed")).data.features.copilot).toBe(false);
+    await setFeature("progressed", "copilot", true);
 
     // A tool round: open Studio, list drafts, try a play route, then reply.
     script = [
@@ -1281,7 +1283,7 @@ it("answers through Copilot with the user's own data, retries safely and enforce
     ).toMatch(/Daily Copilot limit/);
     await quota.delete();
   } finally {
-    await setFeature("player", "copilot", true);
+    await setFeature("progressed", "copilot", true);
     setCopilotModel(null);
     if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = originalKey;
@@ -1349,5 +1351,110 @@ it("gates publishing, uploads and page sharing on the account's publish flag", a
     expect((await call("/studio", undefined, "progressed")).data.canPublish).toBe(true);
   } finally {
     await setFeature("progressed", "publish", true);
+  }
+});
+
+it("lets only admins manage accounts and stories, with guards, retries and an audit log", async () => {
+  const key = () => randomUUID();
+  // Seeded: player is the local admin, progressed a member.
+  const hide = (hidden: boolean, who = "player") =>
+    call("/admin/stories/glass-harbor", { idempotencyKey: key(), hidden }, who);
+  try {
+    for (const path of ["/admin/overview", "/admin/users", "/admin/stories", "/admin/audit"])
+      expect((await call(path, undefined, "progressed")).status).toBe(403);
+    expect(
+      (await call("/admin/users/player", { idempotencyKey: key(), status: "disabled" }, "progressed"))
+        .status,
+    ).toBe(403);
+    expect((await hide(true, "progressed")).status).toBe(403);
+    expect((await call("/profile", undefined, "progressed")).data.features.admin).toBe(false);
+
+    const overview = await call("/admin/overview");
+    expect(overview.status).toBe(200);
+    expect(overview.data.users).toBeGreaterThanOrEqual(2);
+    expect(overview.data.publishedStories).toBeGreaterThanOrEqual(1);
+    const users = (await call("/admin/users")).data.items as Array<{ uid: string; email: string }>;
+    expect(users.find((u) => u.uid === "progressed")?.email).toBe("progressed@storybranch.test");
+
+    // Feature changes apply at once and a retry returns the first result.
+    const command = { idempotencyKey: key(), features: { copilot: false, generate: false } };
+    const changed = await call("/admin/users/progressed", command);
+    expect(changed.data.features).toMatchObject({ copilot: false, generate: false, publish: true });
+    expect((await call("/admin/users/progressed", command)).data).toEqual(changed.data);
+    expect(
+      (await call("/admin/users/progressed", { ...command, features: { publish: false } })).status,
+    ).toBe(409);
+    expect((await db.doc("users/progressed").get()).data()!.features.generate).toBe(false);
+
+    // Admins cannot lock themselves out.
+    expect(
+      (await call("/admin/users/player", { idempotencyKey: key(), features: { admin: false } })).status,
+    ).toBe(400);
+    expect(
+      (await call("/admin/users/player", { idempotencyKey: key(), status: "disabled" })).status,
+    ).toBe(400);
+    expect((await call("/admin/users/player", { idempotencyKey: key() })).status).toBe(400);
+
+    // A disabled account is refused on its next request; enabling restores it.
+    await call("/admin/users/progressed", { idempotencyKey: key(), status: "disabled" });
+    expect((await call("/profile", undefined, "progressed")).status).toBe(403);
+    await call("/admin/users/progressed", { idempotencyKey: key(), status: "active" });
+    expect((await call("/profile", undefined, "progressed")).status).toBe(200);
+
+    // Hiding a story: gone from Discover and closed to new players, while an
+    // existing save keeps playing and stays on that player's dashboard.
+    const started = await call(
+      "/playthroughs",
+      { idempotencyKey: key(), payload: { storyId: "glass-harbor" } },
+      "progressed",
+    );
+    expect(started.status).toBe(200);
+    expect((await hide(true)).data).toEqual({ id: "glass-harbor", hidden: true });
+    const listed = (await call("/catalogue", undefined, "none")).data.items as Array<{ id: string }>;
+    expect(listed.map((s) => s.id)).not.toContain("glass-harbor");
+    expect(
+      (
+        await call(
+          "/playthroughs",
+          { idempotencyKey: key(), payload: { storyId: "glass-harbor" } },
+          "progressed",
+        )
+      ).status,
+    ).toBe(403);
+    expect((await call(`/playthroughs/${started.data.save.id}`, undefined, "progressed")).status).toBe(200);
+    const dashboard = (await call("/dashboard", undefined, "progressed")).data.summary;
+    expect(dashboard.stories.map((s: { storyId: string }) => s.storyId)).toContain("glass-harbor");
+    expect(
+      dashboard.recommendations.map((r: { storyId: string }) => r.storyId),
+    ).not.toContain("glass-harbor");
+    expect(
+      ((await call("/admin/stories")).data.items as Array<{ id: string; hidden: boolean }>).find(
+        (s) => s.id === "glass-harbor",
+      )?.hidden,
+    ).toBe(true);
+    await hide(false);
+    expect(
+      ((await call("/catalogue", undefined, "none")).data.items as Array<{ id: string }>).map((s) => s.id),
+    ).toContain("glass-harbor");
+
+    // Every change is in the audit log with who made it.
+    const audit = (await call("/admin/audit")).data.items as Array<{
+      actorEmail: string;
+      action: string;
+      target: string;
+      change: Record<string, unknown>;
+    }>;
+    expect(audit[0]).toMatchObject({
+      actorEmail: "player@storybranch.test",
+      action: "story",
+      target: "glass-harbor",
+      change: { hidden: false },
+    });
+    expect(
+      audit.some((e) => e.target === "progressed" && (e.change as { status?: string }).status === "disabled"),
+    ).toBe(true);
+  } finally {
+    await db.doc("catalogue/glass-harbor").update({ hidden: false });
+    await db.doc("users/progressed").update({ features: memberFeatures, status: "active" });
   }
 });

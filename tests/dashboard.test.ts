@@ -248,3 +248,20 @@ it("validates profile edits and defaults older profiles", () => {
     projectProfile("uid", { ...stored, displayName: "Wren", avatarId: "tide" }),
   ).toMatchObject({ displayName: "Wren", avatarId: "tide" });
 });
+
+it("keeps hidden stories for players who started them but never recommends them", () => {
+  const withHidden = [
+    { ...entry("harbor", "The Harbor"), hidden: true },
+    { ...entry("door", "The Door"), hidden: true },
+    entry("lamp", "The Lamp"),
+  ];
+  const summary = summarizeDashboard(
+    [save({ id: "a", status: "completed", pageId: "home" })],
+    outlines,
+    withHidden,
+  );
+  // Started hidden story stays; an unstarted hidden one disappears.
+  expect(summary.stories.map((s) => s.storyId)).toEqual(["harbor", "lamp"]);
+  // The finished harbor still hides endings, but is not suggested.
+  expect(summary.recommendations.map((r) => r.storyId)).toEqual(["lamp"]);
+});

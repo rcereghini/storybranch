@@ -12,7 +12,8 @@ Current implementation contract: stories store `entryPageId` and immutable `vers
 | `creatorProfiles/{uid}` | unique handle, display name, avatar, public bio | Validated owner edits; public reads |
 | `users/{uid}` (player profile) | level, XP, allocated stats, unspent points, ruleset version, display fields | Server writes; owner reads; optional public projection |
 | `stories/{storyId}` | creator ID, title, visibility, status, draft revision, published version ID, community setting | Server controls publication and settings; owner reads private metadata |
-| `catalogue/{storyId}` | public title, cover, creator projection, tags, rating, published version | Server generated public projection |
+| `catalogue/{storyId}` | public title, cover, creator projection, tags, rating, published version, `hidden` (admin) | Server generated public projection; hidden entries are left out of Discover and new playthroughs |
+| `adminAudit/{entryId}` | time, actor uid and email, action (user or story), target, change | Server only, written with each admin change (docs/20-admin.md) |
 | `stories/{id}/draftNodes/{nodeId}` | type, asset ID, choices, effects, combat config, revision | Owner allowlisted edits under draft policy |
 | `stories/{id}/versions/{versionId}` | source draft revision, schema/ruleset versions, manifest hash, readiness, entry node, permissions snapshot | Server only; authorized readers |
 | `stories/{id}/versions/{vid}/nodes/{nodeId}` | frozen validated node payload | Server only; authorized readers |

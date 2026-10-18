@@ -136,7 +136,7 @@ const when = (ms: number) => new Date(ms).toISOString().slice(0, 16) + "Z";
 
 async function catalogue() {
   const docs = await db.collection("catalogue").limit(50).get();
-  return docs.docs.map((d) => d.data());
+  return docs.docs.map((d) => d.data()).filter((s) => s.hidden !== true);
 }
 
 // Each tool returns JSON for the model and, for navigate, an app action.

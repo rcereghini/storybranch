@@ -21,6 +21,7 @@ import { Adventures } from "./Adventures";
 import { Avatar } from "./avatars";
 import { accents } from "./theme";
 import { Copilot } from "./Copilot";
+import { Admin } from "./Admin";
 import { copilotAvailable } from "../../../packages/contracts/copilot";
 import "./hub.css";
 const api = createApi(fetch, async () =>
@@ -77,6 +78,7 @@ function App() {
   const loadKey = `${path}|${user?.uid ?? ""}`;
   // Offered only to accounts with the flag, on a deployment with the key.
   const copilotEnabled = !!user && !!profile?.features?.copilot;
+  const isAdmin = !!user && !!profile?.features?.admin;
   const navigate = (p: string) => {
     if (
       p !== path &&
@@ -389,6 +391,14 @@ function App() {
           >
             Assets
           </button>
+          {isAdmin && (
+            <button
+              className={path === "/admin" ? "nav-active" : ""}
+              onClick={() => navigate("/admin")}
+            >
+              Admin
+            </button>
+          )}
         </nav>
         {user ? (
           <div className="account">
@@ -507,6 +517,17 @@ function App() {
             <section className="empty">
               <h1>Your asset library</h1>
               <button onClick={() => setLogin(true)}>Sign in to upload</button>
+            </section>
+          )
+        ) : path === "/admin" ? (
+          isAdmin ? (
+            <Admin api={api} uid={user!.uid} navigate={navigate} />
+          ) : user && !profile ? (
+            <div className="placeholder summary-placeholder" aria-hidden="true" />
+          ) : (
+            <section className="empty">
+              <h1>Admins only</h1>
+              <p>This area is for Storybranch admins.</p>
             </section>
           )
         ) : path === "/studio" ? (
