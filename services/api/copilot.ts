@@ -518,6 +518,16 @@ export async function copilot(
       } catch (error) {
         // Nothing was committed: the same key can be retried.
         await receipt.delete().catch(() => {});
+        if (!(error instanceof GameError))
+          console.error(
+            JSON.stringify({
+              copilot: "reply failed",
+              threadId,
+              error: error instanceof Error ? error.message : String(error),
+              status: error instanceof Anthropic.APIError ? error.status : undefined,
+              stack: error instanceof Error ? error.stack : undefined,
+            }),
+          );
         send({
           type: "error",
           code: error instanceof GameError ? error.code : "UNAVAILABLE",

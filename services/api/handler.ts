@@ -367,6 +367,19 @@ export async function handle(request: Request): Promise<Response> {
         : error instanceof ZodError
           ? "VALIDATION_FAILED"
           : "UNAVAILABLE";
+    // Expected failures (validation, auth, conflicts) are answers, not
+    // incidents; anything else goes to the runtime log with the ID the
+    // user sees, so it can be found in Vercel's logs.
+    if (code === "UNAVAILABLE")
+      console.error(
+        JSON.stringify({
+          correlationId,
+          method: request.method,
+          path: new URL(request.url).pathname,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        }),
+      );
     const status =
       code === "UNAUTHENTICATED"
         ? 401
