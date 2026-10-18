@@ -29,7 +29,7 @@ Copilot is not available during play (`/play/`, `/p/`): it could reveal routes, 
 - `{ "type": "action", "action": { "kind": "navigate", "path": "/studio" } }` — the server has already checked the path against the allowed routes (`copilotRoute`); the browser performs it with the app's normal navigation, including the unsaved-Studio confirmation.
 - `{ "type": "done" }` or `{ "type": "error", "code": "...", "message": "..." }` — always the last line.
 
-`GET /api/copilot` returns `{ enabled }`, so the app only offers Copilot to accounts that can use it. `GET /api/copilot/threads/{threadId}` returns the visible transcript (user text and assistant text only). A retried request with the same idempotency key returns the stored reply instead of running again; a different body with a used key is an `IDEMPOTENCY_CONFLICT`.
+`GET /api/copilot/threads/{threadId}` returns the visible transcript (user text and assistant text only). A retried request with the same idempotency key returns the stored reply instead of running again; a different body with a used key is an `IDEMPOTENCY_CONFLICT`.
 
 ## Storage
 
@@ -39,7 +39,7 @@ Copilot is not available during play (`/play/`, `/p/`): it could reveal routes, 
 
 ## Access and limits
 
-- `STORYBRANCH_COPILOT_UIDS` (comma-separated) allows accounts in production; everyone is allowed in emulator mode. Missing `ANTHROPIC_API_KEY` disables Copilot with a clear message.
+- An account needs its `copilot` feature (`pnpm features grant <email> copilot`; see Account access in `15-shared-firebase-setup.md`), and the deployment needs `ANTHROPIC_API_KEY`. Emulator accounts have the feature. The profile's `features.copilot` is true only when both hold, and the app shows the Copilot button only then.
 - 100 messages per account per day; at most 8 model turns per message; 2,000 characters per message.
 - Model `claude-opus-5-5` at low effort, which suits chat and keeps replies quick. Server-side refusal fallback (`fallbacks: "default"`) is on, so a declined request is retried on Anthropic's recommended fallback model.
 

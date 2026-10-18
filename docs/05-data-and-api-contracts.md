@@ -8,7 +8,7 @@ Current implementation contract: stories store `entryPageId` and immutable `vers
 
 | Entity and suggested path | Essential fields | Writer and visibility |
 | --- | --- | --- |
-| `users/{uid}` | account status, private preferences, entitlement references | User may edit allowlisted preferences; server controls status; owner reads |
+| `users/{uid}` | account status, `features` (publish, generate, copilot access flags), private preferences, entitlement references | User may edit allowlisted preferences; server and `pnpm features` control status and features; owner reads |
 | `creatorProfiles/{uid}` | unique handle, display name, avatar, public bio | Validated owner edits; public reads |
 | `users/{uid}` (player profile) | level, XP, allocated stats, unspent points, ruleset version, display fields | Server writes; owner reads; optional public projection |
 | `stories/{storyId}` | creator ID, title, visibility, status, draft revision, published version ID, community setting | Server controls publication and settings; owner reads private metadata |

@@ -10,8 +10,10 @@ import {
   frameId,
   profileDefaults,
   tagline,
+  accountFeatures,
   type PlayerProfile,
 } from "../../packages/contracts/profile";
+import { usableFeatures } from "./access";
 import type { ZodType } from "zod";
 
 const or = <T>(schema: ZodType<T>, value: unknown, fallback: T): T => {
@@ -39,5 +41,6 @@ export function projectProfile(
     favoriteGenres: or(favoriteGenres, data.favoriteGenres, []),
     stats: data.stats as Stats,
     achievements: Array.isArray(data.achievements) ? data.achievements : [],
+    features: usableFeatures(accountFeatures(data)),
   };
 }

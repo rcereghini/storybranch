@@ -12,7 +12,7 @@ import { assetIdOf, type PublishedClip } from "../../packages/contracts/media";
 import { db, config } from "./firebase";
 import * as paths from "./paths";
 import { publishedClip } from "./uploads";
-import { publisherAllowed } from "./creator-access";
+import type { Features } from "../../packages/contracts/profile";
 import { contentOf } from "../../packages/contracts/page-library";
 
 export async function authoring(
@@ -21,12 +21,9 @@ export async function authoring(
   segments: string[],
   cursor: string | null,
   limit: number,
+  features: Features,
 ) {
-  const canPublish = publisherAllowed(
-    config.mode,
-    uid,
-    process.env.STORYBRANCH_PUBLISHER_UIDS,
-  );
+  const canPublish = features.publish;
   const collection = db.collection(paths.drafts(uid));
   const storyId = segments[2];
   if (request.method === "GET" && segments.length === 2) {
@@ -35,7 +32,6 @@ export async function authoring(
     const records = await query.get();
     return {
       canPublish,
-      uid,
       items: records.docs.map((d) => ({
         id: d.id,
         title: d.data().story.title,

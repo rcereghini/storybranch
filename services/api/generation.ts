@@ -11,18 +11,14 @@ import { db, bucket } from "./firebase";
 import * as paths from "./paths";
 import { assetView } from "./uploads";
 import { sniffAsset } from "./video-check";
+import type { Features } from "../../packages/contracts/profile";
 
 const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
-function access(uid: string) {
+function access(features: Features) {
   if (!process.env.FAL_KEY)
     return "AI generation is not connected yet. You can upload frames and edit videos now.";
-  if (
-    !(process.env.STORYBRANCH_GENERATOR_UIDS ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .includes(uid)
-  )
+  if (!features.generate)
     return "AI generation is not enabled for this account.";
   return null;
 }
@@ -185,13 +181,14 @@ export async function generation(
   request: Request,
   uid: string,
   segments: string[],
+  features: Features,
 ) {
   if (request.method === "GET" && segments.length === 2) {
     const records = await db
       .collection("generationJobs")
       .where("ownerUid", "==", uid)
       .get();
-    const reason = access(uid);
+    const reason = access(features);
     return {
       enabled: !reason,
       reason,
@@ -202,7 +199,7 @@ export async function generation(
     };
   }
   if (request.method === "POST" && segments.length === 2) {
-    const reason = access(uid);
+    const reason = access(features);
     if (reason) throw new GameError("FORBIDDEN", reason);
     const raw = await request.text();
     if (raw.length > 4096)

@@ -72,17 +72,11 @@ function App() {
     [studioDirty, setStudioDirty] = useState(false),
     [loadedKey, setLoadedKey] = useState<string | null>(null),
     [copilotOpen, setCopilotOpen] = useState(false),
-    [copilotEnabled, setCopilotEnabled] = useState(false),
     [profile, setProfile] = useState<PlayerProfile | null>(null);
   // Identifies what the latest refresh() must load: this page for this user.
   const loadKey = `${path}|${user?.uid ?? ""}`;
-  useEffect(() => {
-    setCopilotEnabled(false);
-    if (!user) return;
-    api<{ enabled: boolean }>("/copilot")
-      .then((r) => setCopilotEnabled(r.enabled))
-      .catch(() => {});
-  }, [user]);
+  // Offered only to accounts with the flag, on a deployment with the key.
+  const copilotEnabled = !!user && !!profile?.features?.copilot;
   const navigate = (p: string) => {
     if (
       p !== path &&

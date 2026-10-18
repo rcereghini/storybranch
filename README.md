@@ -10,7 +10,7 @@ The player now uses a landscape overlay on larger screens and an authored portra
 
 Signed-in players land on their **Dashboard**: profile with display name and avatar, shared stats, progress across stories, endings found and where they left off. The catalogue lives under **Discover** (`/discover`). See [Player dashboard and profile](docs/18-player-dashboard.md).
 
-**Create** opens the new Creator Studio: private drafts, all six page types, a personality-quiz template, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Video pages can use sample clips or uploaded MP4/WebM clips stored in Firebase Storage. Hosted publishing requires server-only `STORYBRANCH_PUBLISHER_UIDS`; emulator accounts can publish immediately.
+**Create** opens the new Creator Studio: private drafts, all six page types, a personality-quiz template, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Video pages can use sample clips or uploaded MP4/WebM clips stored in Firebase Storage. Hosted publishing needs the account's `publish` feature (`pnpm features grant <email> publish`, see [Account access](docs/15-shared-firebase-setup.md#account-access)); emulator accounts can publish immediately.
 
 The player now supports six explicit page types and three additional stories: **The Clockwork Door**, **The Storm Signal** and the personality quiz **What Kind of Explorer Are You?**. See [Story and Page model](docs/16-story-pages.md). Reseed to publish the new `pages-v1` editions. Pre-page prototype saves require a new journey; accounts are unchanged.
 
@@ -102,7 +102,7 @@ Read [Product requirements](docs/01-product-requirements.md), [Game and communit
 | [Phone playback preview](docs/14-phone-playback-preview.md) | Private HTTPS tunnel for testing on a real phone |
 | [Shared Firebase setup](docs/15-shared-firebase-setup.md) | Live Firebase project, credentials and Vercel hosting |
 | [Story and Page model](docs/16-story-pages.md) | Current page-type contract; read before changing stories, pages or routing |
-| [Creator Studio](docs/17-creator-studio.md) | Drafts, preview, publishing and the publisher allowlist |
+| [Creator Studio](docs/17-creator-studio.md) | Drafts, preview, publishing and publishing access |
 | [Player dashboard](docs/18-player-dashboard.md) | Dashboard home, profile customization and progress summary |
 
 ## How to use these documents

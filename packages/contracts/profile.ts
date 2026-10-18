@@ -98,6 +98,26 @@ export const profileUpdateSchema = z
   .strict();
 export type ProfileUpdate = z.infer<typeof profileUpdateSchema>;
 
+// Per-account access to gated features, stored on the profile as
+// users/{uid}.features. Only the server and scripts/features.ts write it;
+// a missing flag means no access.
+export const featureIds = ["publish", "generate", "copilot"] as const;
+export const featureId = z.enum(featureIds);
+export type FeatureId = z.infer<typeof featureId>;
+export type Features = Record<FeatureId, boolean>;
+export const accountFeatures = (data: { features?: unknown } | undefined) => {
+  const stored =
+    data?.features && typeof data.features === "object"
+      ? (data.features as Record<string, unknown>)
+      : {};
+  return Object.fromEntries(
+    featureIds.map((feature) => [feature, stored[feature] === true]),
+  ) as Features;
+};
+export const allFeatures = Object.fromEntries(
+  featureIds.map((feature) => [feature, true]),
+) as Features;
+
 // What the signed-in player sees about themselves; never another player.
 export type PlayerProfile = {
   id: string;
@@ -112,6 +132,9 @@ export type PlayerProfile = {
   favoriteGenres: GenreId[];
   stats: Stats;
   achievements: string[];
+  // What this account can use right now: its flags, limited to services
+  // this deployment has configured.
+  features: Features;
 };
 export const profileDefaults = {
   avatarId: defaultAvatarId,

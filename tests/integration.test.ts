@@ -15,14 +15,17 @@ import { handle } from "../services/api/handler";
 import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
 import { ensurePlayerProfile } from "../services/api/player-profile";
 import type { Save } from "../packages/contracts/index";
+import type { FeatureId } from "../packages/contracts/profile";
 import { pageStories } from "../fixtures/page-stories";
 import { migrateLayout, OLD_ROOT } from "../scripts/migrate-layout";
 import { contentOf, placePage } from "../packages/contracts/page-library";
 let tokens: Record<string, string> = {};
 let rules: RulesTestEnvironment;
+// Seeded accounts start with every feature; tests switch one off and back.
+const setFeature = (uid: string, feature: FeatureId, on: boolean) =>
+  db.doc(`users/${uid}`).update({ [`features.${feature}`]: on });
 it("gates paid generation, preserves request receipts, and protects job ownership", async () => {
-  const originalKey = process.env.FAL_KEY,
-    originalAllow = process.env.STORYBRANCH_GENERATOR_UIDS;
+  const originalKey = process.env.FAL_KEY;
   const realFetch = globalThis.fetch;
   let submissions = 0;
   let succeed = false;
@@ -66,8 +69,10 @@ it("gates paid generation, preserves request receipts, and protects job ownershi
     };
     expect((await call("/generation", command)).status).toBe(403);
     process.env.FAL_KEY = "test-key-not-real";
-    process.env.STORYBRANCH_GENERATOR_UIDS = "player";
+    // Generation follows the account's flag, not just the key.
+    await setFeature("progressed", "generate", false);
     expect((await call("/generation", command, "progressed")).status).toBe(403);
+    expect((await call("/generation", undefined, "progressed")).data.enabled).toBe(false);
     expect(
       (await call("/generation", { ...command, referenceId: "not-owned" }))
         .status,
@@ -110,9 +115,7 @@ it("gates paid generation, preserves request receipts, and protects job ownershi
     spy.mockRestore();
     if (originalKey === undefined) delete process.env.FAL_KEY;
     else process.env.FAL_KEY = originalKey;
-    if (originalAllow === undefined)
-      delete process.env.STORYBRANCH_GENERATOR_UIDS;
-    else process.env.STORYBRANCH_GENERATOR_UIDS = originalAllow;
+    await setFeature("progressed", "generate", true);
   }
 });
 it("pins reusable page revisions, protects sharing, and rejects forged library content", async () => {
@@ -1173,9 +1176,13 @@ it("answers through Copilot with the user's own data, retries safely and enforce
   try {
     delete process.env.ANTHROPIC_API_KEY;
     expect((await post(command("Hi"))).status).toBe(403);
-    expect((await call("/copilot")).data).toEqual({ enabled: false });
+    expect((await call("/profile")).data.features.copilot).toBe(false);
     process.env.ANTHROPIC_API_KEY = "test-key";
-    expect((await call("/copilot")).data).toEqual({ enabled: true });
+    expect((await call("/profile")).data.features.copilot).toBe(true);
+    await setFeature("player", "copilot", false);
+    expect((await post(command("Hi"))).status).toBe(403);
+    expect((await call("/profile")).data.features.copilot).toBe(false);
+    await setFeature("player", "copilot", true);
 
     // A tool round: open Studio, list drafts, try a play route, then reply.
     script = [
@@ -1274,8 +1281,73 @@ it("answers through Copilot with the user's own data, retries safely and enforce
     ).toMatch(/Daily Copilot limit/);
     await quota.delete();
   } finally {
+    await setFeature("player", "copilot", true);
     setCopilotModel(null);
     if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = originalKey;
+  }
+});
+
+it("gates publishing, uploads and page sharing on the account's publish flag", async () => {
+  try {
+    await setFeature("progressed", "publish", false);
+    expect(
+      (await call("/profile", undefined, "progressed")).data.features.publish,
+    ).toBe(false);
+    // Studio still saves drafts; publishing is refused.
+    expect((await call("/studio", undefined, "progressed")).data.canPublish).toBe(false);
+    expect(
+      (await draftAndPublish(`gate-${randomUUID()}`, "/media/harbor-landscape-audio-v1.mp4", "progressed"))
+        .status,
+    ).toBe(403);
+    const uploads = await call("/uploads", undefined, "progressed");
+    expect(uploads.data.enabled).toBe(false);
+    expect(
+      (
+        await call(
+          "/uploads",
+          {
+            idempotencyKey: randomUUID(),
+            fileName: "clip.mp4",
+            contentType: "video/mp4",
+            bytes: 1000,
+            durationSeconds: 5,
+          },
+          "progressed",
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await call(
+          `/pages/${randomUUID()}/share`,
+          { idempotencyKey: randomUUID(), revision: 1 },
+          "progressed",
+        )
+      ).status,
+    ).toBe(403);
+    // A player cannot grant themselves a feature through the profile API.
+    const before = await call("/profile", undefined, "progressed");
+    expect(
+      (
+        await call(
+          "/profile",
+          {
+            displayName: before.data.displayName,
+            avatarId: before.data.avatarId,
+            features: { publish: true },
+          },
+          "progressed",
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (await db.doc("users/progressed").get()).data()!.features.publish,
+    ).toBe(false);
+    // Turning the flag on takes effect on the next request, with no redeploy.
+    await setFeature("progressed", "publish", true);
+    expect((await call("/studio", undefined, "progressed")).data.canPublish).toBe(true);
+  } finally {
+    await setFeature("progressed", "publish", true);
   }
 });

@@ -14,7 +14,7 @@ import {
 import type { DraftRecord } from "../../packages/contracts/authoring";
 import type { Save } from "../../packages/contracts/index";
 import { db, config } from "./firebase";
-import { publisherAllowed } from "./creator-access";
+import type { Features } from "../../packages/contracts/profile";
 import * as paths from "./paths";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
@@ -57,11 +57,9 @@ export const setCopilotModel = (fake: CopilotModel | null) => {
 
 const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
-function access(uid: string) {
+function access(features: Features) {
   if (!process.env.ANTHROPIC_API_KEY) return "Copilot is not connected yet.";
-  if (
-    !publisherAllowed(config.mode, uid, process.env.STORYBRANCH_COPILOT_UIDS)
-  )
+  if (!features.copilot)
     return "Copilot is not enabled for this account yet.";
   return null;
 }
@@ -313,14 +311,9 @@ export async function copilot(
   request: Request,
   uid: string,
   segments: string[],
+  features: Features,
 ): Promise<Response> {
-  const reason = access(uid);
-  // Whether to offer Copilot to this account at all.
-  if (request.method === "GET" && segments.length === 2)
-    return Response.json(
-      { enabled: !reason },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+  const reason = access(features);
   const threadId = segments[3];
   if (segments[2] !== "threads" || !threadId || segments.length !== 4)
     throw new GameError("NOT_FOUND", "Route not found.");

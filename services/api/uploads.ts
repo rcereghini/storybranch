@@ -14,19 +14,17 @@ import {
 } from "../../packages/contracts/media";
 import { resolveFixtureMedia } from "../../fixtures/media";
 import { db, bucket, config } from "./firebase";
-import { publisherAllowed } from "./creator-access";
+import type { Features } from "../../packages/contracts/profile";
 import { downloadUrl, sniffAsset } from "./video-check";
 
 // A clip's record is users/{uid}/clips/{assetId} and its file sits at the
 // same path in Storage. The browser uploads straight to Storage; Storage rules
 // accept only a pending clip this API created for the same user, with the
 // declared size and type (firebase/storage.rules).
-function access(uid: string) {
+function access(features: Features) {
   if (!config.storageHost && config.mode === "emulator")
     return "Clip uploads are not available in this preview.";
-  if (
-    !publisherAllowed(config.mode, uid, process.env.STORYBRANCH_PUBLISHER_UIDS)
-  )
+  if (!features.publish)
     return "Clip uploads are limited to approved creators during this alpha.";
   return null;
 }
@@ -91,8 +89,9 @@ export async function uploads(
   request: Request,
   uid: string,
   segments: string[],
+  features: Features,
 ) {
-  const reason = access(uid);
+  const reason = access(features);
   if (request.method === "GET" && segments.length === 2) {
     const records = await db
       .collection(paths.clips(uid))

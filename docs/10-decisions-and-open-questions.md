@@ -1,6 +1,6 @@
 # Storybranch decisions and open questions
 
-Creator alpha implementation assumptions (October 14, 2026): private drafts are available to active accounts; hosted publication requires a server-side Firebase UID allowlist; publication is public and atomic for a bounded graph of up to 80 pages. The first editor uses shipped sample clips and a disposable client preview. Uploads, moderation and community branch authoring are not enabled by this slice. These are prototype defaults, not settled public-launch policy. See [Creator Studio](17-creator-studio.md).
+Creator alpha implementation assumptions (October 14, 2026): private drafts are available to active accounts; hosted publication requires the account's `publish` feature flag (a server-side UID allowlist until October 18, 2026); publication is public and atomic for a bounded graph of up to 80 pages. The first editor uses shipped sample clips and a disposable client preview. Uploads, moderation and community branch authoring are not enabled by this slice. These are prototype defaults, not settled public-launch policy. See [Creator Studio](17-creator-studio.md).
 
 This register distinguishes the user's requirements from proposed defaults. A proposed default can guide a reversible prototype. It must not become an undisclosed paid-service or content-permission promise.
 

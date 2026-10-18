@@ -42,7 +42,7 @@ The project's default bucket `storybranch-f77a3.firebasestorage.app` exists and 
 pnpm exec firebase deploy --only storage --project storybranch-f77a3
 ```
 
-A clip's file is `users/{uid}/clips/{clipId}`; the rules read the clip record at the same Firestore path to authorize each upload. The first deploy asks to let Storage rules read Firestore; accept it. No CORS configuration is needed: the Storage SDK and `<video>` playback work without it. Uploading is limited to `STORYBRANCH_PUBLISHER_UIDS`. Locally the Storage emulator runs on port 9299 with the other emulators.
+A clip's file is `users/{uid}/clips/{clipId}`; the rules read the clip record at the same Firestore path to authorize each upload. The first deploy asks to let Storage rules read Firestore; accept it. No CORS configuration is needed: the Storage SDK and `<video>` playback work without it. Uploading needs the account's `publish` feature (see Account access below). Locally the Storage emulator runs on port 9299 with the other emulators.
 
 ## Data layout
 
@@ -70,11 +70,25 @@ A published edition records the Storage file and download token of each uploaded
 
 Until October 2026 the live project kept everything under `storybranch/app/...` (with `playerProfiles`, top-level `playthroughs`, `creatorDrafts/{uid}/stories` and `commandReceipts`). `pnpm migrate:layout` copies that into the layout above using the local server credential: run it without flags for a dry run, then with `--apply`. It only creates records or moves a save forward to a higher revision, never overwrites newer data and never deletes. It refuses to write if any record has no place in the new layout. Run it once before deploying the new code and once right after, to pick up anything written in between. Delete `storybranch/app` only after checking the live site, and keep it for a while first.
 
+## Account access
+
+Publishing, uploads and page sharing, AI generation, and Copilot are each turned on per account by a flag on the profile: `users/{uid}.features` with `publish`, `generate` and `copilot`. A missing flag means no access. The API reads the profile on every request anyway, so a change applies on the account's next request with no redeploy. Players can read their own profile but cannot change these flags: the profile API accepts only presentation fields and Firestore rules deny client writes.
+
+Manage flags with the local server credential:
+
+```sh
+pnpm features list                                  # every profile and its features
+pnpm features grant someone@example.com publish copilot
+pnpm features revoke someone@example.com generate
+```
+
+The account must have signed in once (that creates its profile). `generate` and `copilot` also need `FAL_KEY` and `ANTHROPIC_API_KEY` on the deployment; the app only shows a feature the account can actually use. Emulator accounts, seeded or created locally, get every feature; `STORYBRANCH_MODE=emulator pnpm features ...` changes them. These flags are an alpha access policy, not a finished moderation, verification or billing system; paid plans would add entitlements alongside them.
+
 ## Vercel
 
 `vercel.json` builds with `pnpm build:vercel`, serves `dist`, and routes every `/api/*` request to `api/index.js`. That function re-exports a Vite bundle of the same handler (`vite.api.config.ts` → `dist-api/`), because Vercel compiles TypeScript functions file by file and cannot resolve this project's extensionless ESM imports.
 
-In Project → Settings → Environment Variables, add `FIREBASE_SERVICE_ACCOUNT_JSON` (entire JSON, marked Sensitive), `STORYBRANCH_PUBLISHER_UIDS`, and `ENABLE_EXPERIMENTAL_COREPACK=1` so the install uses the pinned pnpm version. Add the `*.vercel.app` and any custom domain to Firebase Authentication → Settings → Authorized domains. Redeploy after changing variables.
+In Project → Settings → Environment Variables, add `FIREBASE_SERVICE_ACCOUNT_JSON` (entire JSON, marked Sensitive), `ENABLE_EXPERIMENTAL_COREPACK=1`, and optionally `FAL_KEY` (AI generation) and `ANTHROPIC_API_KEY` (Copilot), so the install uses the pinned pnpm version. Add the `*.vercel.app` and any custom domain to Firebase Authentication → Settings → Authorized domains. Redeploy after changing variables.
 
 The default server mode is `firebase`; an explicit `STORYBRANCH_MODE=firebase` is also supported. Keep emulator overrides (`STORYBRANCH_MODE=emulator`, `FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`, `STORYBRANCH_PHONE_PREVIEW`, `VITE_PHONE_PREVIEW`, `VITE_STORYBRANCH_MODE=emulator`) out of the production deployment. After credentials and seed are in place, `/api/catalogue` should return HTTP 200 with Glass Harbor; sign in, begin a journey, choose a route, reload and check the saved scene.
 

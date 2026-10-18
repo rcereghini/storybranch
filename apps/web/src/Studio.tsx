@@ -173,7 +173,6 @@ type Listing = {
   }[];
   nextCursor: string | null;
   canPublish: boolean;
-  uid: string;
 };
 
 export function Studio({
@@ -504,8 +503,9 @@ export function Studio({
       )}
       {listing && !listing.canPublish && (
         <p>
-          Publishing is invite-only during alpha. Your publisher ID:{" "}
-          <code>{listing.uid}</code>. Drafts and previews are available.
+          Publishing is invite-only during alpha. Drafts and previews are
+          available; ask the Storybranch team to turn on publishing for your
+          account.
         </p>
       )}
       <div className="studio-layout">

@@ -13,6 +13,10 @@ import {
 } from "../../packages/contracts/index";
 import { isResultPage, start, transition } from "../../packages/domain/index";
 import { ensurePlayerProfile } from "./player-profile";
+import {
+  accountFeatures,
+  allFeatures,
+} from "../../packages/contracts/profile";
 import { authoring } from "./authoring";
 import { pageMedia, pageImage, uploads } from "./uploads";
 import { pageLibrary, sharedPage } from "./page-library";
@@ -100,7 +104,11 @@ export async function handle(request: Request): Promise<Response> {
       );
     }
     const profileRef = db.doc(paths.user(uid));
-    await ensurePlayerProfile(db, uid);
+    await ensurePlayerProfile(
+      db,
+      uid,
+      config.mode === "emulator" ? allFeatures : undefined,
+    );
     const profile = await profileRef.get();
     if (!profile.exists || profile.data()!.status !== "active")
       throw new GameError(
@@ -109,17 +117,23 @@ export async function handle(request: Request): Promise<Response> {
           ? "This account is not enabled for the local prototype. Use a seeded account."
           : "This account is not enabled for Storybranch.",
       );
+    // Gated features read the account's flags from the profile just loaded.
+    const features = accountFeatures(profile.data());
     if (segments[1] === "studio")
-      return json(await authoring(request, uid, segments, cursor, limit));
+      return json(
+        await authoring(request, uid, segments, cursor, limit, features),
+      );
     if (segments[1] === "uploads")
-      return json(await uploads(request, uid, segments));
+      return json(await uploads(request, uid, segments, features));
     if (segments[1] === "generation")
-      return json(await generation(request, uid, segments));
+      return json(await generation(request, uid, segments, features));
     // Streams its reply, so it builds its own response.
     if (segments[1] === "copilot")
-      return await copilot(request, uid, segments);
+      return await copilot(request, uid, segments, features);
     if (segments[1] === "pages")
-      return json(await pageLibrary(request, uid, segments, cursor, limit));
+      return json(
+        await pageLibrary(request, uid, segments, cursor, limit, features),
+      );
     if (segments[1] === "profile" || segments[1] === "dashboard")
       return json(
         await profileRoutes(request, uid, segments, profile.data()!, tokenName),

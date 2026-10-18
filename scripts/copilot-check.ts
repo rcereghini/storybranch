@@ -11,9 +11,16 @@ try {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const sent: Array<{ text: string; context: { path: string } }> = [];
-  await page.route("**/api/copilot", (route) =>
-    route.fulfill({ json: { enabled: true } }),
-  );
+  // CI has no Anthropic key, so the real profile reports Copilot as
+  // unusable; switch it on in the response to exercise the drawer.
+  await page.route("**/api/profile", async (route) => {
+    const response = await route.fetch();
+    const profile = await response.json();
+    await route.fulfill({
+      response,
+      json: { ...profile, features: { ...profile.features, copilot: true } },
+    });
+  });
   await page.route("**/api/copilot/threads/*", async (route) => {
     if (route.request().method() === "GET")
       return route.fulfill({

@@ -24,9 +24,9 @@ Supported types are Text, Text with Options, Video, Video with Options, Dice and
 
 ## Local and hosted publishing
 
-The existing emulator setup works without new services: `pnpm emulators`, `pnpm seed`, `pnpm dev:emulator`. Active emulator accounts can create and publish. Hosted/shared-Firebase accounts can create private drafts and preview; public publishing is restricted to an explicit creator allowlist during this alpha.
+The existing emulator setup works without new services: `pnpm emulators`, `pnpm seed`, `pnpm dev:emulator`. Active emulator accounts can create and publish. Hosted/shared-Firebase accounts can create private drafts and preview; public publishing is limited to accounts with the `publish` feature during this alpha.
 
-Set server-only `STORYBRANCH_PUBLISHER_UIDS` to a comma-separated list of Firebase Authentication user IDs. Studio displays the signed-in user's publisher ID when publishing is unavailable. For local shared Firebase, put the variable in ignored `.env.local` and restart `pnpm dev`. On Vercel set it for Production and Preview. Redeploy after changing it. Do not use an email address or a `VITE_` variable. Firebase web configuration is unchanged. This is a prototype access policy, not a finished moderation or creator-verification system.
+Publishing needs the account's `publish` feature: `pnpm features grant <email> publish` (see Account access in `15-shared-firebase-setup.md`). It applies on the next request, with no redeploy. When publishing is unavailable, Studio says so and keeps drafts and previews available. This is a prototype access policy, not a finished moderation or creator-verification system.
 
 ## Clip uploads
 
@@ -45,7 +45,7 @@ On a Video page, **Upload a clip** accepts an MP4 or WebM file of up to 100 MB a
 
 Pages store an uploaded clip as `video: "asset:<assetId>"`. Publishing rejects a clip that is missing, not ready, or not among the publisher's own clips, marks used clips `published`, and records each clip's Storage file and token in the edition so playback never reads the creator's clip records. Players get `media.landscape.src` as the Storage download URL. Uploaded clips have no portrait rendition, poster, captions or social teaser, so the player contains the one rendition at every width and shows no captions track.
 
-Hosted uploads use the same allowlist as publishing (`STORYBRANCH_PUBLISHER_UIDS`); emulator accounts can upload immediately. Each account can keep 50 clips. The length comes from the browser and is informational: the server checks size, type and file signature, not duration or whether the video decodes. There is no transcoding, thumbnail, moderation, deletion or storage quota beyond those limits. The phone preview has no Storage emulator and shows uploads as unavailable.
+Hosted uploads use the same `publish` feature as publishing; emulator accounts can upload immediately. Each account can keep 50 clips. The length comes from the browser and is informational: the server checks size, type and file signature, not duration or whether the video decodes. There is no transcoding, thumbnail, moderation, deletion or storage quota beyond those limits. The phone preview has no Storage emulator and shows uploads as unavailable.
 
 ## Contracts and persistence
 
@@ -56,7 +56,7 @@ All endpoints require a verified active Firebase user:
 | `GET /api/studio?cursor=...&limit=20` | Own draft summaries, opaque document-ID cursor, publishing capability and own UID. Limit 1–50. |
 | `GET /api/studio/{storyId}` | Own private draft and its saved revision. Other users cannot read it. |
 | `POST /api/studio/{storyId}` | Save `{idempotencyKey, expectedRevision, draft: {story, description}}`. Revision 0 creates; later revisions use optimistic concurrency. |
-| `POST /api/studio/{storyId}/publish` | Publish `{idempotencyKey, expectedRevision, policyVersion: "creator-alpha-1"}`. Requires creator allowlist in Firebase mode. |
+| `POST /api/studio/{storyId}/publish` | Publish `{idempotencyKey, expectedRevision, policyVersion: "creator-alpha-1"}`. Requires the account's `publish` feature. |
 
 Drafts live at `users/{uid}/drafts/{storyId}`. A first save reserves story ownership at `stories/{storyId}`. IDs of existing sample stories cannot be claimed. API authorization derives identity from the token; direct Firestore draft access and writes remain denied by default.
 
@@ -72,7 +72,7 @@ Loading and notifications overlay content. Reload/closing the browser warns abou
 
 Assets links to **Generate video** and **Edit video**. Generation starts with a scene prompt, then an ordered timeline of two to six uploaded or generated keyframes. Creators can generate an initial image from text, use an owned image as a reference for another image, and adapt suggested shot directions. These directions are editable templates, not claims of AI scene analysis. Each neighboring pair generates a silent 480p Wan shot (81 frames at 16 fps). The browser joins completed shots; individual shots remain independently reusable. Prompt and frame selection drafts persist locally, scoped to the signed-in UID. Jobs persist on the server; after interruption, check them in Recent generations and select completed shots in order to join them.
 
-The server integrates fal's `flux/schnell`, `flux/dev/image-to-image`, and `wan-flf2v` queue endpoints. Configure server-only `FAL_KEY` and explicit comma-separated `STORYBRANCH_GENERATOR_UIDS` in `.env.local` or the hosting environment, then restart the server. Both are required, including for emulator mode. Never use `VITE_` for the key. A local developer can allow the seeded `player` UID. No key is included in the repository. The UI explains when generation is unavailable and links to provider pricing; estimates are not invented. Start with short 480p previews and approved frames before requesting video. No paid requests were made during implementation.
+The server integrates fal's `flux/schnell`, `flux/dev/image-to-image`, and `wan-flf2v` queue endpoints. Configure server-only `FAL_KEY` in `.env.local` or the hosting environment, then restart the server, and grant the account's `generate` feature (`pnpm features grant <email> generate`; emulator accounts already have it). Never use `VITE_` for the key. No key is included in the repository. The UI explains when generation is unavailable and links to provider pricing; estimates are not invented. Start with short 480p previews and approved frames before requesting video. No paid requests were made during implementation.
 
 `POST /api/generation` accepts a strict image/video command with a prompt, owned reference asset IDs, and an idempotency key. The server validates ready image ownership, uses fixed model settings with safety checking, and sends image bytes to fal (including with local Storage). A durable receipt is reserved before provider submission. An ambiguous submission is marked uncertain and never automatically resubmitted; inspect fal's dashboard. Each creator is limited to 20 submitted image/video requests per UTC day, and full libraries reject new submissions. `GET /api/generation` returns only the creator's recent jobs. `POST /api/generation/{jobId}` checks a saved job and imports completed media once under a deterministic asset ID, using an import lease. Media imports allow only HTTPS fal CDN hosts, reject redirects, bound file sizes, inspect signatures, and remain private. Provider credentials and arbitrary model/source URLs are never accepted from the browser. A worker/webhook and reconciliation of ambiguous submissions are not yet implemented; completion import is driven by the browser's status checks. The library size check remains a soft cap under concurrency, like ordinary uploads.
 

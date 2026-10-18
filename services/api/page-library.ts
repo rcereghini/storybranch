@@ -7,7 +7,7 @@ import {
 } from "../../packages/contracts/page-library";
 import { assetIdOf, type PublishedClip } from "../../packages/contracts/media";
 import { db, config } from "./firebase";
-import { publisherAllowed } from "./creator-access";
+import type { Features } from "../../packages/contracts/profile";
 import * as paths from "./paths";
 import { pageMedia, pageImage, publishedClip } from "./uploads";
 import { resolveFixtureMedia } from "../../fixtures/media";
@@ -36,6 +36,7 @@ export async function pageLibrary(
   segments: string[],
   cursor: string | null,
   limit: number,
+  features: Features,
 ) {
   const collection = db.collection("pageLibrary");
   if (request.method === "GET" && segments.length === 2) {
@@ -58,10 +59,7 @@ export async function pageLibrary(
   )
     throw new GameError("NOT_FOUND", "Route not found.");
   const sharing = segments[3] === "share";
-  if (
-    sharing &&
-    !publisherAllowed(config.mode, uid, process.env.STORYBRANCH_PUBLISHER_UIDS)
-  )
+  if (sharing && !features.publish)
     throw new GameError(
       "FORBIDDEN",
       "Sharing pages is limited to approved creators during alpha.",
