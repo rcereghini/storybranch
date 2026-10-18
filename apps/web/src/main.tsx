@@ -19,7 +19,12 @@ import { Dashboard } from "./Dashboard";
 import { Discover, type CatalogueEntry } from "./Discover";
 import { Adventures } from "./Adventures";
 import { Avatar } from "./avatars";
-import { accents } from "./theme";
+import { AccountMenu } from "./AccountMenu";
+import { Icon, Logo, type IconName } from "./icons";
+import "@fontsource-variable/figtree";
+import "@fontsource-variable/bricolage-grotesque";
+import "@fontsource-variable/fraunces";
+import "./shell.css";
 import { Copilot } from "./Copilot";
 import { Admin } from "./Admin";
 import { copilotAvailable } from "../../../packages/contracts/copilot";
@@ -79,6 +84,18 @@ function App() {
   // Offered only to accounts with the flag, on a deployment with the key.
   const copilotEnabled = !!user && !!profile?.features?.copilot;
   const isAdmin = !!user && !!profile?.features?.admin;
+  const immersive = path.startsWith("/play/") || path.startsWith("/p/");
+  // Main sections: the desktop header nav and the phone tab bar.
+  const tabs: Array<[string, string, IconName]> = user
+    ? [
+        ["/", "Home", "home"],
+        ["/discover", "Discover", "discover"],
+        ["/adventures", "Adventures", "adventures"],
+        ["/studio", "Create", "create"],
+      ]
+    : [["/", "Discover", "discover"]];
+  const current = (to: string) =>
+    to === "/" ? path === "/" : path === to || path.startsWith(`${to}/`);
   const navigate = (p: string) => {
     if (
       p !== path &&
@@ -232,12 +249,6 @@ function App() {
     setPending(null);
     if (!path.startsWith("/play/") || user) void refresh();
   }, [path, user]);
-  // The chosen accent themes the shell; the story player keeps its own colors.
-  useEffect(() => {
-    const root = document.documentElement.style;
-    if (profile) root.setProperty("--accent", accents[profile.accent].color);
-    else root.removeProperty("--accent");
-  }, [profile?.accent]);
   // The header shows the player's chosen name and avatar on every page.
   useEffect(() => {
     setProfile(null);
@@ -331,124 +342,83 @@ function App() {
   );
   return (
     <>
-      <header
-        className={
-          path.startsWith("/play/") || path.startsWith("/p/")
-            ? "immersive-header"
-            : undefined
-        }
-      >
-        <a
-          className="brand"
-          href="/"
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("/");
-          }}
-        >
-          <span className="brand-mark">⌘</span> storybranch
-          <span className="alpha">LOCAL ALPHA</span>
-        </a>
-        {(path.startsWith("/play/") || path.startsWith("/p/")) && (
-          <button className="player-exit" onClick={() => navigate("/discover")}>
-            Discover
-          </button>
-        )}
-        <nav aria-label="Main">
-          {user && (
+      <header className={immersive ? "app-header immersive-header" : "app-header"}>
+        <div className="app-header-inner">
+          <a
+            className="brand"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate("/");
+            }}
+          >
+            <Logo /> storybranch
+          </a>
+          {immersive ? (
             <button
-              className={path === "/" ? "nav-active" : ""}
-              onClick={() => navigate("/")}
+              className="header-button player-exit"
+              onClick={() => navigate("/discover")}
             >
-              Dashboard
+              Discover
             </button>
+          ) : (
+            <nav aria-label="Main" className="main-nav">
+              {tabs.map(([to, label]) => (
+                <button
+                  key={to}
+                  aria-current={current(to) ? "page" : undefined}
+                  onClick={() => navigate(to)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
           )}
-          <button
-            className={
-              path === "/discover" || (!user && path === "/")
-                ? "nav-active"
-                : ""
-            }
-            onClick={() => navigate(user ? "/discover" : "/")}
-          >
-            Discover
-          </button>
-          <button
-            className={path === "/adventures" ? "nav-active" : ""}
-            onClick={() => navigate("/adventures")}
-          >
-            My adventures
-          </button>
-          <button
-            className={path === "/studio" ? "nav-active" : ""}
-            onClick={() => navigate("/studio")}
-          >
-            Create
-          </button>
-          <button
-            className={path === "/assets" || path.startsWith("/assets/") ? "nav-active" : ""}
-            onClick={() => navigate("/assets")}
-          >
-            Assets
-          </button>
-          {isAdmin && (
-            <button
-              className={path === "/admin" ? "nav-active" : ""}
-              onClick={() => navigate("/admin")}
-            >
-              Admin
-            </button>
-          )}
-        </nav>
-        {user ? (
-          <div className="account">
+          <div className="header-actions">
             {copilotEnabled && copilotAvailable(path) && (
               <button
-                className="copilot-toggle"
+                className="header-button"
                 aria-expanded={copilotOpen}
                 aria-label="Copilot"
                 onClick={() => setCopilotOpen((open) => !open)}
               >
-                ✦<span className="copilot-toggle-label"> Copilot</span>
+                <Icon name="sparkle" size={18} />
+                <span className="header-button-label">Copilot</span>
               </button>
             )}
-            <button
-              className="account-chip"
-              aria-label="Open your dashboard"
-              onClick={() => navigate("/")}
-            >
-              {profile ? (
-                <Avatar
-                  id={profile.avatarId}
-                  tint={profile.avatarTint}
-                  frame={profile.avatarFrame}
-                  size={30}
-                />
-              ) : (
-                <span className="avatar">◈</span>
-              )}
-              <span className="account-name">
-                {profile?.displayName ?? user.displayName ?? "Player"}
-              </span>
-            </button>
-            <button
-              className="sign-out"
-              onClick={() => {
-                if (
-                  !studioDirty ||
-                  confirm("Sign out and discard unsaved changes?")
-                )
-                  void signOut(auth);
-              }}
-            >
-              Sign out
-            </button>
+            {user ? (
+              <AccountMenu
+                avatar={
+                  profile ? (
+                    <Avatar
+                      id={profile.avatarId}
+                      tint={profile.avatarTint}
+                      frame={profile.avatarFrame}
+                      size={34}
+                    />
+                  ) : (
+                    <Icon name="profile" />
+                  )
+                }
+                name={profile?.displayName ?? user.displayName ?? "Player"}
+                email={user.email}
+                isAdmin={isAdmin}
+                onNavigate={navigate}
+                onSignOut={() => {
+                  if (
+                    !studioDirty ||
+                    confirm("Sign out and discard unsaved changes?")
+                  )
+                    void signOut(auth);
+                }}
+              />
+            ) : (
+              <button className="sign-in-button" onClick={() => setLogin(true)}>
+                Sign in
+              </button>
+            )}
           </div>
-        ) : (
-          <button className="account sign-in" onClick={() => setLogin(true)}>
-            Sign in
-          </button>
-        )}
+        </div>
       </header>
       <main
         className={`${playing ? "playback-active" : ""} ${path.startsWith("/play/") || path.startsWith("/p/") ? "immersive-player" : ""}`}
@@ -868,11 +838,30 @@ function App() {
           />
         )}
       </main>
-      <footer>
-        <span className="brand">⌘ storybranch</span>
-        <span>Made of moments. Shaped by you.</span>
-        <span>STORYBRANCH · CREATOR ALPHA</span>
+      <footer
+        className={`app-footer ${user && !immersive ? "with-tab-bar" : ""}`}
+      >
+        <div className="app-footer-inner">
+          <span className="brand">
+            <Logo size={22} /> storybranch
+          </span>
+          <span>Made of moments. Shaped by you.</span>
+        </div>
       </footer>
+      {user && !immersive && (
+        <nav aria-label="Main" className="tab-bar">
+          {tabs.map(([to, label, icon]) => (
+            <button
+              key={to}
+              aria-current={current(to) ? "page" : undefined}
+              onClick={() => navigate(to)}
+            >
+              <Icon name={icon} size={22} />
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
       {copilotOpen && copilotEnabled && user && copilotAvailable(path) && (
         <Copilot
           key={user.uid}

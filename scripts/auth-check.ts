@@ -26,12 +26,14 @@ try {
   await dialog.getByRole("button", { name: "Create account ↗" }).click();
   await dialog.waitFor({ state: "hidden" });
   await page.reload();
-  await page.getByRole("button", { name: /Sign out/ }).waitFor();
+  await page.getByRole("button", { name: "Account menu" }).waitFor();
   await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
   await page.getByRole("button", { name: "Start a new journey" }).click();
   await page.locator("video").waitFor();
   const saveUrl = page.url();
-  await page.getByRole("button", { name: /Sign out/ }).click();
+  // Sign out lives in the account menu.
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await page
     .getByRole("button", { name: "Sign in", exact: true })
     .first()
@@ -43,7 +45,9 @@ try {
   await page.goto(saveUrl);
   await page.locator("video").waitFor();
   assert.equal(page.url(), saveUrl);
-  await page.getByRole("button", { name: /Sign out/ }).click();
+  // Sign out lives in the account menu.
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await page
     .getByRole("button", { name: "Sign in", exact: true })
     .first()

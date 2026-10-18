@@ -1,116 +1,7 @@
 /* Shell, dashboard, Discover and My adventures. The story player and Studio
    keep style.css / scene-player.css; rules here are scoped so they don't. */
-:root {
-  --surface-1: #141b1c;
-  --surface-2: #1a2324;
-  --surface-3: #233031;
-  --border: #ffffff14;
-  --border-strong: #ffffff26;
-  --accent: var(--teal);
-  --on-accent: #10201a;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --shadow: 0 18px 40px rgb(0 0 0 / 35%);
-  --font-ui:
-    "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: Georgia, "Iowan Old Style", serif;
-}
 body {
   font-family: var(--font-ui);
-  background:
-    radial-gradient(1200px 600px at 85% -10%, #a7e9cf0d, transparent 60%),
-    var(--bg);
-}
-
-/* Header */
-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  height: 72px;
-  max-width: none;
-  padding: 0 max(5%, 16px);
-  background: rgb(13 18 19 / 78%);
-  backdrop-filter: blur(14px) saturate(140%);
-  border-bottom: 1px solid var(--border);
-}
-header nav {
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-1);
-  /* Wider fonts may not fit: scroll the nav rather than the page. */
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-header nav button {
-  min-height: 36px;
-  padding: 6px 16px;
-  border: 0;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 500;
-}
-header nav button:hover:not(:disabled) {
-  background: var(--surface-2);
-  color: var(--text);
-}
-header nav .nav-active {
-  background: var(--surface-3);
-  color: var(--text);
-  border-bottom: 0;
-  border-radius: 999px;
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-header .account {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-}
-.account-chip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 4px 14px 4px 5px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-1);
-  color: var(--text);
-  font-size: 14px;
-}
-.account-name {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sign-out {
-  min-height: 40px;
-  padding: 6px 14px;
-  border: 0;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 13px;
-}
-header .sign-in {
-  min-height: 40px;
-  padding: 8px 20px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 650;
-  font-size: 14px;
-}
-header .sign-in:hover:not(:disabled) {
-  background: var(--accent);
-  filter: brightness(1.08);
 }
 
 /* Shared controls in redesigned areas */
@@ -267,28 +158,25 @@ header .sign-in:hover:not(:disabled) {
   display: block;
 }
 .story-cover.generated {
-  display: grid;
-  place-items: center;
-}
-.story-cover.generated::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    135deg,
-    transparent 0 18px,
-    rgb(255 255 255 / 3%) 18px 19px
-  );
+  display: flex;
+  align-items: flex-end;
+  padding: 18px;
 }
 .story-cover.generated span {
-  font: 400 clamp(40px, 6vw, 64px) / 1 var(--font-display);
-  opacity: 0.9;
+  max-width: 88%;
+  font: 600 clamp(20px, 2.2vw, 26px) / 1.12 var(--font-story);
+  text-wrap: balance;
 }
 .story-cover.thumb {
   width: 64px;
   flex: none;
   aspect-ratio: 1;
   border-radius: var(--radius-sm);
+}
+.story-cover.thumb.generated {
+  justify-content: center;
+  align-items: center;
+  padding: 0;
 }
 .story-cover.thumb.generated span {
   font-size: 26px;
@@ -1150,44 +1038,7 @@ header .sign-in:hover:not(:disabled) {
     grid-template-columns: 1fr;
   }
 }
-/* The header stays on one row down to 801px; drop what it can spare. */
-@media (min-width: 801px) and (max-width: 1100px) {
-  header .alpha,
-  .account-name,
-  .copilot-toggle-label {
-    display: none;
-  }
-  .account-chip {
-    padding: 4px;
-  }
-  header nav button {
-    padding: 6px 12px;
-  }
-}
 @media (max-width: 800px) {
-  header {
-    height: auto;
-    padding: 12px 16px;
-  }
-  header nav {
-    order: 3;
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  header nav button {
-    flex: 1 0 auto;
-    padding: 6px 10px;
-    font-size: 13px;
-  }
-  .account-name {
-    max-width: 110px;
-  }
-  .sign-out {
-    padding: 6px 8px;
-  }
   .hub {
     padding-top: 18px;
     gap: 18px;
@@ -1232,14 +1083,6 @@ header .sign-in:hover:not(:disabled) {
   .row-head {
     flex-wrap: wrap;
     align-items: flex-start;
-  }
-}
-@media (max-width: 380px) {
-  .account-name {
-    display: none;
-  }
-  .account-chip {
-    padding-right: 5px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

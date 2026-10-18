@@ -5,16 +5,22 @@ export const coverArt: Record<string, string> = {
   "bell-diver": "/media/bell-diver-arrival-mock-v1-landscape.svg",
   "paper-moon": "/media/paper-moon-arrival-mock-v1-landscape.svg",
 };
+// [top, bottom, ink]: deep enough that the light ink title reads on both
+// themes' cards.
 const palettes = [
-  ["#1d3b3f", "#0f1c22", "#a7e9cf"],
-  ["#2d2340", "#121019", "#c9b1e9"],
-  ["#3d2e1c", "#16110c", "#ecc597"],
-  ["#1c2d45", "#0d131d", "#9fd3f5"],
-  ["#3a1f2a", "#170d12", "#f2a7b8"],
-  ["#26351c", "#10160c", "#cfe89a"],
+  ["#2e7a8a", "#142540", "#e6f7fa"],
+  ["#5550d2", "#20185a", "#eeedff"],
+  ["#b9752e", "#3e2211", "#fff4e6"],
+  ["#3a8f68", "#283866", "#eafbf2"],
+  ["#c2566b", "#3b1530", "#ffe9ee"],
+  ["#6b7a2e", "#1f2a12", "#f4f8e4"],
 ];
+// FNV-1a: spreads similar ids across the palettes.
 const hash = (text: string) =>
-  [...text].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+  [...text].reduce(
+    (h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0,
+    2166136261,
+  );
 export const coverPalette = (storyId: string) => {
   const [top, bottom, ink] = palettes[hash(storyId) % palettes.length];
   return { top, bottom, ink };

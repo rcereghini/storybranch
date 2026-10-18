@@ -278,7 +278,9 @@ try {
   await heading("A quieter harbor");
   await click("Story log");
   await heading("Your story log");
-  await page.getByRole("button", { name: /Sign out/ }).click();
+  // Sign out lives in the account menu.
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await click("Sign in");
   await page
     .getByLabel("Email", { exact: true })

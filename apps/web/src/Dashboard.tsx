@@ -1,19 +1,19 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { createApi } from "../../../packages/api-client/index";
 import type { StatId } from "../../../packages/contracts/index";
 import type {
   DashboardSummary,
   PlayerProfile,
   ProfileUpdate,
-  StoryProgress,
 } from "../../../packages/contracts/profile";
 import { genreLabels } from "../../../packages/domain/dashboard";
 import { auth } from "./firebase";
 import { Avatar, avatars } from "./avatars";
 import { ProfileEditor, draftOf, type ProfileDraft } from "./ProfileEditor";
 import { StoryCover } from "./StoryCover";
+import { coverArt } from "./cover-palette";
 import { endingLink, shareLink } from "./share";
-import { accents } from "./theme";
+import "./dashboard.css";
 
 const api = createApi(
   fetch,
@@ -46,16 +46,14 @@ const ago = (at: number) => {
   const days = Math.round(hours / 24);
   return days < 7 ? `${days} d ago` : new Date(at).toLocaleDateString();
 };
-function goal(story: StoryProgress) {
-  const left = story.endingsTotal - story.endingsFound;
-  if (story.status === "not-started") return "Begin your first journey";
-  if (story.endingsTotal === 0)
-    return story.status === "completed" ? "Story finished" : "In progress";
-  if (left === 0) return "Every ending found";
-  return story.status === "in-progress"
-    ? `Reach an ending · ${left} still undiscovered`
-    : `Find ${left} more ending${left === 1 ? "" : "s"}`;
-}
+const greeting = () => {
+  const hour = new Date().getHours();
+  return hour < 5 || hour >= 18
+    ? "Good evening"
+    : hour < 12
+      ? "Good morning"
+      : "Good afternoon";
+};
 
 export function Dashboard({
   profile,
@@ -110,56 +108,190 @@ export function Dashboard({
   };
   // While editing, the header previews the draft.
   const view = profile ? { ...profile, ...(draft ?? {}) } : null;
-  const accent = view ? accents[view.accent].color : undefined;
   const [spotlight, ...others] = summary?.continue ?? [];
   const drafts = studio && studio !== "unavailable" ? studio.items : [];
 
+  const name = view?.displayName.trim() || "Player";
+  const progressOf = (storyId: string) =>
+    summary?.stories.find((s) => s.storyId === storyId);
+  const spotlightProgress = spotlight ? progressOf(spotlight.storyId) : undefined;
+
   return (
-    <div
-      className="hub"
-      style={accent ? ({ "--accent": accent } as CSSProperties) : undefined}
-    >
-      <section
-        className={`hub-hero banner-${view?.bannerId ?? "harbor"}`}
-        aria-labelledby="profile-name"
-      >
-        {view ? (
-          <div className="hub-hero-inner">
-            <Avatar
-              id={view.avatarId}
-              size={112}
-              tint={view.avatarTint}
-              frame={view.avatarFrame}
-              label={`${avatars[view.avatarId].label} avatar`}
-            />
-            <div className="hub-identity">
-              <p className="eyebrow">YOUR STORYBRANCH</p>
-              <h1 id="profile-name">{view.displayName.trim() || "Player"}</h1>
-              {view.tagline.trim() && <p className="tagline">{view.tagline}</p>}
-              {view.favoriteGenres.length > 0 && (
-                <ul className="chips" aria-label="Favorite genres">
-                  {view.favoriteGenres.map((g) => (
-                    <li key={g}>{genreLabels[g]}</li>
-                  ))}
-                </ul>
+    <div className="dash">
+      <section className="dash-top">
+        <div className="dash-main">
+          <div className="dash-greeting">
+            <p>{greeting()}</p>
+            <h1>Welcome back, {name}</h1>
+          </div>
+          {loadError ? (
+            <div className="notice error" role="alert">
+              {loadError} <button onClick={() => void load()}>Retry</button>
+            </div>
+          ) : !summary ? (
+            <div className="dash-card placeholder-block tall" role="status">
+              <span className="sr-only">Loading your dashboard…</span>
+            </div>
+          ) : spotlight ? (
+            <article className="dash-card dash-continue">
+              <StoryCover storyId={spotlight.storyId} title={spotlight.title} />
+              <div className="dash-continue-body">
+                <p className="dash-kicker">
+                  Continue · {spotlight.sideQuest ? "Side quest · " : ""}
+                  {spotlight.title}
+                </p>
+                <h2>{spotlight.pageTitle}</h2>
+                <p className="dash-muted">Saved {ago(spotlight.updatedAt)}</p>
+                {spotlightProgress && spotlightProgress.endingsTotal > 0 && (
+                  <div
+                    className="dash-progress"
+                    role="img"
+                    aria-label={`${spotlightProgress.endingsFound} of ${spotlightProgress.endingsTotal} endings found`}
+                  >
+                    <span className="dash-track">
+                      <span
+                        style={{
+                          width: `${Math.max(4, (spotlightProgress.endingsFound / spotlightProgress.endingsTotal) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="dash-muted">
+                      {spotlightProgress.endingsFound} of{" "}
+                      {spotlightProgress.endingsTotal} endings
+                    </span>
+                  </div>
+                )}
+                <div className="dash-actions">
+                  <button
+                    className="btn btn-primary"
+                    aria-label={`Resume ${spotlight.title}`}
+                    onClick={() => onResume(spotlight.saveId)}
+                  >
+                    Resume story
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => onNavigate("/adventures")}
+                  >
+                    All adventures
+                  </button>
+                </div>
+              </div>
+            </article>
+          ) : (
+            <article className="dash-card dash-empty">
+              <h2>Pick your first story</h2>
+              <p className="dash-muted">
+                Every choice opens a different path. Start one and it will
+                wait for you here.
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={() => onNavigate("/discover")}
+              >
+                Find a story
+              </button>
+            </article>
+          )}
+          {others.length > 0 && (
+            <ul className="dash-also" aria-label="Also in progress">
+              {others.map((entry) => (
+                <li key={entry.saveId}>
+                  <button
+                    aria-label={`Resume ${entry.title}`}
+                    onClick={() => onResume(entry.saveId)}
+                  >
+                    <StoryCover
+                      storyId={entry.storyId}
+                      title={entry.title}
+                      className="thumb"
+                    />
+                    <span>
+                      <strong>{entry.pageTitle}</strong>
+                      <small>
+                        {entry.sideQuest ? "Side quest · " : ""}
+                        {entry.title} · {ago(entry.updatedAt)}
+                      </small>
+                    </span>
+                    <span className="dash-also-go">Resume</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <aside className="dash-card dash-profile" aria-labelledby="profile-name">
+          <div className={`dash-banner banner-${view?.bannerId ?? "harbor"}`} />
+          {view ? (
+            <div className="dash-identity">
+              <Avatar
+                id={view.avatarId}
+                size={72}
+                tint={view.avatarTint}
+                frame={view.avatarFrame}
+                label={`${avatars[view.avatarId].label} avatar`}
+              />
+              <div className="dash-identity-text">
+                <h2 id="profile-name">{name}</h2>
+                {view.tagline.trim() && <p>{view.tagline}</p>}
+              </div>
+              {!draft && (
+                <button
+                  className="btn btn-secondary btn-small"
+                  onClick={() => setDraft(draftOf(profile!))}
+                >
+                  Edit profile
+                </button>
               )}
             </div>
-            {!draft && (
-              <button
-                className="glass"
-                onClick={() => setDraft(draftOf(profile!))}
-              >
-                Customize profile
-              </button>
-            )}
-            {view.bio.trim() && <p className="bio">{view.bio}</p>}
-          </div>
-        ) : (
-          <div
-            className="hub-hero-inner placeholder-block"
-            aria-hidden="true"
-          />
-        )}
+          ) : (
+            <div className="placeholder-block short" aria-hidden="true" />
+          )}
+          {view && view.favoriteGenres.length > 0 && (
+            <ul className="dash-chips" aria-label="Favorite genres">
+              {view.favoriteGenres.map((g) => (
+                <li key={g}>{genreLabels[g]}</li>
+              ))}
+            </ul>
+          )}
+          {view?.bio.trim() && <p className="dash-bio">{view.bio}</p>}
+          {summary && (
+            <ul className="dash-stats" aria-label="Your progress">
+              {(
+                [
+                  ["Stories started", summary.totals.started],
+                  ["Endings found", summary.totals.endingsFound],
+                  ["Side quests", summary.totals.sideQuests],
+                ] as const
+              ).map(([label, value]) => (
+                <li key={label}>
+                  <b>{value}</b>
+                  <span>{label}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {profile && (
+            <dl className="dash-meters" aria-label="Shared stats">
+              {(Object.keys(statLabels) as StatId[]).map((stat) => (
+                <div key={stat}>
+                  <dt>{statLabels[stat]}</dt>
+                  <dd>
+                    <span className="dash-track">
+                      <span
+                        style={{
+                          width: `${Math.min(100, (profile.stats[stat] / STAT_SCALE) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    <b>{profile.stats[stat]}</b>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </aside>
       </section>
 
       {draft && (
@@ -171,354 +303,133 @@ export function Dashboard({
         />
       )}
 
-      {loadError ? (
-        <div className="notice error" role="alert">
-          {loadError} <button onClick={() => void load()}>Retry</button>
-        </div>
-      ) : !summary ? (
-        <div className="hub-grid" role="status">
-          <span className="sr-only">Loading your dashboard…</span>
-          <div
-            className="panel span-8 placeholder-block tall"
-            aria-hidden="true"
-          />
-          <div
-            className="panel span-4 placeholder-block tall"
-            aria-hidden="true"
-          />
-        </div>
-      ) : (
-        <div className="hub-grid">
-          <section
-            className="panel span-8 spotlight"
-            aria-labelledby="continue-title"
-          >
-            <h2 id="continue-title" className="panel-title">
-              Continue your story
-            </h2>
-            {spotlight ? (
-              <>
-                <button
-                  className="spotlight-card"
-                  aria-label={`Resume ${spotlight.title}`}
-                  onClick={() => onResume(spotlight.saveId)}
-                >
-                  <StoryCover
-                    storyId={spotlight.storyId}
-                    title={spotlight.title}
-                  />
-                  <span className="spotlight-copy">
-                    <small>
-                      {spotlight.sideQuest ? "Side quest · " : ""}
-                      {spotlight.title}
-                    </small>
-                    <strong>{spotlight.pageTitle}</strong>
-                    <span className="muted">
-                      Saved {ago(spotlight.updatedAt)}
-                    </span>
-                    <span className="pill-action">Resume ↗</span>
-                  </span>
-                </button>
-                {others.length > 0 && (
-                  <ul className="compact-list">
-                    {others.map((entry) => (
-                      <li key={entry.saveId}>
-                        <button
-                          aria-label={`Resume ${entry.title}`}
-                          onClick={() => onResume(entry.saveId)}
-                        >
-                          <StoryCover
-                            storyId={entry.storyId}
-                            title={entry.title}
-                            className="thumb"
-                          />
-                          <span>
-                            <strong>{entry.pageTitle}</strong>
-                            <small>
-                              {entry.sideQuest ? "Side quest · " : ""}
-                              {entry.title} · {ago(entry.updatedAt)}
-                            </small>
-                          </span>
-                          <span aria-hidden="true">↗</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+      {summary && summary.recommendations.length > 0 && (
+        <section aria-labelledby="next-title" className="dash-section">
+          <div className="dash-section-head">
+            <h2 id="next-title">Up next for you</h2>
+            <button className="btn-link" onClick={() => onNavigate("/discover")}>
+              Browse all stories
+            </button>
+          </div>
+          <div className="dash-cards">
+            {summary.recommendations.map((rec) => (
+              <article key={rec.storyId} className="dash-card dash-story">
+                <StoryCover storyId={rec.storyId} title={rec.title} />
+                <div className="dash-story-body">
+                  <p className="dash-reason">{rec.reason}</p>
+                  {/* A generated cover already shows the title. */}
+                  {coverArt[rec.storyId] && <h3>{rec.title}</h3>}
+                  <p className="dash-muted">{rec.description}</p>
+                  <button
+                    className="btn btn-secondary"
+                    aria-label={`Start ${rec.title}`}
+                    disabled={disabled}
+                    onClick={() => onStart(rec.storyId)}
+                  >
+                    Start story
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {summary && summary.recentEndings.length > 0 && (
+        <section aria-labelledby="endings-title" className="dash-section">
+          <div className="dash-section-head">
+            <h2 id="endings-title">Endings you found</h2>
+          </div>
+          <ul className="dash-endings">
+            {summary.recentEndings.map((ending) => (
+              <li key={ending.saveId} className="dash-card">
+                <span>
+                  <strong>{ending.pageTitle}</strong>
+                  <small>
+                    {ending.title} · {new Date(ending.at).toLocaleDateString()}
+                  </small>
+                </span>
+                {/* Side-quest endings have no public story page. */}
+                {summary.stories.some((s) => s.storyId === ending.storyId) && (
+                  <button
+                    className="btn btn-secondary btn-small"
+                    aria-label={`Share ${ending.pageTitle}`}
+                    onClick={async () =>
+                      setShareStatus(
+                        await shareLink(
+                          {
+                            title: `${ending.pageTitle} · ${ending.title}`,
+                            text: `I reached “${ending.pageTitle}” in ${ending.title}. Which ending will you find?`,
+                            url: endingLink(ending.storyId, ending.pageId),
+                          },
+                          "Ending link",
+                        ),
+                      )
+                    }
+                  >
+                    Share
+                  </button>
                 )}
-              </>
-            ) : (
-              <div className="empty-state">
-                <p>Nothing in progress. Your next adventure is a click away.</p>
-                <button
-                  className="primary"
-                  onClick={() => onNavigate("/discover")}
-                >
-                  Find a story
-                </button>
-              </div>
-            )}
-          </section>
+              </li>
+            ))}
+          </ul>
+          <p className="dash-muted" role="status">
+            {shareStatus}
+          </p>
+        </section>
+      )}
 
-          <section className="panel span-4" aria-labelledby="stats-title">
-            <h2 id="stats-title" className="panel-title">
-              Your progress
-            </h2>
-            <ul className="glance">
-              {(
-                [
-                  ["Stories started", summary.totals.started],
-                  ["Stories finished", summary.totals.completed],
-                  ["Endings found", summary.totals.endingsFound],
-                  ["Side quests", summary.totals.sideQuests],
-                  ["Keys collected", summary.totals.keys],
-                  ["Milestones", summary.totals.milestones],
-                ] as const
-              ).map(([label, value]) => (
-                <li key={label}>
-                  <b>{value}</b>
-                  <span>{label}</span>
-                </li>
-              ))}
-            </ul>
-            {profile && (
-              <dl className="stat-meters" aria-label="Shared stats">
-                {(Object.keys(statLabels) as StatId[]).map((stat) => (
-                  <div key={stat}>
-                    <dt>{statLabels[stat]}</dt>
-                    <dd>
-                      <span className="track">
-                        <span
-                          className="meter"
-                          style={{
-                            width: `${Math.min(100, (profile.stats[stat] / STAT_SCALE) * 100)}%`,
-                          }}
-                        />
-                      </span>
-                      <b>{profile.stats[stat]}</b>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </section>
-
-          <section className="span-12" aria-labelledby="goals-title">
-            <div className="row-head">
-              <h2 id="goals-title" className="panel-title">
-                What you’re working toward
-              </h2>
-              <button className="ghost" onClick={() => onNavigate("/discover")}>
-                Browse all stories ↗
-              </button>
-            </div>
-            <div className="goal-grid">
-              {summary.stories.map((story) => (
-                <article key={story.storyId} className="goal-card">
-                  <StoryCover storyId={story.storyId} title={story.title} />
-                  <div className="goal-body">
-                    <p className={`status-badge ${story.status}`}>
-                      {story.status === "not-started"
-                        ? "Not started"
-                        : story.status === "in-progress"
-                          ? "In progress"
-                          : "Finished"}
-                    </p>
-                    <h3>{story.title}</h3>
-                    {story.endingsTotal > 0 && (
-                      <div
-                        className="endings"
-                        role="img"
-                        aria-label={`${story.endingsFound} of ${story.endingsTotal} endings found`}
-                      >
-                        <span className="endings-track">
-                          <span
-                            style={{
-                              width: `${(story.endingsFound / story.endingsTotal) * 100}%`,
-                            }}
-                          />
-                        </span>
-                        <span>
-                          {story.endingsFound}/{story.endingsTotal} endings
-                        </span>
-                      </div>
-                    )}
-                    <p className="goal-next">{goal(story)}</p>
-                    <div className="goal-actions">
-                      {story.activeSaveId && (
-                        <button
-                          className="primary"
-                          aria-label={`Resume ${story.title}`}
-                          onClick={() => onResume(story.activeSaveId!)}
-                        >
-                          Resume ↗
-                        </button>
-                      )}
-                      <button
-                        className={story.activeSaveId ? "ghost" : "primary"}
-                        disabled={disabled}
-                        onClick={() => onStart(story.storyId)}
-                      >
-                        {story.status === "not-started"
-                          ? `Play ${story.title} ↗`
-                          : `Play ${story.title} again`}
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel span-7" aria-labelledby="activity-title">
-            <h2 id="activity-title" className="panel-title">
-              Recent activity
-            </h2>
-            {summary.activity.length === 0 ? (
-              <p className="muted">
-                Your choices will appear here as you play.
+      <section className="dash-bottom">
+        <div className="dash-card dash-studio" aria-labelledby="studio-title">
+          <div>
+            <h2 id="studio-title">Your studio</h2>
+            {studio === null ? (
+              <p className="dash-studio-muted">Loading your drafts…</p>
+            ) : studio === "unavailable" ? (
+              <p className="dash-studio-muted">Studio is unavailable right now.</p>
+            ) : drafts.length === 0 ? (
+              <p className="dash-studio-muted">
+                No drafts yet. Write a branching story or a personality quiz.
               </p>
             ) : (
-              <ol className="timeline">
-                {summary.activity.map((item, i) => (
-                  <li key={`${item.saveId}-${item.at}-${i}`}>
-                    <span className="dot" aria-hidden="true" />
-                    <span>
-                      <strong>{item.label}</strong>
-                      <small>
-                        {item.title} · {ago(item.at)}
-                      </small>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-
-          <section
-            className="panel span-5 creator"
-            aria-labelledby="creator-title"
-          >
-            <h2 id="creator-title" className="panel-title">
-              Creator corner
-            </h2>
-            {studio === null ? (
-              <div className="placeholder-block short" aria-hidden="true" />
-            ) : studio === "unavailable" ? (
-              <p className="muted">Studio is unavailable right now.</p>
-            ) : (
-              <>
-                <div className="creator-stats">
-                  <span>
-                    <b>{drafts.length}</b> draft{drafts.length === 1 ? "" : "s"}
-                  </span>
-                  <span>
-                    <b>{drafts.filter((d) => d.publishedVersionId).length}</b>{" "}
-                    published
-                  </span>
-                </div>
-                {drafts.length === 0 ? (
-                  <p className="muted">
-                    Write your own branching story with any page type.
-                  </p>
-                ) : (
-                  <ul className="draft-list">
-                    {drafts.slice(0, 3).map((d) => (
-                      <li key={d.id}>
-                        <strong>{d.title || "Untitled story"}</strong>
-                        <small>
-                          {d.publishedVersionId ? "Published" : "Private draft"}{" "}
-                          · revision {d.revision}
-                        </small>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <button className="ghost" onClick={() => onNavigate("/studio")}>
-                  {drafts.length === 0 ? "Start creating ↗" : "Open Studio ↗"}
-                </button>
-              </>
-            )}
-          </section>
-
-          {summary.recommendations.length > 0 && (
-            <section className="span-12" aria-labelledby="recommend-title">
-              <h2 id="recommend-title" className="panel-title">
-                Recommended for you
-              </h2>
-              <div className="recommend-grid">
-                {summary.recommendations.map((rec) => (
-                  <article key={rec.storyId} className="recommend-card">
-                    <StoryCover storyId={rec.storyId} title={rec.title} />
-                    <div>
-                      <p className="reason">{rec.reason}</p>
-                      <h3>{rec.title}</h3>
-                      <p className="muted">{rec.description}</p>
-                      <button
-                        className="ghost"
-                        aria-label={`Start ${rec.title}`}
-                        disabled={disabled}
-                        onClick={() => onStart(rec.storyId)}
-                      >
-                        Start story ↗
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {summary.recentEndings.length > 0 && (
-            <section className="span-12" aria-labelledby="endings-title">
-              <h2 id="endings-title" className="panel-title">
-                Endings collection
-              </h2>
-              <ul className="ending-badges">
-                {summary.recentEndings.map((ending) => (
-                  <li key={ending.saveId}>
-                    <span className="gem" aria-hidden="true">
-                      ◆
-                    </span>
-                    <span>
-                      <strong>{ending.pageTitle}</strong>
-                      <small>
-                        {ending.title} ·{" "}
-                        {new Date(ending.at).toLocaleDateString()}
-                      </small>
-                    </span>
-                    {/* Side-quest endings have no public story page. */}
-                    {summary.stories.some(
-                      (s) => s.storyId === ending.storyId,
-                    ) && (
-                      <button
-                        className="ghost share-ending"
-                        aria-label={`Share ${ending.pageTitle}`}
-                        onClick={async () =>
-                          setShareStatus(
-                            await shareLink(
-                              {
-                                title: `${ending.pageTitle} · ${ending.title}`,
-                                text: `I reached “${ending.pageTitle}” in ${ending.title}. Which ending will you find?`,
-                                url: endingLink(ending.storyId, ending.pageId),
-                              },
-                              "Ending link",
-                            ),
-                          )
-                        }
-                      >
-                        Share
-                      </button>
-                    )}
+              <ul className="dash-drafts">
+                {drafts.slice(0, 3).map((d) => (
+                  <li key={d.id}>
+                    <strong>{d.title || "Untitled story"}</strong>
+                    <small>
+                      {d.publishedVersionId ? "Published" : "Private draft"} ·
+                      revision {d.revision}
+                    </small>
                   </li>
                 ))}
               </ul>
-              <p className="muted" role="status">
-                {shareStatus}
-              </p>
-            </section>
+            )}
+          </div>
+          <button className="btn btn-coral" onClick={() => onNavigate("/studio")}>
+            {drafts.length === 0 ? "Start creating" : "Open Studio"}
+          </button>
+        </div>
+        <div className="dash-card dash-activity" aria-labelledby="activity-title">
+          <h2 id="activity-title">Recent activity</h2>
+          {!summary ? null : summary.activity.length === 0 ? (
+            <p className="dash-muted">Your choices will appear here as you play.</p>
+          ) : (
+            <ol>
+              {summary.activity.map((item, i) => (
+                <li key={`${item.saveId}-${item.at}-${i}`}>
+                  <span className="dash-dot" aria-hidden="true" />
+                  <span>
+                    <strong>{item.label}</strong>
+                    <small>
+                      {item.title} · {ago(item.at)}
+                    </small>
+                  </span>
+                </li>
+              ))}
+            </ol>
           )}
         </div>
-      )}
+      </section>
     </div>
   );
 }

@@ -1,11 +1,124 @@
+/* Storybranch design tokens: one semantic set, two themes.
+   Light is the default; <html data-theme="dark"> or a dark system setting
+   (when no theme is chosen) switch to dark. Components use the semantic
+   names; the legacy names at the end keep older styles working. */
 :root {
-  --bg: #101516;
-  --panel: #192122;
-  --text: #f3efe5;
-  --muted: #a2b0ad;
-  --line: #344241;
-  --teal: #a7e9cf;
-  --violet: #c9b1e9;
-  --amber: #ecc597;
-  --radius: 8px;
+  color-scheme: light;
+  --bg: #f6f6f9;
+  --surface-1: #ffffff;
+  --surface-2: #f2f2f7;
+  --surface-3: #e9e9f1;
+  --border: #e4e4ec;
+  --border-strong: #d2d2de;
+  --text: #17171f;
+  --text-body: #45455a;
+  --muted: #5c5c6e;
+  --primary: #4b44d6;
+  --primary-hover: #3e37c4;
+  --on-primary: #ffffff;
+  --primary-soft: #edecfb;
+  --primary-soft-text: #2f29a3;
+  --link: #4b44d6;
+  --coral: #e8684a;
+  --coral-text: #b8452a;
+  --on-coral: #1c0b05;
+  --success: #1e7a52;
+  --success-soft: #e7f5ee;
+  --warning: #9a6200;
+  --warning-soft: #fdf3e1;
+  --danger: #c03a2b;
+  --danger-soft: #fcecea;
+  --overlay: rgb(17 17 23 / 55%);
+  --header-bg: rgb(255 255 255 / 88%);
+  --shadow-sm: 0 1px 2px rgb(23 23 31 / 6%);
+  --shadow: 0 1px 2px rgb(23 23 31 / 6%), 0 12px 32px rgb(23 23 31 / 6%);
+  --shadow-lg: 0 20px 48px rgb(23 23 31 / 14%);
+
+  --font-ui: "Figtree Variable", "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", var(--font-ui);
+  --font-story: "Fraunces Variable", "Fraunces", Georgia, "Times New Roman", serif;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --radius: var(--radius-sm);
+}
+
+/* Dark values, once for an explicit choice and once for the system setting. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111117;
+  --surface-1: #1a1a22;
+  --surface-2: #23232d;
+  --surface-3: #2c2c38;
+  --border: #2c2c38;
+  --border-strong: #3a3a48;
+  --text: #f2f2f5;
+  --text-body: #c8c8d4;
+  --muted: #a3a3b2;
+  --primary: #5b54e8;
+  --primary-hover: #6a63f0;
+  --on-primary: #ffffff;
+  --primary-soft: #2a2850;
+  --primary-soft-text: #d4d2ff;
+  --link: #a9a5ff;
+  --coral: #f07457;
+  --coral-text: #ff8e75;
+  --on-coral: #1c0b05;
+  --success: #5fd39a;
+  --success-soft: #17352a;
+  --warning: #f2b35b;
+  --warning-soft: #3a2c14;
+  --danger: #ff7a6b;
+  --danger-soft: #3a1916;
+  --overlay: rgb(0 0 0 / 60%);
+  --header-bg: rgb(26 26 34 / 88%);
+  --shadow-sm: 0 0 0 1px #2c2c38;
+  --shadow: 0 0 0 1px #2c2c38;
+  --shadow-lg: 0 20px 48px rgb(0 0 0 / 45%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111117;
+    --surface-1: #1a1a22;
+    --surface-2: #23232d;
+    --surface-3: #2c2c38;
+    --border: #2c2c38;
+    --border-strong: #3a3a48;
+    --text: #f2f2f5;
+    --text-body: #c8c8d4;
+    --muted: #a3a3b2;
+    --primary: #5b54e8;
+    --primary-hover: #6a63f0;
+    --on-primary: #ffffff;
+    --primary-soft: #2a2850;
+    --primary-soft-text: #d4d2ff;
+    --link: #a9a5ff;
+    --coral: #f07457;
+    --coral-text: #ff8e75;
+    --on-coral: #1c0b05;
+    --success: #5fd39a;
+    --success-soft: #17352a;
+    --warning: #f2b35b;
+    --warning-soft: #3a2c14;
+    --danger: #ff7a6b;
+    --danger-soft: #3a1916;
+    --overlay: rgb(0 0 0 / 60%);
+    --header-bg: rgb(26 26 34 / 88%);
+    --shadow-sm: 0 0 0 1px #2c2c38;
+    --shadow: 0 0 0 1px #2c2c38;
+    --shadow-lg: 0 20px 48px rgb(0 0 0 / 45%);
+  }
+}
+
+/* Legacy names used by older styles; prefer the semantic names above. */
+:root {
+  --panel: var(--surface-1);
+  --line: var(--border);
+  --teal: var(--link);
+  --accent: var(--primary);
+  --on-accent: var(--on-primary);
+  --violet: var(--link);
+  --amber: var(--warning);
 }

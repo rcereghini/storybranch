@@ -21,8 +21,10 @@ try {
     .getByRole("button", { name: "Sign in ↗", exact: true })
     .click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
-  const nav = page.getByRole("navigation", { name: "Main" });
-  await nav.getByRole("button", { name: "Admin", exact: true }).click();
+  // Admin is in the account menu, only for admins.
+  const menu = page.getByRole("button", { name: "Account menu" });
+  await menu.click();
+  await page.locator("#account-menu").getByRole("button", { name: "Admin", exact: true }).click();
   await page.waitForURL("**/admin");
   await page.getByText("Published stories", { exact: true }).waitFor();
   assert.equal(await overflow(), false, "Horizontal overflow on Admin at 1024");
@@ -93,13 +95,14 @@ try {
   await page.setViewportSize({ width: 1024, height: 900 });
   await page.reload();
   await page.getByRole("heading", { name: "Admins only" }).waitFor();
+  await menu.click();
   assert.equal(
-    await nav.getByRole("button", { name: "Admin", exact: true }).count(),
+    await page.locator("#account-menu").getByRole("button", { name: "Admin", exact: true }).count(),
     0,
   );
   assert.deepEqual(errors, []);
   console.log(
-    "Admin PASS: nav for admins only, overview, user feature toggle, self-lockout locked, hide/show story, activity log, no overflow at 1024/390.",
+    "Admin PASS: admin menu entry for admins only, overview, user feature toggle, self-lockout locked, hide/show story, activity log, no overflow at 1024/390.",
   );
 } finally {
   await browser.close();

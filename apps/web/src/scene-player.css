@@ -25,10 +25,6 @@ main.immersive-player {
   margin: 0;
   min-height: calc(100dvh - 64px);
 }
-.immersive-header {
-  min-height: 64px;
-  padding-block: 8px;
-}
 .immersive-player .player-heading {
   padding: 12px 24px;
 }
@@ -75,15 +71,6 @@ main.immersive-player {
   }
 }
 @media (max-width: 700px) {
-  .immersive-header nav {
-    display: none;
-  }
-  .immersive-header .player-exit {
-    display: inline-flex;
-  }
-  .immersive-header :is(.account, .sign-in) {
-    display: none;
-  }
   .immersive-player .scene-stage {
     height: calc(100svh - 170px);
     min-height: 450px;

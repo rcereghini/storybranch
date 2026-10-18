@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#101516" />
+    <meta name="theme-color" content="#f6f6f9" />
+    <script>
+      // Apply the saved light/dark choice before first paint (theme-mode.ts).
+      try {
+        var mode = localStorage.getItem("storybranch-theme");
+        if (mode === "light" || mode === "dark")
+          document.documentElement.dataset.theme = mode;
+      } catch (e) {}
+    </script>
     <meta
       name="description"
       content="Stories worth getting lost in. Play The Glass Harbor, an interactive harbor mystery."
