@@ -16,7 +16,7 @@ Copilot is a chat assistant that works alongside a signed-in user: it explains S
 |---|---|---|---|
 | 1. Navigate and explain | Read-only help in the dashboard, Discover, Adventures, Studio and Assets | `navigate`, `list_catalogue`, `list_my_adventures`, `list_my_drafts`, `get_draft`, `list_my_assets` | Built |
 | 2. Co-author | Proposes story, page, choice and quiz changes in Studio; the user applies them through Studio's normal save (revision-checked) | adds `propose_draft_change` | Planned |
-| 3. Generate | Writes image and video prompts from story context and reference images; the user approves each job, which runs through `/api/generation` (fal) and its daily limit | adds `propose_generation` | Planned, after the model test below |
+| 3. Generate | Writes image and video prompts from story context and reference images; the user approves each job, which runs through `/api/generation` (fal) and its daily limit | adds `propose_generation` | Planned; model test paused after stills (below) |
 
 Copilot is not available during play (`/play/`, `/p/`): it could reveal routes, conditions or endings.
 
@@ -47,7 +47,10 @@ Copilot is not available during play (`/play/`, `/p/`): it could reveal routes, 
 
 fal remains the generation provider (`services/api/generation.ts`); Claude writes and refines prompts but does not generate images. Before phase 3:
 
-1. **Model test.** Run 2–3 scenes from a real story through Kling, Veo and Seedance on fal with the same reference images, and compare quality, character consistency, speed and cost per clip. This settles the default models and the clip-length question in `10-decisions-and-open-questions.md`.
+1. **Model test** (`scripts/model-test.ts`, output in `test-results/model-test/`). Run scenes from a real story through Kling, Veo and Seedance on fal from the same start stills, and compare quality, character consistency, speed and cost per clip. This settles the default models and the clip-length question in `10-decisions-and-open-questions.md`.
+   - **Stills: done (2026-10-18, $0.60).** A courier reference image and three Glass Harbor stills (docks, the courier's favor, the lantern market) from Nano Banana Pro (`fal-ai/nano-banana-pro`, `/edit` with the reference, $0.15 an image). The courier stayed consistent across scenes (hair, scar, coat, satchel, gloves) and so did the world's look. Small misses: the reference sheet has garbled text labels (its prompt lacked "no text"), the dock's beacon is lit rather than broken, and the edit instruction placed the courier in the market scene too. Takeaway: reference-image editing is a workable basis for consistent characters.
+   - **Videos: paused, ready to run** with `pnpm exec tsx scripts/model-test.ts videos` (about $9.30). Nine clips at 720p, no audio, same still per scene: Kling 3.0 Pro (`fal-ai/kling-video/v3/pro/image-to-video`, $0.14/s, 3 × 5 s ≈ $2.10), Veo 3.1 Fast (`fal-ai/veo3.1/fast/image-to-video`, $0.15/s, 3 × 6 s ≈ $2.70) and Seedance 2.0 (`bytedance/seedance-2.0/image-to-video`, per-token, ≈ $0.30/s, 3 × 5 s ≈ $4.50). Prices are from fal's pricing API on 2026-10-18; re-check before running. The full Veo 3.1 endpoint ($0.40/s) is reportedly retiring on 2026-11-17, so it is left out. The script writes a side-by-side `index.html` with timings and costs.
+   - **Still to decide after the videos:** whether clips need audio, a portrait (9:16) rendition test for phones, and Kling's `elements` reference input as a second consistency approach.
 2. **Swappable provider.** Model IDs move into configuration behind our own generation commands, so a later provider change touches neither Copilot nor the UI.
 3. **Reference images.** Stories keep a small set of character and location images that every generation includes, for consistency across scenes.
 
