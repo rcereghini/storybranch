@@ -13,7 +13,6 @@ export function backendConfig(env: Record<string, string | undefined>) {
     return {
       mode,
       projectId: "storybranch-f77a3",
-      prefix: "storybranch/app/",
       firestoreHost: undefined,
       authHost: undefined,
       bucket: "storybranch-f77a3.firebasestorage.app",
@@ -35,7 +34,6 @@ export function backendConfig(env: Record<string, string | undefined>) {
   return {
     mode,
     projectId: phone ? "demo-storybranch-phone" : "demo-storybranch",
-    prefix: "",
     firestoreHost,
     authHost,
     bucket: "demo-storybranch.appspot.com",

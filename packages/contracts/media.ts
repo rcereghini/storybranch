@@ -79,6 +79,13 @@ export type ClipAsset = {
   media?: SceneMedia;
   url?: string;
 };
+// The Storage file behind an uploaded clip or photo, frozen into a published
+// edition or shared library page.
+export type PublishedClip = {
+  path: string;
+  token: string;
+  contentType: (typeof assetTypes)[number];
+};
 export type UploadListing = {
   enabled: boolean;
   reason: string | null;

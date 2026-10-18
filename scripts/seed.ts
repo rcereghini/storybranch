@@ -1,6 +1,7 @@
 import "./local-env";
 import { createHash } from "node:crypto";
 import { db, auth, config } from "../services/api/firebase";
+import { user } from "../services/api/paths";
 import { stories, branches, catalogue } from "../fixtures/stories";
 import { pageStories, pageCatalogue } from "../fixtures/page-stories";
 import { baseStats } from "../packages/domain/index";
@@ -68,7 +69,7 @@ if (config.mode === "emulator") {
         displayName: uid,
       });
     }
-    const ref = db.doc(`playerProfiles/${uid}`);
+    const ref = db.doc(user(uid));
     if (!(await ref.get()).exists)
       await ref.create({
         stats: { ...baseStats, agility },

@@ -38,12 +38,7 @@ const app =
     { projectId: config.projectId, ...(credential ? { credential } : {}) },
     config.projectId,
   );
-const firestore = getFirestore(app);
-// Keep this app's live records separate from pre-existing collections.
-export const db = {
-  doc: (path: string) => firestore.doc(config.prefix + path),
-  collection: (path: string) => firestore.collection(config.prefix + path),
-  runTransaction: firestore.runTransaction.bind(firestore),
-};
+// Live and emulator use the same layout; see ./paths.
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const bucket = getStorage(app).bucket(config.bucket);

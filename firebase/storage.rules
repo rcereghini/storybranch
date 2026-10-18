@@ -1,16 +1,14 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Live records sit under storybranch/app; the emulator project has no prefix.
-    function asset(assetId) {
-      return bucket == 'storybranch-f77a3.firebasestorage.app'
-        ? firestore.get(/databases/(default)/documents/storybranch/app/assets/$(assetId))
-        : firestore.get(/databases/(default)/documents/assets/$(assetId));
+    // The clip record the API created before the upload (users/{uid}/clips).
+    function clip(uid, clipId) {
+      return firestore.get(/databases/(default)/documents/users/$(uid)/clips/$(clipId)).data;
     }
-    // A creator may upload a clip only once, into a pending asset the API
-    // created for them, with exactly the declared size and type. Nobody reads
-    // through rules: playback uses download tokens the API issues.
-    match /uploads/{uid}/{assetId} {
+    // A creator may upload a clip only once, into a pending clip record the
+    // API created for them, with exactly the declared size and type. Nobody
+    // reads through rules: playback uses download tokens the API issues.
+    match /users/{uid}/clips/{clipId} {
       allow create: if request.auth != null
         && resource == null
         && request.auth.uid == uid
@@ -18,10 +16,9 @@ service firebase.storage {
         && (request.resource.contentType.matches('video/(mp4|webm)')
           || (request.resource.contentType.matches('image/(jpeg|png|webp)')
             && request.resource.size <= 10 * 1024 * 1024))
-        && asset(assetId).data.ownerUid == uid
-        && asset(assetId).data.status == 'pending'
-        && asset(assetId).data.bytes == request.resource.size
-        && asset(assetId).data.contentType == request.resource.contentType;
+        && clip(uid, clipId).status == 'pending'
+        && clip(uid, clipId).bytes == request.resource.size
+        && clip(uid, clipId).contentType == request.resource.contentType;
     }
     match /{path=**} {
       allow read, write: if false;

@@ -18,7 +18,8 @@ import { pageMedia, pageImage, uploads } from "./uploads";
 import { pageLibrary, sharedPage } from "./page-library";
 import { generation } from "./generation";
 import { profileRoutes } from "./profile";
-import { version } from "./story-store";
+import { edition } from "./story-store";
+import * as paths from "./paths";
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -41,16 +42,11 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 const hash = (v: string) => createHash("sha256").update(v).digest("hex");
-async function owner(saveId: string, uid: string) {
-  const d = await db.doc(`playthroughs/${saveId}`).get();
+// Saves live under their player, so another player's save is simply not found.
+async function owned(saveId: string, uid: string) {
+  const d = await db.doc(paths.save(uid, saveId)).get();
   if (!d.exists) throw new GameError("NOT_FOUND", "Adventure not found.");
-  const s = d.data() as Save;
-  if (s.playerUid !== uid)
-    throw new GameError(
-      "FORBIDDEN",
-      "This adventure belongs to another player.",
-    );
-  return s;
+  return d.data() as Save;
 }
 export async function handle(request: Request): Promise<Response> {
   const correlationId = randomUUID();
@@ -102,7 +98,7 @@ export async function handle(request: Request): Promise<Response> {
         "Your session expired. Sign in again.",
       );
     }
-    const profileRef = db.doc(`playerProfiles/${uid}`);
+    const profileRef = db.doc(paths.user(uid));
     await ensurePlayerProfile(db, uid);
     const profile = await profileRef.get();
     if (!profile.exists || profile.data()!.status !== "active")
@@ -127,8 +123,7 @@ export async function handle(request: Request): Promise<Response> {
     if (request.method === "GET") {
       if (path === "/api/playthroughs") {
         let q = db
-          .collection("playthroughs")
-          .where("playerUid", "==", uid)
+          .collection(paths.saves(uid))
           .orderBy("updatedAt", "desc")
           .orderBy(FieldPath.documentId(), "desc")
           .limit(limit);
@@ -150,10 +145,10 @@ export async function handle(request: Request): Promise<Response> {
       }
       const saveId = segments[2];
       if (segments[1] === "playthroughs" && saveId) {
-        const s = await owner(saveId, uid);
+        const s = await owned(saveId, uid);
         if (segments[3] === "events") {
           let q = db
-            .collection(`playthroughs/${saveId}/events`)
+            .collection(paths.events(uid, saveId))
             .orderBy(FieldPath.documentId())
             .limit(limit);
           if (cursor) q = q.startAfter(cursor);
@@ -164,8 +159,8 @@ export async function handle(request: Request): Promise<Response> {
           });
         }
         if (segments.length === 3) {
-          const story = await db.runTransaction((tx) =>
-            version(tx, s.storyId, s.versionId),
+          const { story, clips } = await db.runTransaction((tx) =>
+            edition(tx, s.storyId, s.versionId),
           );
           const page = story.pages[s.pageId];
           const next =
@@ -204,11 +199,11 @@ export async function handle(request: Request): Promise<Response> {
             page,
             // Quiz results share as "my result" rather than an ending.
             result: isResultPage(story, page.id),
-            media: await pageMedia(page.video),
+            media: pageMedia(page.video, clips),
             nextMedia: next?.pageType.startsWith("video")
-              ? await pageMedia(next.video)
+              ? pageMedia(next.video, clips)
               : undefined,
-            image: await pageImage(page.image),
+            image: pageImage(page.image, clips),
             branches,
             featuredId,
           });
@@ -246,9 +241,7 @@ export async function handle(request: Request): Promise<Response> {
           ? choiceCommandSchema.parse(body)
           : branchCommandSchema.parse(body);
     const requestHash = hash(canonical({ path, command }));
-    const receipt = db.doc(
-      `commandReceipts/${hash(`${uid}:${kind}:${command.idempotencyKey}`)}`,
-    );
+    const receipt = db.doc(paths.receipt(uid, kind, command.idempotencyKey));
     const newId = randomUUID();
     const rolls = new Map<number, number>();
     const now = Date.now();
@@ -274,7 +267,7 @@ export async function handle(request: Request): Promise<Response> {
         const latest = await tx.get(db.doc(`stories/${c.payload.storyId}`));
         const v = c.payload.versionId ?? latest.data()?.publishedVersionId;
         if (!v) throw new GameError("NOT_FOUND", "Story not found.");
-        const story = await version(tx, c.payload.storyId, v);
+        const { story } = await edition(tx, c.payload.storyId, v);
         save = start(story, newId, uid, profile.data()!.stats as Stats, now);
         event = {
           label: `Started ${story.title}`,
@@ -284,17 +277,12 @@ export async function handle(request: Request): Promise<Response> {
           at: now,
         };
       } else {
-        const ref = db.doc(`playthroughs/${segments[2]}`);
+        const ref = db.doc(paths.save(uid, segments[2]));
         const snapshot = await tx.get(ref);
         if (!snapshot.exists)
           throw new GameError("NOT_FOUND", "Adventure not found.");
         const current = snapshot.data() as Save;
-        if (current.playerUid !== uid)
-          throw new GameError(
-            "FORBIDDEN",
-            "This adventure belongs to another player.",
-          );
-        const story = await version(tx, current.storyId, current.versionId);
+        const { story } = await edition(tx, current.storyId, current.versionId);
         if (kind === "choice") {
           const c = choiceCommandSchema.parse(command);
           const moved = transition(
@@ -335,7 +323,11 @@ export async function handle(request: Request): Promise<Response> {
               "VALIDATION_FAILED",
               "Branch unavailable at this location.",
             );
-          const childStory = await version(tx, b.storyId, b.versionId);
+          const { story: childStory } = await edition(
+            tx,
+            b.storyId,
+            b.versionId,
+          );
           save = start(childStory, newId, uid, current.stats, now, current);
           event = {
             label: "Entered community side quest",
@@ -347,14 +339,20 @@ export async function handle(request: Request): Promise<Response> {
         }
       }
       const result = { save };
-      tx.set(db.doc(`playthroughs/${save.id}`), save);
+      tx.set(db.doc(paths.save(uid, save.id)), save);
       tx.create(
         db.doc(
-          `playthroughs/${save.id}/events/${String(save.revision).padStart(8, "0")}`,
+          `${paths.events(uid, save.id)}/${String(save.revision).padStart(8, "0")}`,
         ),
         { ...event, commandId: command.idempotencyKey },
       );
-      tx.create(receipt, { actor: uid, requestHash, result, at: now });
+      tx.create(receipt, {
+        actor: uid,
+        requestHash,
+        result,
+        at: now,
+        ...paths.receiptExpiry(now),
+      });
       return result;
     });
     return json(result);

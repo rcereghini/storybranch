@@ -8,6 +8,7 @@ import {
 import { GameError } from "../../packages/contracts/index";
 import { uploadLimits } from "../../packages/contracts/media";
 import { db, bucket } from "./firebase";
+import * as paths from "./paths";
 import { assetView } from "./uploads";
 import { sniffAsset } from "./video-check";
 
@@ -57,10 +58,9 @@ async function fal(url: string, body?: unknown) {
   return response.json();
 }
 async function reference(uid: string, assetId: string) {
-  const asset = (await db.doc(`assets/${assetId}`).get()).data();
+  const asset = (await db.doc(paths.clip(uid, assetId)).get()).data();
   if (
     !asset ||
-    asset.ownerUid !== uid ||
     asset.status !== "ready" ||
     !asset.contentType.startsWith("image/")
   )
@@ -150,10 +150,11 @@ async function importResult(id: string, job: DocumentData, result: any) {
     !contentType.startsWith(job.kind === "video" ? "video/" : "image/")
   )
     throw new Error("Invalid generated media format.");
-  const path = `uploads/${job.ownerUid}/generated-${id}`;
   // A deterministic asset ID makes repeated completion checks safe.
   const assetId = `generated-${id}`;
-  const existing = (await db.doc(`assets/${assetId}`).get()).data();
+  const path = paths.clipFile(job.ownerUid, assetId);
+  const record = db.doc(paths.clip(job.ownerUid, assetId));
+  const existing = (await record.get()).data();
   if (existing) return assetView(assetId, existing);
   const token = randomUUID();
   await bucket
@@ -176,7 +177,7 @@ async function importResult(id: string, job: DocumentData, result: any) {
     durationSeconds: job.kind === "video" ? 81 / 16 : 0,
     createdAt: Date.now(),
   };
-  await db.doc(`assets/${assetId}`).set(asset);
+  await record.set(asset);
   return assetView(assetId, asset);
 }
 
@@ -226,11 +227,7 @@ export async function generation(
       return view(id, existing);
     }
     const prepared = await input(uid, command);
-    const owned = await db
-      .collection("assets")
-      .where("ownerUid", "==", uid)
-      .count()
-      .get();
+    const owned = await db.collection(paths.clips(uid)).count().get();
     if (owned.data().count >= uploadLimits.maxAssets)
       throw new GameError(
         "VALIDATION_FAILED",

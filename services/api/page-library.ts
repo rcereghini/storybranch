@@ -1,14 +1,15 @@
 import { createHash } from "node:crypto";
-import { FieldPath } from "firebase-admin/firestore";
+import { FieldPath, type DocumentReference } from "firebase-admin/firestore";
 import { GameError } from "../../packages/contracts/index";
 import {
   libraryCommandSchema,
   sharePageCommandSchema,
 } from "../../packages/contracts/page-library";
-import { assetIdOf } from "../../packages/contracts/media";
+import { assetIdOf, type PublishedClip } from "../../packages/contracts/media";
 import { db, config } from "./firebase";
 import { publisherAllowed } from "./creator-access";
-import { pageMedia, pageImage } from "./uploads";
+import * as paths from "./paths";
+import { pageMedia, pageImage, publishedClip } from "./uploads";
 import { resolveFixtureMedia } from "../../fixtures/media";
 const hash = (v: string) => createHash("sha256").update(v).digest("hex");
 
@@ -20,10 +21,12 @@ export async function sharedPage(pageId: string, revision: string) {
     .get();
   const record = snapshot.data();
   if (!record?.shared) throw new GameError("NOT_FOUND", "Page not found.");
+  // Sharing recorded the page's files, so viewers never read clip records.
+  const { clips = {}, ...page } = record;
   return {
-    ...record,
-    media: await pageMedia(record.content.video),
-    image: await pageImage(record.content.image),
+    ...page,
+    media: pageMedia(record.content.video, clips),
+    image: pageImage(record.content.image, clips),
   };
 }
 
@@ -76,9 +79,7 @@ export async function pageLibrary(
     ? sharePageCommandSchema.parse(body)
     : libraryCommandSchema.parse(body);
   const fingerprint = hash(JSON.stringify({ segments, command }));
-  const receipt = db.doc(
-    `commandReceipts/${hash(`${uid}:page:${command.idempotencyKey}`)}`,
-  );
+  const receipt = db.doc(paths.receipt(uid, "page", command.idempotencyKey));
   const root = collection.doc(segments[2]);
   return db.runTransaction(async (tx) => {
     const previous = await tx.get(receipt);
@@ -99,21 +100,23 @@ export async function pageLibrary(
       const ref = root.collection("revisions").doc(String(c.revision));
       const record = (await tx.get(ref)).data();
       if (!record) throw new GameError("NOT_FOUND", "Save the page first.");
-      const assets = [];
+      const assets: DocumentReference[] = [];
+      const clips: Record<string, PublishedClip> = {};
       for (const value of [record.content.video, record.content.image]) {
         const assetId = assetIdOf(value);
         if (!assetId) continue;
-        const ref = db.doc(`assets/${assetId}`);
+        const ref = db.doc(paths.clip(uid, assetId));
         const asset = (await tx.get(ref)).data();
-        if (asset?.ownerUid !== uid || asset.status !== "ready")
+        if (asset?.status !== "ready")
           throw new GameError(
             "VALIDATION_FAILED",
             "Choose your own finished assets.",
           );
         assets.push(ref);
+        clips[assetId] = publishedClip(asset);
       }
       result = { ...record, shared: true };
-      tx.update(ref, { shared: true });
+      tx.update(ref, { shared: true, clips });
       if (old?.latest.revision === c.revision)
         tx.update(root, { latest: result });
       for (const asset of assets) tx.update(asset, { published: true });
@@ -130,10 +133,9 @@ export async function pageLibrary(
       })) {
         const assetId = assetIdOf(value);
         if (assetId) {
-          const asset = (await tx.get(db.doc(`assets/${assetId}`))).data();
+          const asset = (await tx.get(db.doc(paths.clip(uid, assetId)))).data();
           if (
-            asset?.ownerUid !== uid ||
-            asset.status !== "ready" ||
+            asset?.status !== "ready" ||
             !asset.contentType.startsWith(
               field === "video" ? "video/" : "image/",
             )
@@ -157,7 +159,13 @@ export async function pageLibrary(
       );
       tx.set(root, { ownerUid: uid, latest: result });
     }
-    tx.create(receipt, { actor: uid, fingerprint, result, at: Date.now() });
+    tx.create(receipt, {
+      actor: uid,
+      fingerprint,
+      result,
+      at: Date.now(),
+      ...paths.receiptExpiry(Date.now()),
+    });
     return result;
   });
 }

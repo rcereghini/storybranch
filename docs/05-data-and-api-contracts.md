@@ -4,13 +4,13 @@ The following logical model is a proposed schema, suitable for implementation pl
 
 ## Persisted entities
 
-Current implementation contract: stories store `entryPageId` and immutable `versions/{versionId}/pages/{pageId}`; saves store `pageId`. Required page inputs, completion events, outputs, user context and branch closure are specified in [Story and Page model](16-story-pages.md). Earlier node terminology below describes the original design, not a compatibility API.
+Current implementation contract: stories store `entryPageId` and immutable `versions/{versionId}/pages/{pageId}`; saves store `pageId`. Required page inputs, completion events, outputs, user context and branch closure are specified in [Story and Page model](16-story-pages.md). Earlier node terminology below describes the original design, not a compatibility API. The implemented paths group player-owned records under `users/{uid}`; see [Data layout](15-shared-firebase-setup.md#data-layout).
 
 | Entity and suggested path | Essential fields | Writer and visibility |
 | --- | --- | --- |
 | `users/{uid}` | account status, private preferences, entitlement references | User may edit allowlisted preferences; server controls status; owner reads |
 | `creatorProfiles/{uid}` | unique handle, display name, avatar, public bio | Validated owner edits; public reads |
-| `playerProfiles/{uid}` | level, XP, allocated stats, unspent points, ruleset version | Server writes; owner reads; optional public projection |
+| `users/{uid}` (player profile) | level, XP, allocated stats, unspent points, ruleset version, display fields | Server writes; owner reads; optional public projection |
 | `stories/{storyId}` | creator ID, title, visibility, status, draft revision, published version ID, community setting | Server controls publication and settings; owner reads private metadata |
 | `catalogue/{storyId}` | public title, cover, creator projection, tags, rating, published version | Server generated public projection |
 | `stories/{id}/draftNodes/{nodeId}` | type, asset ID, choices, effects, combat config, revision | Owner allowlisted edits under draft policy |
@@ -22,17 +22,17 @@ Current implementation contract: stories store `entryPageId` and immutable `vers
 | `placements/{locationId}` | holder UID or null, nominated branch ID or null, revision, status | Server only; public holder projection |
 | `placementAccounts/{uid}` | active holding count, limit, revision | Server only; locks account caps across simultaneous claims |
 | `tradeOffers/{tradeId}` | proposer/recipient, placement IDs and expected revisions, expiry, status | Participants read; server writes |
-| `playthroughs/{playthroughId}` | player UID, pinned story/version, parent ID/revision, current node, state revision, stats snapshot, local state, status, ruleset version | Owner reads; server writes |
-| `playthroughs/{id}/events/{eventId}` | command ID, transition, node IDs, reward references, timestamp | Append-only server writes; owner reads |
-| `playthroughs/{id}/checkpoints/{checkpointId}` | local state snapshot, entry-effect markers, battle state, revision | Server writes; owner reads |
+| `users/{uid}/playthroughs/{playthroughId}` | player UID, pinned story/version, parent ID/revision, current node, state revision, stats snapshot, local state, status, ruleset version | Owner reads; server writes |
+| `users/{uid}/playthroughs/{id}/events/{eventId}` | command ID, transition, node IDs, reward references, timestamp | Append-only server writes; owner reads |
+| `users/{uid}/playthroughs/{id}/checkpoints/{checkpointId}` | local state snapshot, entry-effect markers, battle state, revision | Server writes; owner reads |
 | `battles/{battleId}` | playthrough, encounter version, actors, turn, resources, outcome, revision | Owner reads; server writes |
 | `achievementDefinitions/{id}` | scope, eligibility, stable reward ID, display data | Platform or validated story publishing |
 | `users/{uid}/rewardClaims/{rewardId}` | scope, source, award, timestamp | Server only; owner reads |
 | `wallets/{uid}` | available credits, reserved credits, revision, account lock | Server only; owner reads |
 | `wallets/{uid}/ledger/{entryId}` | operation ID, deltaAvailable, deltaReserved, reason, job/payment reference, price version | Append-only server writes; owner reads |
 | `generationJobs/{jobId}` | owner, quote, normalized input, provider request ID, state, reservation ID, output asset ID, lease, attempts | Server writes; owner reads safe projection |
-| `assets/{assetId}` | owner, storage key, readiness, media attributes, captions, provenance, retention references | Server controlled readiness; access by entitlement/reference |
-| `commandReceipts/{receiptId}` | actor, idempotency key, request hash, status, result | Server only; scoped API result |
+| `users/{uid}/clips/{clipId}` (uploaded and generated videos and photos) | owner, storage key, readiness, media attributes, captions, provenance, retention references | Server controlled readiness; access by entitlement/reference |
+| `users/{uid}/receipts/{receiptId}` | actor, idempotency key, request hash, status, result, expiry | Server only; scoped API result; deleted by TTL |
 | `outbox/{id}` and `inbox/{id}` | event kind, payload reference, dedupe key, lease, status, due time | Server only |
 | `moderationCases/{id}` | target, report, evidence references, decision, audit | Restricted moderators |
 

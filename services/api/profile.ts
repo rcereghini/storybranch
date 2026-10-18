@@ -11,6 +11,7 @@ import {
 } from "../../packages/domain/dashboard";
 import { projectProfile } from "./profile-projection";
 import { version } from "./story-store";
+import * as paths from "./paths";
 
 // The dashboard summarizes at most this many recent saves.
 const DASHBOARD_SAVES = 100;
@@ -48,7 +49,7 @@ export async function profileRoutes(
     const changes = Object.fromEntries(
       Object.entries(parsed.data).filter(([, value]) => value !== undefined),
     );
-    await db.doc(`playerProfiles/${uid}`).update(changes);
+    await db.doc(paths.user(uid)).update(changes);
     return projectProfile(uid, { ...data, ...changes }, tokenName);
   }
   if (request.method !== "GET")
@@ -58,8 +59,7 @@ export async function profileRoutes(
 
   const [savesSnapshot, catalogueSnapshot] = await Promise.all([
     db
-      .collection("playthroughs")
-      .where("playerUid", "==", uid)
+      .collection(paths.saves(uid))
       .orderBy("updatedAt", "desc")
       .orderBy(FieldPath.documentId(), "desc")
       .limit(DASHBOARD_SAVES)
@@ -115,7 +115,7 @@ export async function profileRoutes(
       saves.slice(0, ACTIVITY_SAVES).map(async (s) =>
         (
           await db
-            .collection(`playthroughs/${s.id}/events`)
+            .collection(paths.events(uid, s.id))
             .orderBy("at", "desc")
             .limit(ACTIVITY_PER_SAVE)
             .get()
