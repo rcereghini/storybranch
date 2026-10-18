@@ -458,16 +458,24 @@ export function Studio({
   };
   return (
     <section className="studio">
-      <div className="section-heading">
+      <div className="studio-head">
         <div>
-          <p className="eyebrow">CREATOR STUDIO · ALPHA</p>
-          <h1>Build your next world.</h1>
+          <h1>Studio</h1>
+          <p className="studio-sub">
+            Write a branching story or a quiz, preview it, then publish an
+            edition. Players keep the edition they started.
+          </p>
         </div>
-        <div className="studio-actions">
-          <Button disabled={busy || dirty || !!retry} onClick={() => create()}>
+        <div className="studio-head-actions">
+          <Button
+            className="btn btn-primary"
+            disabled={busy || dirty || !!retry}
+            onClick={() => create()}
+          >
             New story
           </Button>
           <Button
+            className="btn btn-secondary"
             disabled={busy || dirty || !!retry}
             onClick={() => create(true)}
           >
@@ -475,10 +483,6 @@ export function Studio({
           </Button>
         </div>
       </div>
-      <p>
-        Save a private draft, connect its pages, preview the journey, then
-        publish an edition. Existing players keep their original edition.
-      </p>
       <div className="app-notices" aria-live="polite">
         {(notice || offline) && (
           <div className="notice">
@@ -502,7 +506,7 @@ export function Studio({
         </Button>
       )}
       {listing && !listing.canPublish && (
-        <p>
+        <p className="studio-note">
           Publishing is invite-only during alpha. Drafts and previews are
           available; ask the Storybranch team to turn on publishing for your
           account.
@@ -535,10 +539,24 @@ export function Studio({
               More drafts
             </Button>
           )}
-          {!listing?.items.length && (
-            <p>Create your first story to get started.</p>
+          {listing && !listing.items.length && (
+            <p className="studio-sub">No drafts yet.</p>
           )}
         </aside>
+        {!draft && listing && (
+          <div className="studio-start">
+            <h2>
+              {listing.items.length
+                ? "Open a draft or start something new"
+                : "Start your first story"}
+            </h2>
+            <p className="studio-sub">
+              A story is a set of pages linked by choices: text, video, dice
+              rolls and quiz results. Start from a blank story or a ready-made
+              quiz.
+            </p>
+          </div>
+        )}
         {draft && (
           <div className="studio-editor">
             <div className="studio-actions">

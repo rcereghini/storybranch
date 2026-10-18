@@ -106,6 +106,7 @@ Read [Product requirements](docs/01-product-requirements.md), [Game and communit
 | [Player dashboard](docs/18-player-dashboard.md) | Dashboard home, profile customization and progress summary |
 | [Copilot](docs/19-copilot.md) | In-app chat assistant: phases, contract, limits and the video model test |
 | [Admin dashboard](docs/20-admin.md) | Admins, managing accounts and stories, audit log |
+| [Design system](docs/21-design-system.md) | Light and dark themes, tokens, fonts, shell and component rules |
 
 ## How to use these documents
 

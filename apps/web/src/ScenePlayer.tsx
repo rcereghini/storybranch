@@ -129,7 +129,7 @@ export function ScenePlayer({
   return (
     <div className="scene-player">
       <div
-        className={`scene-stage ${portrait ? "portrait" : "landscape"} ${watching ? "watching" : "deciding"}`}
+        className={`scene-stage theme-dark ${portrait ? "portrait" : "landscape"} ${watching ? "watching" : "deciding"}`}
       >
         <video
           ref={video}

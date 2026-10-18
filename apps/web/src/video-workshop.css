@@ -44,8 +44,8 @@
   flex: 1;
 }
 .video-steps [aria-current="step"] {
-  border-color: var(--accent, #cfb77a);
-  background: #cfb77a22;
+  border-color: var(--primary);
+  background: var(--primary-soft);
 }
 .keyframe-grid {
   display: grid;
@@ -53,7 +53,7 @@
   gap: 12px;
 }
 .keyframe-card {
-  border: 1px solid #ffffff20;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px;
   display: grid;
@@ -95,12 +95,12 @@
   text-overflow: ellipsis;
 }
 .frame-assets [aria-pressed="true"] {
-  outline: 2px solid var(--accent, #cfb77a);
+  outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 .video-empty {
   padding: 40px 20px;
-  border: 1px dashed #ffffff40;
+  border: 1px dashed var(--border-strong);
   border-radius: 12px;
   text-align: center;
 }

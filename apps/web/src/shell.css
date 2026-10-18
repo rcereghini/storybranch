@@ -102,8 +102,12 @@
 .sign-in-button:hover:not(:disabled) {
   background: var(--primary-hover);
 }
+/* In the story player: the way back sits beside the account button. */
 .player-exit {
   margin-left: auto;
+}
+.immersive-header .header-actions {
+  margin-left: 0;
 }
 
 /* Account menu */
@@ -255,6 +259,11 @@
     width: 44px;
     height: 44px;
   }
+  /* The story player's way back keeps its label. */
+  .header-button.player-exit {
+    width: auto;
+    padding: 0 16px;
+  }
   .tab-bar {
     position: fixed;
     left: 0;
@@ -296,6 +305,13 @@
   }
   .app-footer-inner {
     padding: 20px 16px;
+  }
+}
+/* Very narrow phones in the player: the logo alone leaves room for the way
+   back and the account button. */
+@media (max-width: 380px) {
+  .immersive-header .brand-name {
+    display: none;
   }
 }
 

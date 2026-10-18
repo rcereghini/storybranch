@@ -80,19 +80,6 @@ main {
   align-items: center;
   background: #13252a;
 }
-.hero-art {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, #101b20 0%, #101b20e8 24%, #101b2060 55%, #101b2000),
-    linear-gradient(0deg, #101516 0%, transparent 30%),
-    url("/media/harbor.svg") right center/cover;
-}
-.hero-content {
-  position: relative;
-  padding: 58px 7% 80px;
-  width: 100%;
-}
 .eyebrow {
   font: 700 12px/1.6 var(--font-ui);
   letter-spacing: 1px;
@@ -100,15 +87,8 @@ main {
   color: var(--coral-text);
   margin: 0 0 20px;
 }
-.live-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background: var(--teal);
-  margin-right: 9px;
-}
 .hero h1 {
-  font-family: Georgia, serif;
+  font-family: var(--font-story);
   font-size: clamp(65px, 6.8vw, 110px);
   line-height: 0.95;
   font-weight: 400;
@@ -118,32 +98,6 @@ main {
 .hero h1 em {
   font-weight: 400;
   color: #d7eee4;
-}
-.title-period {
-  color: var(--teal);
-}
-.hero-subtitle {
-  color: #c4d0cc;
-  font-size: 17px;
-  line-height: 1.7;
-}
-.tags {
-  display: flex;
-  gap: 10px;
-  margin: 24px 0;
-}
-.tags span {
-  font:
-    10px Consolas,
-    monospace;
-  letter-spacing: 1px;
-  border: 1px solid #98b6ad55;
-  padding: 6px 9px;
-}
-.hero-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 30px;
 }
 .primary {
   background: var(--primary);
@@ -157,55 +111,6 @@ main {
 }
 .primary span {
   margin-left: 24px;
-}
-.secondary {
-  border-color: var(--border-strong);
-  color: var(--text);
-}
-.hero-note {
-  font:
-    11px Consolas,
-    monospace;
-  color: var(--muted);
-  margin-top: 18px;
-}
-.hero-index {
-  position: absolute;
-  right: 6%;
-  bottom: 32px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  font: 10px monospace;
-  letter-spacing: 2px;
-  color: #b4c7be;
-}
-.hero-index i {
-  width: 70px;
-  height: 1px;
-  background: #8daf9e;
-}
-.intro-strip {
-  margin: 0 6%;
-  padding: 28px 0;
-  display: flex;
-  gap: 28px;
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-}
-.intro-strip span {
-  font: 10px monospace;
-  letter-spacing: 2px;
-  color: var(--teal);
-}
-.intro-strip p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-.intro-strip span:last-child {
-  margin-left: auto;
-  font-size: 22px;
 }
 .discover,
 .continue,
@@ -232,81 +137,6 @@ h3 {
 .muted {
   color: var(--muted);
   font-size: 13px;
-}
-.story-row {
-  display: grid;
-  grid-template-columns: minmax(300px, 1.1fr) 1fr;
-  gap: 64px;
-}
-.story-card {
-  border: 0;
-  padding: 0;
-  text-align: left;
-  overflow: hidden;
-}
-.card-art {
-  height: 245px;
-  position: relative;
-  overflow: hidden;
-}
-.card-art img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.card-art > span {
-  position: absolute;
-  top: 18px;
-  left: 20px;
-  font: 9px monospace;
-  letter-spacing: 2px;
-  background: #112020ab;
-  padding: 6px;
-}
-.card-art b {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  border: 1px solid #98baad;
-  padding: 7px 16px;
-}
-.card-copy {
-  padding: 20px 2px;
-}
-.card-copy small {
-  font: 10px monospace;
-  letter-spacing: 2px;
-  color: var(--teal);
-}
-.card-copy h3 {
-  font-size: 24px;
-  margin: 8px 0 2px;
-}
-.card-copy p {
-  font-size: 13px;
-  color: var(--muted);
-  margin: 0 0 14px;
-}
-.card-copy > span {
-  font-size: 11px;
-  color: var(--muted);
-}
-.editorial {
-  padding: 12px 0;
-  max-width: 440px;
-}
-.editorial-icon {
-  color: var(--teal);
-  font-size: 35px;
-}
-.editorial h3 {
-  font-size: 29px;
-  line-height: 1.3;
-  margin: 10px 0 18px;
-}
-.editorial p {
-  color: var(--muted);
-  font-size: 14px;
 }
 .continue {
   padding-bottom: 0;
@@ -351,10 +181,6 @@ h3 {
   background: var(--danger-soft);
   border-color: var(--danger);
 }
-.notice.subtle {
-  background: var(--surface-2);
-  border: 0;
-}
 .player-heading {
   padding: 40px 6% 20px;
   display: flex;
@@ -363,9 +189,7 @@ h3 {
   gap: 24px;
 }
 .player-heading h1 {
-  font:
-    36px Georgia,
-    serif;
+  font: 600 36px/1.15 var(--font-story);
   margin: 0;
 }
 .player-heading .eyebrow {
@@ -380,36 +204,14 @@ h3 {
   gap: 20px;
 }
 .saved {
-  font: 12px monospace;
-  color: var(--teal);
+  font: 600 13px var(--font-ui);
+  color: var(--success);
 }
 .player-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 270px;
   gap: 35px;
   padding: 10px 6% 40px;
-}
-.video-frame {
-  position: relative;
-  background: #080d10;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.video-frame video {
-  width: 100%;
-  aspect-ratio: 16/9;
-  display: block;
-}
-.media-label {
-  position: absolute;
-  top: 12px;
-  left: 15px;
-  font: 9px monospace;
-  background: #101516bd;
-  padding: 4px 8px;
-  pointer-events: none;
-  letter-spacing: 1px;
 }
 .transcript {
   margin: 20px 0 35px;
@@ -423,9 +225,7 @@ summary {
   font-size: 13px;
 }
 .transcript p {
-  font:
-    17px/1.8 Georgia,
-    serif;
+  font: 17px/1.8 var(--font-story);
   color: var(--text-body);
   margin: 8px 0;
 }
@@ -440,22 +240,19 @@ summary {
   text-align: left;
   margin: 10px 0;
   padding: 16px 20px;
-  background: #192221;
+  border-color: var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
 }
 .choice-number {
-  font: 12px monospace;
-  color: var(--teal);
+  font: 700 13px var(--font-ui);
+  color: var(--link);
 }
 .choices small {
   display: block;
   font-size: 12px;
   color: var(--muted);
   margin-top: 3px;
-}
-.arrow {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--teal);
 }
 aside {
   background: var(--surface-1);
@@ -465,9 +262,7 @@ aside {
   height: fit-content;
 }
 aside h2 {
-  font:
-    24px Georgia,
-    serif;
+  font: 700 20px/1.3 var(--font-display);
 }
 .stats > div {
   display: flex;
@@ -500,7 +295,7 @@ hr {
   text-transform: capitalize;
 }
 .edition {
-  font: 10px/1.8 monospace;
+  font: 12px/1.8 var(--font-ui);
   color: var(--muted);
   border-top: 1px solid var(--line);
   padding-top: 22px;
@@ -526,8 +321,8 @@ hr {
 }
 .community small {
   display: block;
-  font: 10px/2 monospace;
-  color: var(--violet);
+  font: 600 12px/2 var(--font-ui);
+  color: var(--link);
 }
 .community p:last-child {
   font-size: 12px;
@@ -604,9 +399,7 @@ hr {
   font-size: 22px;
 }
 .modal h2 {
-  font:
-    36px Georgia,
-    serif;
+  font: 700 30px/1.2 var(--font-display);
 }
 .modal > p {
   color: var(--muted);
@@ -638,58 +431,27 @@ hr {
   color: var(--muted);
 }
 .demo-accounts small {
-  font: 10px monospace;
-  letter-spacing: 1px;
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.5px;
 }
 .error-text {
   color: var(--danger);
 }
 @media (max-width: 800px) {
+  .studio {
+    padding: 20px 16px 40px;
+  }
   .hero {
     min-height: 630px;
   }
-  .hero-art {
-    background:
-      linear-gradient(90deg, #101b20ea, #101b2060),
-      linear-gradient(0deg, #101516, transparent),
-      url("/media/harbor.svg") 65% center/cover;
-  }
-  .hero-content {
-    padding: 40px 6% 80px;
-  }
   .hero h1 {
     font-size: 80px;
-  }
-  .hero-index {
-    left: 6%;
-    right: auto;
-    font-size: 8px;
-  }
-  .hero-actions {
-    flex-wrap: wrap;
-  }
-  .intro-strip {
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .intro-strip > span:last-child {
-    display: none;
-  }
-  .intro-strip p {
-    font-size: 12px;
-  }
-  .story-row {
-    grid-template-columns: 1fr;
-    gap: 20px;
   }
   .section-heading > .muted {
     display: none;
   }
   .discover {
     padding-top: 32px;
-  }
-  .editorial {
-    max-width: none;
   }
   .player-grid {
     grid-template-columns: 1fr;
@@ -712,9 +474,6 @@ hr {
   .choices > button {
     padding: 15px 12px;
     gap: 12px;
-  }
-  .choices .arrow {
-    font-size: 10px;
   }
   .continue img {
     width: 75px;
@@ -765,20 +524,18 @@ hr {
 }
 .reading-page {
   padding: clamp(24px, 5vw, 64px);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: linear-gradient(145deg, #1c302c, #101c24);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
 }
 .reading-page h1 {
-  font:
-    clamp(32px, 5vw, 56px) Georgia,
-    serif;
+  font: 600 clamp(32px, 5vw, 52px) / 1.1 var(--font-story);
   margin: 16px 0 24px;
 }
 .page-copy {
-  font:
-    21px/1.8 Georgia,
-    serif;
+  font: 20px/1.8 var(--font-story);
+  color: var(--text-body);
   white-space: pre-wrap;
   max-width: 65ch;
 }
@@ -789,11 +546,9 @@ hr {
   align-content: center;
   justify-items: center;
   margin: 24px 0;
-  font:
-    64px Georgia,
-    serif;
+  font: 700 64px var(--font-display);
   text-align: center;
-  color: var(--accent);
+  color: var(--primary);
 }
 .app-notices {
   position: fixed;
@@ -829,10 +584,51 @@ hr {
   align-self: center;
 }
 .studio {
-  padding: 36px 5%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 32px 64px;
 }
-.studio h1 {
-  font-size: clamp(28px, 4vw, 48px);
+.studio :is(h1, h2, h3) {
+  font-family: var(--font-display);
+}
+.studio-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.studio-head h1 {
+  margin: 0;
+  font: 700 clamp(30px, 4vw, 40px) / 1.15 var(--font-display);
+  letter-spacing: -0.8px;
+}
+.studio-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.studio-sub {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.studio-note {
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--warning-soft);
+  color: var(--text-body);
+}
+.studio-start {
+  align-self: start;
+  padding: 32px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+.studio-start h2 {
+  margin: 0;
+  font: 700 22px/1.3 var(--font-display);
 }
 .studio-layout {
   display: grid;
@@ -856,13 +652,16 @@ hr {
 }
 .studio-library h2 {
   margin: 0 0 12px;
+  font: 700 16px/1.3 var(--font-ui);
 }
 .studio-draft-stack {
   padding: 0;
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
 }
 .studio-draft-stack:empty {
   display: none;
@@ -969,9 +768,7 @@ hr {
   color: var(--muted);
 }
 .library-text-preview {
-  font:
-    48px Georgia,
-    serif;
+  font: 600 48px var(--font-story);
   background: var(--surface-2);
 }
 .library-text-preview span {
@@ -1090,15 +887,4 @@ hr {
     16px/1.5 "Segoe UI",
     sans-serif;
   color: var(--text);
-}
-.mock-story-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: 24px;
-  margin-bottom: 28px;
-}
-.mock-story-grid h3 {
-  font:
-    30px Georgia,
-    serif;
 }

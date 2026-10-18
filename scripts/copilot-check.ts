@@ -63,13 +63,21 @@ try {
       main: JSON.stringify(document.querySelector("main")!.getBoundingClientRect()),
       overflow: document.documentElement.scrollWidth > innerWidth,
     }));
-  const before = await layout();
+  // Measure only once fonts and images have settled the layout.
+  await page.evaluate(() => document.fonts.ready);
+  let before = await layout();
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(250);
+    const next = await layout();
+    if (next.main === before.main) break;
+    before = next;
+  }
   const toggle = page.getByRole("button", { name: "Copilot", exact: true });
   await toggle.click();
   const drawer = page.getByRole("complementary", { name: "Copilot" });
   await drawer.waitFor();
   const opened = await layout();
-  assert.equal(opened.main, before.main, "Opening Copilot moved page content");
+  assert.equal(opened.main, before.main, `Opening Copilot moved page content: ${before.main} -> ${opened.main}`);
   assert.equal(opened.overflow, false, "Horizontal overflow with Copilot open");
 
   // A streamed reply arrives in pieces and reads as one message.

@@ -85,8 +85,8 @@
   max-height: 75dvh;
   overflow: auto;
   overscroll-behavior: contain;
-  background-color: #0b1618;
-  background-image: radial-gradient(#3b5150 1px, transparent 1px);
+  background-color: var(--surface-2);
+  background-image: radial-gradient(var(--border-strong) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 .graph-canvas {
@@ -97,11 +97,11 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  color: #668d87;
+  color: var(--muted);
 }
 .graph-wires > path {
   fill: none;
-  stroke: #668d87;
+  stroke: var(--muted);
   stroke-width: 2;
 }
 .graph-wires > path.selected {
@@ -110,16 +110,16 @@
 }
 .graph-card {
   position: absolute;
-  border: 1px solid #4b6660;
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: #182724;
-  box-shadow: 0 8px 24px #0003;
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
 }
 .graph-card.is-selected {
   border-color: var(--accent);
   box-shadow:
-    0 0 0 2px #a4dfc533,
-    0 8px 24px #0003;
+    0 0 0 2px var(--primary-soft),
+    var(--shadow);
 }
 .graph-card.is-target {
   border-style: dashed;
@@ -140,9 +140,9 @@
   height: 34px;
   padding: 0 12px;
   border: 0;
-  border-bottom: 1px solid #385148;
+  border-bottom: 1px solid var(--border);
   border-radius: 12px 12px 0 0;
-  background: #233c34;
+  background: var(--surface-2);
   color: var(--accent);
   font-size: 10px;
   text-transform: uppercase;
@@ -188,7 +188,7 @@
   height: 34px;
   padding: 0 12px;
   border: 0;
-  border-top: 1px solid #30473e;
+  border-top: 1px solid var(--border);
   background: transparent;
   font-size: 12px;
   gap: 8px;
@@ -222,7 +222,7 @@
   color: var(--muted);
 }
 .graph-outputs button[aria-pressed="true"] {
-  background: #355847;
+  background: var(--primary-soft);
 }
 .studio-page-inspector {
   max-height: 850px;

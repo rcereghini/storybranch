@@ -1,0 +1,336 @@
+/* Discover and story pages. The featured hero sits on dark art in both
+   themes, so its text uses fixed light colors; everything else is tokens. */
+.disc {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+.disc h1,
+.disc h2,
+.disc h3 {
+  margin: 0;
+}
+.disc-muted {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+/* Featured hero */
+.disc-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 440px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: var(--radius-lg);
+  background: #13252a;
+  box-shadow: var(--shadow);
+  color: #ffffff;
+}
+.disc-hero-art {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(11 20 26 / 92%) 0%, rgb(11 20 26 / 70%) 38%, rgb(11 20 26 / 10%) 75%),
+    linear-gradient(0deg, rgb(11 20 26 / 55%) 0%, transparent 45%),
+    url("/media/harbor.svg") right center / cover;
+}
+.disc-hero-content {
+  position: relative;
+  max-width: 560px;
+  padding: 48px 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.disc-hero-kicker {
+  margin: 0;
+  color: #ffb39f;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.disc-hero h1 {
+  font: 600 clamp(44px, 6vw, 76px) / 1 var(--font-story);
+  letter-spacing: -1.5px;
+}
+.disc-hero-period {
+  color: #ff8e75;
+}
+.disc-hero-sub {
+  margin: 0;
+  color: #dfe6ea;
+  font-size: 17px;
+}
+.disc-hero-tags {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.disc-hero-tags li {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 14%);
+  font-size: 13px;
+  font-weight: 600;
+}
+.disc-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.disc-hero .disc-hero-secondary {
+  border-color: rgb(255 255 255 / 45%);
+  background: transparent;
+  color: #ffffff;
+  font-weight: 600;
+}
+.disc-hero .disc-hero-secondary:hover:not(:disabled) {
+  background: rgb(255 255 255 / 12%);
+}
+.disc-hero .btn-primary:focus-visible,
+.disc-hero-secondary:focus-visible {
+  outline-color: #ffffff;
+}
+
+/* Library */
+.disc-library {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.disc-library-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.disc-library-head h2 {
+  font: 700 28px/1.2 var(--font-display);
+  letter-spacing: -0.5px;
+}
+.disc-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.disc-search input {
+  width: min(260px, 100%);
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  color: var(--text);
+  font: 15px var(--font-ui);
+}
+.disc-search input::placeholder {
+  color: var(--muted);
+}
+.disc-filter {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+.disc-filter button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--muted);
+  font: 600 14px var(--font-ui);
+}
+.disc-filter [aria-pressed="true"],
+.disc-filter [aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--surface-1);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.disc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 20px;
+}
+.disc-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
+}
+.disc-card > .story-cover {
+  border-radius: 0;
+}
+.disc-card-body {
+  flex: 1;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.disc-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--link);
+  font-size: 13px;
+  font-weight: 700;
+}
+.disc-status {
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+}
+.disc-status.in-progress {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.disc-status.completed {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.disc-card h3 {
+  font: 600 21px/1.2 var(--font-story);
+}
+.disc-card-text {
+  margin: 0;
+  color: var(--text-body);
+  font-size: 15px;
+}
+.disc-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.disc-more {
+  align-self: center;
+}
+
+/* Story page */
+.disc-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.disc-shared {
+  margin: 0;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+}
+.disc-detail-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: center;
+}
+.disc-detail-cover {
+  flex: 1 1 420px;
+  min-width: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.disc-detail-copy {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.disc-detail-copy h1 {
+  font: 600 clamp(34px, 4.5vw, 52px) / 1.05 var(--font-story);
+  letter-spacing: -1px;
+}
+.disc-tagline {
+  margin: 0;
+  font: 700 19px/1.35 var(--font-display);
+}
+.disc-description {
+  margin: 0;
+  color: var(--text-body);
+  font-size: 17px;
+}
+.disc-chips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.disc-chips li {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 600;
+}
+.disc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.disc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 40px 0;
+}
+.disc-empty h1 {
+  font: 700 28px/1.2 var(--font-display);
+}
+
+@media (max-width: 800px) {
+  .disc {
+    padding: 16px 16px 40px;
+    gap: 28px;
+  }
+  .disc-hero {
+    min-height: 520px;
+  }
+  .disc-hero-art {
+    background:
+      linear-gradient(0deg, rgb(11 20 26 / 96%) 0%, rgb(11 20 26 / 75%) 45%, rgb(11 20 26 / 15%) 80%),
+      url("/media/harbor.svg") 70% center / cover;
+  }
+  .disc-hero-content {
+    padding: 28px 22px;
+  }
+  .disc-hero-actions .btn {
+    flex: 1 1 auto;
+  }
+  .disc-tools,
+  .disc-search,
+  .disc-search input {
+    width: 100%;
+  }
+  .disc-filter {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .disc-detail-layout {
+    gap: 20px;
+  }
+}

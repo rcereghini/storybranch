@@ -55,14 +55,16 @@ export function Adventures({
 
   return (
     <section className="adventures-page" aria-labelledby="adventures-title">
-      <p className="eyebrow">YOUR JOURNEYS</p>
-      <h1 id="adventures-title">Pick up the thread.</h1>
+      <h1 id="adventures-title">My adventures</h1>
+      <p className="adventures-sub">
+        Every journey, side quest and ending you have played.
+      </p>
       {!signedIn ? (
         <div className="empty-state">
           <p>
             Sign in to keep every journey, side quest and ending in one place.
           </p>
-          <button className="primary" onClick={onSignIn}>
+          <button className="btn btn-primary" onClick={onSignIn}>
             Sign in to see your saves
           </button>
         </div>
@@ -79,7 +81,7 @@ export function Adventures({
       ) : saves.length === 0 ? (
         <div className="empty-state">
           <p>No adventures yet. Your first choice is waiting.</p>
-          <button className="primary" onClick={onDiscover}>
+          <button className="btn btn-primary" onClick={onDiscover}>
             Discover
           </button>
         </div>
@@ -113,8 +115,8 @@ export function Adventures({
                         {new Date(s.updatedAt).toLocaleString()}
                       </span>
                     </span>
-                    <span className="pill-action">
-                      {s.status === "completed" ? "Revisit ↗" : "Resume ↗"}
+                    <span className="adventure-go">
+                      {s.status === "completed" ? "Revisit" : "Resume"}
                     </span>
                   </button>
                 </li>
@@ -124,7 +126,7 @@ export function Adventures({
         ))
       )}
       {hasMore && (
-        <button className="ghost more" onClick={onLoadMore}>
+        <button className="btn btn-secondary more" onClick={onLoadMore}>
           Load more adventures
         </button>
       )}

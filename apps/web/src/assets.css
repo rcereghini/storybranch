@@ -1,0 +1,131 @@
+/* Assets library. Theme-aware; the filter reuses Discover's .disc-filter. */
+.assets {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.assets h1,
+.assets h2 {
+  margin: 0;
+}
+.assets-muted {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.assets-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.assets-head h1 {
+  font: 700 clamp(30px, 4vw, 40px) / 1.15 var(--font-display);
+  letter-spacing: -0.8px;
+}
+.assets-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.assets-actions label.btn {
+  cursor: pointer;
+}
+.assets-actions label.btn:focus-within {
+  outline: 3px solid var(--link);
+  outline-offset: 3px;
+}
+.assets-actions .is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.assets-status {
+  min-height: 24px;
+  margin: 0;
+  color: var(--text-body);
+  font-size: 14px;
+}
+.assets-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 18px;
+}
+.assets-card {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
+}
+.assets-card.placeholder-block {
+  min-height: 240px;
+}
+.assets-preview {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  background: #0e0e13;
+}
+.assets-preview :is(img, video) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.assets-pending {
+  color: #c8c8d4;
+  font-size: 14px;
+}
+.assets-card-body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.assets-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.assets-meta span:first-child {
+  color: var(--link);
+  font-weight: 700;
+}
+.assets-card h2 {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 15px/1.4 var(--font-ui);
+}
+.assets-empty {
+  padding: 40px 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+.assets-empty h2 {
+  font: 700 20px/1.3 var(--font-display);
+}
+
+@media (max-width: 800px) {
+  .assets {
+    padding: 20px 16px 40px;
+  }
+  .assets-actions,
+  .assets-actions .btn {
+    flex: 1 1 auto;
+  }
+}

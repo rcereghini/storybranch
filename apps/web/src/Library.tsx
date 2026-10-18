@@ -5,7 +5,11 @@ import {
   placePage,
   type LibraryPage,
 } from "../../../packages/contracts/page-library";
-import type { UploadListing } from "../../../packages/contracts/media";
+import {
+  imageTypes,
+  videoTypes,
+  type UploadListing,
+} from "../../../packages/contracts/media";
 import { ClipPicker } from "./ClipPicker";
 import { Button, Panel } from "./ui";
 import { copyLink } from "./share";
@@ -15,6 +19,8 @@ import { resolveFixtureMedia } from "../../../fixtures/media";
 import { VideoGenerator } from "./VideoGenerator";
 import { VideoEditor } from "./VideoEditor";
 import "./video-workshop.css";
+import "./assets.css";
+import { uploadAsset } from "./asset-upload";
 type Api = <T>(path: string, body?: unknown) => Promise<T>;
 type PageRequest = { path: string; body: unknown; instanceId?: string };
 const pageTypes = {
@@ -294,6 +300,7 @@ export function AssetLibrary({
 }) {
   const [uploads, setUploads] = useState<UploadListing | null>(null);
   const [notice, setNotice] = useState("");
+  const [filter, setFilter] = useState<"all" | "video" | "image">("all");
   const load = () =>
     api<UploadListing>("/uploads")
       .then(setUploads)
@@ -344,72 +351,160 @@ export function AssetLibrary({
       </Panel>
     );
   }
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setNotice("");
+    try {
+      onAsset(await uploadAsset(api, file, setNotice));
+      setNotice(`${file.name} is ready to use on any page.`);
+    } catch (error) {
+      setNotice((error as Error).message);
+    }
+  };
+  const items = (uploads?.items ?? []).filter(
+    (asset) =>
+      filter === "all" ||
+      (filter === "video") === asset.contentType.startsWith("video/"),
+  );
   return (
-    <section className="asset-library p-6">
-      <h1>Your assets</h1>
-      <p>
-        Upload videos and photos independently, then reuse them on any page.
-      </p>
-      <Button onClick={() => navigate("/assets/generate")}>
-        Generate video
-      </Button>
-      <div className="grid gap-6 md:grid-cols-2">
-        {(["video", "image"] as const).map((kind) => (
-          <Panel key={kind}>
-            <ClipPicker
-              kind={kind}
-              api={api}
-              uploads={uploads}
-              value={undefined}
-              disabled={false}
-              onChange={() => {}}
-              onUploaded={(asset) =>
-                setUploads(
-                  (old) =>
-                    old && {
-                      ...old,
-                      items: [
-                        asset,
-                        ...old.items.filter((a) => a.id !== asset.id),
-                      ],
-                    },
-                )
-              }
+    <section className="assets" aria-labelledby="assets-title">
+      <div className="assets-head">
+        <div>
+          <h1 id="assets-title">Assets</h1>
+          <p className="assets-muted">
+            Your videos and photos. Upload or generate them once, then use them
+            on any page.
+          </p>
+        </div>
+        <div className="assets-actions">
+          <label
+            className={`btn btn-primary ${uploads?.enabled ? "" : "is-disabled"}`}
+          >
+            Upload video
+            <input
+              className="sr-only"
+              type="file"
+              aria-label="Upload a clip"
+              accept={videoTypes.join(",")}
+              disabled={!uploads?.enabled}
+              onChange={(e) => {
+                void upload(e.target.files?.[0]);
+                e.target.value = "";
+              }}
             />
-          </Panel>
-        ))}
+          </label>
+          <label
+            className={`btn btn-secondary ${uploads?.enabled ? "" : "is-disabled"}`}
+          >
+            Upload photo
+            <input
+              className="sr-only"
+              type="file"
+              aria-label="Upload a photo"
+              accept={imageTypes.join(",")}
+              disabled={!uploads?.enabled}
+              onChange={(e) => {
+                void upload(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <button
+            className="btn btn-secondary"
+            aria-label="Generate video"
+            onClick={() => navigate("/assets/generate")}
+          >
+            Generate with AI
+          </button>
+        </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {uploads?.items.map((asset) => (
-          <Panel key={asset.id}>
-            {asset.url ? (
-              <img
-                className="aspect-video w-full object-contain"
-                src={asset.url}
-                alt={asset.fileName}
-              />
-            ) : asset.media ? (
-              <video
-                className="aspect-video w-full"
-                controls
-                preload="metadata"
-                src={asset.media.landscape.src}
-              />
-            ) : null}
-            <h2 className="break-words">{asset.fileName}</h2>
-            <p>
-              {asset.status} · {(asset.bytes / 1024 / 1024).toFixed(1)} MB
-            </p>
-            {asset.media && (
-              <Button onClick={() => navigate(`/assets/edit/${asset.id}`)}>
-                Edit video
-              </Button>
-            )}
-          </Panel>
-        ))}
+      {/* Reserved line: upload progress and messages never shift the grid. */}
+      <p className="assets-status" role="status">
+        {uploads && !uploads.enabled ? uploads.reason : notice}
+      </p>
+      <div className="assets-toolbar">
+        <div className="disc-filter" role="group" aria-label="Show">
+          {(
+            [
+              ["all", "All"],
+              ["video", "Videos"],
+              ["image", "Photos"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              aria-pressed={filter === value}
+              onClick={() => setFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button className="btn-link" onClick={() => void load()}>
+          Refresh
+        </button>
       </div>
-      <p role="status">{notice}</p>
-      <Button onClick={() => void load()}>Refresh assets</Button>
+      {!uploads ? (
+        <div className="assets-grid" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="assets-card placeholder-block" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="assets-empty">
+          <h2>
+            {uploads.items.length === 0
+              ? "No assets yet"
+              : "Nothing of this type yet"}
+          </h2>
+          <p className="assets-muted">
+            Upload an MP4 or WebM clip (up to 60 seconds) or a JPEG, PNG or WebP
+            photo (up to 10 MB), or generate one with AI.
+          </p>
+        </div>
+      ) : (
+        <div className="assets-grid">
+          {items.map((asset) => (
+            <article key={asset.id} className="assets-card">
+              <div className="assets-preview">
+                {asset.url ? (
+                  <img src={asset.url} alt={asset.fileName} loading="lazy" />
+                ) : asset.media ? (
+                  <video
+                    controls
+                    preload="metadata"
+                    src={asset.media.landscape.src}
+                  />
+                ) : (
+                  <span className="assets-pending">Processing…</span>
+                )}
+              </div>
+              <div className="assets-card-body">
+                <p className="assets-meta">
+                  <span>
+                    {asset.contentType.startsWith("video/") ? "Video" : "Photo"}
+                  </span>
+                  {asset.contentType.startsWith("video/") &&
+                    asset.durationSeconds > 0 && (
+                      <span>{Math.round(asset.durationSeconds)} s</span>
+                    )}
+                  <span>{(asset.bytes / 1024 / 1024).toFixed(1)} MB</span>
+                  {asset.published && <span>In a published story</span>}
+                </p>
+                <h2 title={asset.fileName}>{asset.fileName}</h2>
+                {asset.media && (
+                  <button
+                    className="btn btn-secondary btn-small"
+                    onClick={() => navigate(`/assets/edit/${asset.id}`)}
+                  >
+                    Edit video
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

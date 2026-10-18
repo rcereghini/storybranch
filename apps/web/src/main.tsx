@@ -346,13 +346,14 @@ function App() {
         <div className="app-header-inner">
           <a
             className="brand"
+            aria-label="Storybranch home"
             href="/"
             onClick={(e) => {
               e.preventDefault();
               navigate("/");
             }}
           >
-            <Logo /> storybranch
+            <Logo /> <span className="brand-name">storybranch</span>
           </a>
           {immersive ? (
             <button

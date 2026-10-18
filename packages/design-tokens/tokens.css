@@ -44,8 +44,11 @@
   --radius: var(--radius-sm);
 }
 
-/* Dark values, once for an explicit choice and once for the system setting. */
-:root[data-theme="dark"] {
+/* Dark values, once for an explicit choice (and .theme-dark, for surfaces
+   that stay dark in both themes, like the video stage) and once for the
+   system setting. */
+:root[data-theme="dark"],
+.theme-dark {
   color-scheme: dark;
   --bg: #111117;
   --surface-1: #1a1a22;
@@ -112,8 +115,10 @@
   }
 }
 
-/* Legacy names used by older styles; prefer the semantic names above. */
-:root {
+/* Legacy names used by older styles; prefer the semantic names above.
+   Re-declared on .theme-dark so they resolve to its dark values. */
+:root,
+.theme-dark {
   --panel: var(--surface-1);
   --line: var(--border);
   --teal: var(--link);
