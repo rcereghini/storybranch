@@ -21,6 +21,8 @@ try {
       .first()
       .click();
     await signIn(page);
+    // Stories are played from Discover; Home shows recommendations.
+    await page.goto("http://127.0.0.1:5173/discover");
     await page
       .getByRole("button", { name: /Play What Kind of Explorer Are You\?/ })
       .click();

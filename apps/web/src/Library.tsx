@@ -189,9 +189,9 @@ export function PageLibrary({
     }
   };
   return (
-    <Panel aria-label="Page library">
+    <Panel aria-label="Page library" className="page-library">
       <h2>Reusable pages</h2>
-      <p>
+      <p className="studio-sub">
         Save content once, place it in many stories, and connect its outputs in
         each story. Sharing publishes an isolated page preview.
       </p>

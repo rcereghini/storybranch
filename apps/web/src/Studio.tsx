@@ -559,8 +559,10 @@ export function Studio({
         )}
         {draft && (
           <div className="studio-editor">
-            <div className="studio-actions">
+            {/* Sticky so saving and publishing stay in reach while editing. */}
+            <div className="studio-actions studio-toolbar">
               <Button
+                className="btn btn-primary btn-small"
                 disabled={busy || offline || !!retry}
                 onClick={() =>
                   void work(() =>
@@ -586,6 +588,7 @@ export function Studio({
                 Save draft
               </Button>
               <Button
+                className="btn btn-secondary btn-small"
                 disabled={busy || !!retry}
                 onClick={() => {
                   try {
@@ -609,6 +612,7 @@ export function Studio({
                 Preview
               </Button>
               <Button
+                className="btn btn-coral btn-small"
                 disabled={
                   busy ||
                   offline ||
@@ -640,7 +644,7 @@ export function Studio({
                   Play published story
                 </Button>
               )}
-              <span>
+              <span className={`studio-status ${dirty ? "is-dirty" : ""}`}>
                 {dirty ? "Unsaved changes" : `Saved revision ${draft.revision}`}
               </span>
               {draft.revision > 0 && (
@@ -668,7 +672,7 @@ export function Studio({
                 </Button>
               )}
             </div>
-            <p className="muted">
+            <p className="studio-publish-note">
               Publish makes this story public in Discover. Only publish content
               you have rights to share. Sample clips are placeholders. Uploaded
               clips become public when you publish a story that uses them.

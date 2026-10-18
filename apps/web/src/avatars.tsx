@@ -5,7 +5,8 @@ import type {
 } from "../../../packages/contracts/profile";
 import { accents } from "./theme";
 
-// Each preset is a line glyph on a tinted badge; ids live in contracts.
+// Each preset is a dark line glyph on a solid tinted badge; ids live in
+// contracts.
 export const avatars: Record<
   AvatarId,
   { label: string; tint: string; glyph: string }
@@ -105,21 +106,16 @@ export function Avatar({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <path d={shape.path} fill={color} fillOpacity="0.16" />
-      <path
-        d={shape.path}
-        fill="none"
-        stroke={color}
-        strokeOpacity="0.6"
-        strokeWidth="0.6"
-      />
+      {/* A solid pastel badge with a dark glyph reads on light and dark
+          surfaces alike. */}
+      <path d={shape.path} fill={color} />
       <g
         transform={`translate(${offset} ${offset}) scale(${shape.glyphScale})`}
       >
         <path
           d={avatar.glyph}
           fill="none"
-          stroke={color}
+          stroke="#1b1a24"
           strokeWidth="1.6"
           strokeLinecap="round"
           strokeLinejoin="round"

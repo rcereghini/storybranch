@@ -82,8 +82,8 @@ export function StoryGraph({
     <section className="story-graph" aria-label="Branching story timeline">
       <div className="graph-heading">
         <div>
-          <p className="eyebrow">STORY TIMELINE</p>
-          <h2>Build the branches.</h2>
+          <p className="eyebrow">Story map</p>
+          <h2>Pages and branches</h2>
           <p>
             Drag pages to arrange them. Select an output, then its destination
             to connect a branch.

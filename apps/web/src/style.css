@@ -441,6 +441,9 @@ hr {
   .studio {
     padding: 20px 16px 40px;
   }
+  .studio-toolbar {
+    top: 68px;
+  }
   .hero {
     min-height: 630px;
   }
@@ -823,10 +826,75 @@ hr {
   margin-top: 8px;
 }
 .studio fieldset {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
   min-width: 0;
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
+}
+/* A fieldset legend sits in the card as its heading, not on the border. */
+.studio fieldset > legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 0;
+  color: var(--text);
+  font: 700 17px/1.3 var(--font-display);
+}
+.studio fieldset > legend + * {
+  clear: both;
+}
+.studio-toolbar {
+  position: sticky;
+  top: 76px;
+  z-index: 6;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
+}
+.studio-status {
+  margin-left: auto;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--success-soft);
+  color: var(--success);
+  font: 600 13px var(--font-ui);
+}
+.studio-status.is-dirty {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+/* Reusable pages: a compact panel with inline actions. */
+.page-library {
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
+}
+.page-library > h2 {
+  margin: 0;
+  font: 700 18px/1.3 var(--font-display);
+}
+.page-library > p.studio-sub {
+  margin-bottom: 12px;
+}
+.page-library > .ui-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin: 0 8px 8px 0;
+  border-color: var(--border-strong);
+  border-radius: var(--radius-pill);
+  font: 600 14px var(--font-ui);
+}
+.studio-publish-note {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
 }
 .studio label {
   display: block;
@@ -841,12 +909,30 @@ hr {
   display: block;
   width: 100%;
   margin-top: 8px;
-  padding: 12px;
+  padding: 11px 12px;
   color: var(--text);
-  background: var(--surface-2);
+  background: var(--surface-1);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font: inherit;
+}
+.studio :is(input, textarea, select):focus-visible,
+.video-workspace :is(input, textarea, select):focus-visible {
+  outline: 3px solid var(--primary-soft);
+  outline-offset: 0;
+  border-color: var(--primary);
+}
+/* The browser's file button, styled like a secondary button. */
+input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 13px var(--font-ui);
+  cursor: pointer;
 }
 .studio textarea {
   resize: vertical;
@@ -863,7 +949,8 @@ hr {
   margin: 20px 0;
 }
 .studio-output {
-  border-left: 2px solid var(--accent);
+  border-left: 3px solid var(--primary);
+  border-radius: 2px;
   padding: 0 16px 16px;
   margin: 20px 0;
 }
@@ -883,8 +970,6 @@ hr {
 }
 .dice-result-label,
 .dice-result-detail {
-  font:
-    16px/1.5 "Segoe UI",
-    sans-serif;
+  font: 16px/1.5 var(--font-ui);
   color: var(--text);
 }

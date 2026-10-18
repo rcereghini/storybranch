@@ -18,20 +18,24 @@
 }
 .story-graph {
   min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  border: 0;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: var(--panel);
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
 }
 .graph-heading {
-  padding: 24px 24px 12px;
+  padding: 20px 22px 8px;
   display: flex;
   justify-content: space-between;
   gap: 16px;
 }
+.graph-heading .eyebrow {
+  margin: 0;
+}
 .graph-heading h2 {
-  margin: 4px 0 8px;
-  font-size: 28px;
+  margin: 2px 0 6px;
+  font: 700 20px/1.3 var(--font-display);
 }
 .graph-heading p {
   margin: 0;
@@ -48,24 +52,34 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px 24px;
-  border-bottom: 1px solid var(--line);
+  padding: 10px 22px 14px;
+  border-bottom: 1px solid var(--border);
 }
 .studio .graph-toolbar select {
   width: auto;
+  min-height: 38px;
   margin: 0;
-  padding: 9px;
-  font-size: 13px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
 }
 .graph-toolbar button {
-  padding: 8px 12px;
-  font-size: 12px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-color: var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  font: 600 13px var(--font-ui);
+}
+.graph-zoom button {
+  width: 38px;
+  padding: 0;
 }
 .graph-zoom {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 13px;
 }
 .graph-link-status {
   min-height: 64px;
