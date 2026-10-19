@@ -10,6 +10,12 @@ const site = (
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : "https://www.storybranch.com")
 ).replace(/\/$/, "");
+// A top-level folder named like an app page would be served instead of the
+// app on refresh or a direct link (Vercel serves files before rewrites).
+const appPages = ["assets", "discover", "adventures", "studio", "admin", "play", "p"];
+const shadowed = (await readdir("dist")).filter((entry) => appPages.includes(entry));
+if (shadowed.length)
+  throw new Error(`Build output shadows app pages: ${shadowed.join(", ")}`);
 const shell = await readFile("dist/index.html", "utf8");
 const images = new Set(
   (await readdir("dist/og")).map((file) => file.replace(/\.png$/, "")),
