@@ -1,14 +1,40 @@
 # Creator Studio alpha
 
-Open **Create** in the main navigation (or `/studio`) and sign in. Choose **New story**, edit its title and description, then build its branching **Story timeline**. Each new story starts with an opening and an ending. Select a page card to edit its content in **Page settings**; the **Edit page** selector provides an alternative for long graphs. The first-page selector sets the entry. An ending closes the story and uses the existing replay/recommendation shell.
+Open **Create** in the main navigation (or `/studio`) and sign in. The Studio page lists your drafts; **New story**, **New quiz** or a draft opens the editor, which fills the window below the app header (the footer and phone tab bar step aside, and **←** returns to the drafts after saving). Each new story starts with an opening and an ending. An ending closes the story and uses the existing replay/recommendation shell.
 
-## Branching timeline
+## Editor layout
+
+- **Top bar:** the story title (edit it in place), the save status, Undo/Redo, **Save draft**, **Preview**, **Play published story** (once published) and **Publish edition**.
+- **Pages** (left): the story as an outline in reading order, starting from the first page, with where each page's choices lead; pages nothing leads to yet are listed under "Not reachable yet". Selecting a page edits it and centers it on the map. The **Library** tab holds reusable pages.
+- **Map** (center): the branching canvas (below).
+- **Settings** (right): **Page** edits the selected page (the **Edit page** selector switches pages); **Story** holds the description, the first page, publishing notes and **Reload saved draft**.
+
+At 1100px and narrower one part fills the screen at a time, chosen with **Pages · Map · Edit page**. Selecting a page in the outline or on the map opens its settings; **←** returns to where you came from.
+
+**Saving.** Drafts save automatically two seconds after editing stops; Ctrl/Cmd+S saves at once, and **Publish edition** saves first. The status reads Unsaved changes, Saving…, All changes saved, Not saved (retried after eight seconds, or **Retry save**), Offline, or Changed elsewhere (a newer revision was saved from another tab; **Reload saved draft**). Edits made while a save is in flight are kept and saved next. A save interrupted by the network is resent with the same idempotency key. Because each save is a draft revision and an edition is named after the revision it publishes (`edition-{revision}`), edition numbers can skip.
+
+**Undo.** Undo/Redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y outside text fields) step through story, description and layout changes, up to 60 steps; quick successive edits such as typing count as one step. Text fields keep their own undo while focused. History resets when a draft is opened. Undo/Redo buttons show at 1241px and wider; the shortcuts work at any width.
+
+## Story map
+
+The map is a canvas: drag the background (or two-finger scroll on a trackpad) to move around; pinch, Ctrl/Cmd + scroll or **−/+** to zoom (25–160%); **Fit** shows the whole story; **◎** centers the selected page. The overview in the corner shows every page and the visible area; click or drag in it to move there. With the canvas focused, arrow keys pan, `+`/`-` zoom and `0` fits. It opens showing the whole story if it fits at a readable size, otherwise starting from the first page.
 
 - **Add page** creates the selected page type. From a linear page it inserts the new page between that page and its previous destination; otherwise it creates a page you can connect to a branch. New non-ending pages lead to an existing ending by default.
 - **Add branch** creates a new page and an option leading to it from the selected page. A linear text/video page becomes its options counterpart; existing choices and effects remain. Its library link is detached because its content/output slots changed.
 - Select an output row on a card, then select the destination card to reconnect it. Pass/Fail and quiz result outputs are individually displayed. Quiz results can only connect to endings. Existing route effects and conditions are preserved. **Cancel connection** or Escape cancels selection.
-- Drag a card by its type header to move it. Keyboard users can focus that handle and use arrow keys in 24-pixel increments. Moving cards changes editor layout only. **Save draft** persists positions; reloading restores them.
-- **Arrange tree** lays out the graph from left to right. Branches may rejoin, and cycles are displayed without infinite layout traversal. Disconnected pages appear in a separate column. Zoom controls, scrollbars and **Find selected** help navigate larger stories.
+- Drag a card by its type header to move it (positions are whole canvas pixels, independent of zoom). Keyboard users can focus that handle and use arrow keys in 24-pixel increments. Moving cards changes editor layout only; positions save with the draft and reloading restores them.
+- **Arrange tree** lays out the graph from left to right. Branches may rejoin, and cycles are displayed without infinite layout traversal. Disconnected pages appear in a separate column.
+
+## AI help
+
+With the account's `copilot` feature (and `ANTHROPIC_API_KEY` on the server), page settings offer writing help under the text field:
+
+- **Write it** drafts the page's text from the story title and description, up to three pages leading to it, and its outputs (**Write again** once it has text).
+- **Rewrite** changes the existing text in a chosen way: tighter, more vivid, more suspense, lighter or darker tone, or a custom instruction.
+- **Suggest choices** proposes up to three choices, each with a page title and text. **Add these choices** turns the page into its options type (a plain page's single Continue is replaced) and adds one new page per choice, each continuing to where the page led before.
+- **Generate a page image** opens a dialog with a prompt drafted from the page (or **Write the prompt with AI**), a quality tier and shape; the image is generated through `/api/generation` (the `generate` feature and its daily limit), saved to the creator's assets and set as the page photo.
+
+Suggestions open over the text field, so the panel never shifts, and change nothing until **Use this text** or **Add these choices**; an accepted suggestion is one undo step. `POST /api/assist` takes a strict command (`packages/contracts/assist.ts`): the action, an optional rewrite instruction and bounded story context sent by the browser (the draft may be unsaved). Story text is escaped and wrapped in tags as data, not instructions. The server calls Claude (`claude-opus-5-5`, low effort, structured output) and clamps the reply: text up to 10,000 characters, at most three choices, a prompt up to 1,800 characters. Requests share Copilot's daily limit of 100; a retry with the same key replays the stored suggestion, and a failed answer frees its key. Suggestions are never trusted state: they enter the draft only through the normal revision-checked save, and publication validates them like any other edit.
 
 The graph edits the same authored routing contracts as the destination selectors. Publication still rejects missing destinations, unreachable pages and branches with no route to an ending. Layout is private draft metadata and never becomes gameplay state or part of a published edition.
 
@@ -18,7 +44,7 @@ Supported types are Text, Text with Options, Video, Video with Options, Dice and
 
 **New quiz** starts a draft that is already a working quiz: an opening, two questions with three answers each, a reveal page and three result endings. Each answer has a **Counts toward** selector listing the results by page title, or No result. On the reveal page, **Result N page** chooses each result's ending, **Add result** creates a new ending and adds it (up to twelve), and **Remove result N** drops one while at least three remain. Changing any page's type to Reveal creates two new result endings for it. Preview plays the quiz with the same scoring rules as the server, so a creator can check that a set of answers reaches the expected result. See [Story and Page model](16-story-pages.md) for the scoring contract.
 
-**Save draft** stores a private draft. Incomplete connections may be saved. **Preview** validates a snapshot of the current edits and plays it inside the shared Story and Page components. It runs the portable engine in a disposable client sandbox with default stats, and can force the highest or lowest dice roll. Preview never writes player progress, rewards, or trusted outcomes. Only published gameplay uses the authoritative choice API. Close and reopen preview to test changed content.
+Drafts are private. Incomplete connections may be saved. **Preview** validates a snapshot of the current edits and plays it inside the shared Story and Page components. It runs the portable engine in a disposable client sandbox with default stats, and can force the highest or lowest dice roll. Preview never writes player progress, rewards, or trusted outcomes. Only published gameplay uses the authoritative choice API. Preview opens over the editor; close and reopen it to test changed content.
 
 **Publish edition** requires a saved draft with no local changes. It publishes publicly to Discover; it does not replace old editions. Use **Play published story** to open a real, server-backed journey. Editing and saving afterward makes the next revision available to publish. Existing player saves remain pinned to their edition. Publishing the same revision again is safe.
 
@@ -62,7 +88,7 @@ Drafts live at `users/{uid}/drafts/{storyId}`. A first save reserves story owner
 
 Draft requests are bounded to 250,000 UTF-8 bytes, 80 pages, 20 choices per page, 160-character titles and 500-character descriptions. Schema validation applies even to private drafts. Publication also validates graph references, page completion contracts, key namespaces, a reachable ending, unreachable pages and loops with no route to an ending. Cycles with an exit are allowed. This is structural validation, not a proof that every conditional route is satisfiable for every player state.
 
-Publication writes `edition-{draftRevision}`, its frozen page documents, the public catalogue projection, the latest-version pointer and its durable receipt in one transaction. The bounded graph fits a single transaction; no asynchronous job is needed yet. No partial edition becomes visible. Private draft fields are not copied into the catalogue. Repeated commands return their receipt; changed payloads with the same key conflict. Stale tabs must reload the saved draft. An ambiguous network failure keeps the same request for **Retry same request**.
+Publication writes `edition-{draftRevision}`, its frozen page documents, the public catalogue projection, the latest-version pointer and its durable receipt in one transaction. The bounded graph fits a single transaction; no asynchronous job is needed yet. No partial edition becomes visible. Private draft fields are not copied into the catalogue. Repeated commands return their receipt; changed payloads with the same key conflict. Stale tabs must reload the saved draft. An ambiguous network failure keeps the same request for **Retry save**.
 
 Loading and notifications overlay content. Reload/closing the browser warns about unsaved edits; saving is explicit. Offline edits remain in memory until saved, so do not close the tab before reconnecting.
 
@@ -72,16 +98,18 @@ Loading and notifications overlay content. Reload/closing the browser warns abou
 
 Assets links to **Generate image** and **Edit video**. AI generation makes images only; video generation is turned off (the server refuses `kind: "video"`, and the unused `VideoGenerator` workshop stays in the codebase for when it returns). Creators can still upload their own video clips. The generator takes a prompt, a quality tier and a shape (landscape 16:9, portrait 9:16 or square):
 
-| Tier | Model | Cost | References |
+Both tiers use OpenAI's `gpt-image-2` at exact sizes (1536×864, 864×1536, 1024×1024), returned as JPEG:
+
+| Tier | OpenAI quality | Cost (approximate, 1024×1024) | References |
 |---|---|---|---|
-| Quick draft | `fal-ai/flux/schnell` | a fraction of a cent | none |
-| High quality | `fal-ai/nano-banana-pro` (`/edit` with references) | about $0.15 per image | up to 3 owned images |
+| Quick draft | `low` | about $0.006 per image | none |
+| High quality | `high` (`/v1/images/edits` with references) | about $0.21 per image | up to 3 owned PNG, JPEG or WebP images |
 
 Reference images keep a character or place consistent across images; the contract rejects references on a quick draft. Results land in the asset library and Recent generations. A submitted request is remembered in the browser until the server answers, so a retry after a network failure reuses its idempotency key.
 
-Configure server-only `FAL_KEY` in `.env.local` or the hosting environment, then restart the server, and grant the account's `generate` feature (`pnpm features grant <email> generate`; emulator accounts already have it). Never use `VITE_` for the key. The UI explains when generation is unavailable.
+Configure server-only `OPENAI_API_KEY` in `.env.local` or the hosting environment, then restart the server, and grant the account's `generate` feature (`pnpm features grant <email> generate`; emulator accounts already have it). Never use `VITE_` for the key. The UI explains when generation is unavailable.
 
-`POST /api/generation` accepts a strict image command with a prompt, tier, shape, owned reference asset IDs and an idempotency key. The server validates ready image ownership, uses fixed model settings with safety checking, and sends image bytes to fal (including with local Storage). A durable receipt is reserved before provider submission. An ambiguous submission is marked uncertain and never automatically resubmitted; inspect fal's dashboard. Each creator is limited to 20 submitted image requests per UTC day, and full libraries reject new submissions. `GET /api/generation` returns only the creator's recent jobs. `POST /api/generation/{jobId}` checks a saved job and imports completed media once under a deterministic asset ID, using an import lease. Media imports allow only HTTPS fal CDN hosts, reject redirects, bound file sizes, inspect signatures, and remain private. Provider credentials and arbitrary model/source URLs are never accepted from the browser. A worker/webhook and reconciliation of ambiguous submissions are not yet implemented; completion import is driven by the browser's status checks. The library size check remains a soft cap under concurrency, like ordinary uploads.
+`POST /api/generation` accepts a strict image command with a prompt, tier, shape, owned reference asset IDs and an idempotency key. The server validates ready image ownership, uses fixed model settings with OpenAI's default moderation, and sends reference image bytes to OpenAI as multipart uploads. A durable receipt is reserved before the provider call. OpenAI returns the image in the response, so the same request saves it once under a deterministic asset ID; the Vercel function allows 300 seconds for this (`vercel.json`). A 400 refusal (including `moderation_blocked`) marks the job failed. Any other failure is marked uncertain and never automatically resubmitted; check OpenAI usage. A job still submitting after five minutes is shown as uncertain. Each creator is limited to 20 submitted image requests per UTC day, and full libraries reject new submissions. `GET /api/generation` returns only the creator's recent jobs. `POST /api/generation/{jobId}` reports a saved job's status, so a retried request can wait for the original. Results are size-bounded, signature-checked and private. Provider credentials and arbitrary model/source URLs are never accepted from the browser. Reconciliation of uncertain jobs is not implemented. The library size check remains a soft cap under concurrency, like ordinary uploads.
 
 Editing supports clip start/end, original/landscape/portrait/square crop, horizontal/vertical framing, crop preview, and audio removal. Export uses browser Canvas/MediaRecorder with Web Audio, retaining source audio unless muted. It runs in real time in a visible tab and saves a new WebM through the same validated upload path as other assets. It preserves the source and never silently rewrites pages referencing it. Export is capped at 60 seconds and a 1280-pixel longest edge. Chrome/Edge WebM recording is required; server transcoding, multi-track editing, lossless export, and background rendering are not implemented.
 

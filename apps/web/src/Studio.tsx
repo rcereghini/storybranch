@@ -1,5 +1,5 @@
 import { Button } from "./ui";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createApi, ApiError } from "../../../packages/api-client/index";
 import { z } from "zod";
 import { choiceSchema, effectSchema } from "../../../packages/contracts/index";
@@ -11,6 +11,7 @@ import {
   type Save,
 } from "../../../packages/contracts/index";
 import { type DraftRecord } from "../../../packages/contracts/authoring";
+import type { AssistChoice } from "../../../packages/contracts/assist";
 import { validatePublication } from "../../../packages/domain/authoring";
 import {
   baseStats,
@@ -18,152 +19,40 @@ import {
   start,
   transition,
 } from "../../../packages/domain/index";
-import { sceneMedia, resolveFixtureMedia } from "../../../fixtures/media";
+import { resolveFixtureMedia } from "../../../fixtures/media";
 import { Story } from "./Story";
 import { Page } from "./Page";
 import { ClipPicker } from "./ClipPicker";
 import { PageLibrary } from "./Library";
 import { StoryGraph } from "./StoryGraph";
+import { StoryOutline } from "./StoryOutline";
+import { PageAssist, PageImageDialog } from "./StudioAssist";
 import { connectPage } from "../../../packages/domain/story-graph";
 import {
   assetIdOf,
+  assetRef,
   type UploadListing,
 } from "../../../packages/contracts/media";
+import {
+  blankStory,
+  choice,
+  countToward,
+  ending,
+  makePage,
+  media,
+  quizTemplate,
+  result,
+  revealChoice,
+  route,
+  scoreOf,
+  shortId,
+} from "./studio-model";
+import "./studio.css";
 
 const api = createApi(
   fetch,
   async () => auth.currentUser?.getIdToken() ?? null,
 );
-const route = (targetPageId: string) => ({ targetPageId, effects: [] });
-const choice = (target = "ending"): Choice => ({
-  id: crypto.randomUUID(),
-  label: "Continue",
-  unavailableDisplay: "locked",
-  costs: [],
-  outcome: { kind: "direct", route: route(target) },
-});
-const makePage = (id: string): StoryPage => ({
-  id,
-  title: "New page",
-  transcript: "What happens here?",
-  kind: "scene",
-  pageType: "text",
-  entryEffects: [],
-  choices: [choice()],
-});
-const media = Object.values(sceneMedia);
-const shortId = () => crypto.randomUUID().slice(0, 8);
-const ending = (id: string, title: string, transcript: string): StoryPage => ({
-  ...makePage(id),
-  title,
-  transcript,
-  kind: "ending",
-  choices: [],
-});
-type Results = Extract<Choice["outcome"], { kind: "reveal" }>["results"];
-const result = (storyId: string, pageId: string): Results[number] => ({
-  scoreId: `${storyId}:${pageId}`,
-  route: route(pageId),
-});
-const revealChoice = (results: Results): Choice => ({
-  ...choice(),
-  label: "Reveal my result",
-  outcome: { kind: "reveal", results },
-});
-// An answer counts toward at most one result, through a score effect.
-const scoreOf = (c: Choice) =>
-  c.outcome.kind === "direct"
-    ? c.outcome.route.effects.find((e) => e.kind === "score")?.scoreId
-    : undefined;
-const countToward = (c: Choice, scoreId?: string): Choice =>
-  c.outcome.kind !== "direct"
-    ? c
-    : {
-        ...c,
-        outcome: {
-          kind: "direct",
-          route: {
-            ...c.outcome.route,
-            effects: [
-              ...c.outcome.route.effects.filter((e) => e.kind !== "score"),
-              ...(scoreId
-                ? [
-                    {
-                      id: `score-${c.id}`,
-                      kind: "score" as const,
-                      scoreId,
-                      delta: 1,
-                    },
-                  ]
-                : []),
-            ],
-          },
-        },
-      };
-// A starter quiz: two questions whose answers each add a point toward one of
-// three results, then a reveal page that shows the winning result.
-function quizTemplate(id: string): StoryData {
-  const results = ["result-a", "result-b", "result-c"];
-  const names = ["The Explorer", "The Builder", "The Dreamer"];
-  const question = (
-    pageId: string,
-    title: string,
-    labels: string[],
-    target: string,
-  ): StoryPage => ({
-    ...makePage(pageId),
-    title,
-    transcript: "Pick the answer that fits you best.",
-    pageType: "text-options",
-    choices: labels.map((label, i) =>
-      countToward({ ...choice(target), label }, `${id}:${results[i]}`),
-    ),
-  });
-  return {
-    id,
-    versionId: "draft",
-    rulesetVersion: "prototype-1",
-    title: "Untitled quiz",
-    entryPageId: "opening",
-    pages: {
-      opening: {
-        ...makePage("opening"),
-        title: "Opening",
-        transcript: "Answer a few questions to find out which one you are.",
-        choices: [{ ...choice("question-1"), label: "Start the quiz" }],
-      },
-      "question-1": question(
-        "question-1",
-        "Question 1",
-        ["Go somewhere new", "Make something", "Daydream"],
-        "question-2",
-      ),
-      "question-2": question(
-        "question-2",
-        "Question 2",
-        ["A map", "A toolbox", "A notebook"],
-        "reveal",
-      ),
-      reveal: {
-        ...makePage("reveal"),
-        title: "Your answers are in",
-        transcript: "Ready to see your result?",
-        pageType: "reveal",
-        choices: [revealChoice(results.map((r) => result(id, r)))],
-      },
-      ...Object.fromEntries(
-        results.map((r, i) => [
-          r,
-          ending(
-            r,
-            names[i],
-            "Describe this result and what it says about you.",
-          ),
-        ]),
-      ),
-    },
-  };
-}
 type Listing = {
   items: {
     id: string;
@@ -174,13 +63,27 @@ type Listing = {
   nextCursor: string | null;
   canPublish: boolean;
 };
+// What undo restores: everything the creator edits in a draft.
+type Snapshot = Pick<DraftRecord, "story" | "description" | "pagePositions">;
+type Request = { path: string; body: unknown; version: number };
+type SaveState = "idle" | "saving" | "saved" | "error" | "conflict";
+// Phone layout: which part of the editor fills the screen.
+type View = "pages" | "map" | "panel";
+const AUTOSAVE_MS = 2000;
+const RETRY_MS = 8000;
+const typing = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  !!target.closest("input, textarea, select, [contenteditable]");
 
 export function Studio({
   onPlay,
   onDirtyChange,
+  aiWriting,
 }: {
   onPlay: (id: string) => void;
   onDirtyChange: (dirty: boolean) => void;
+  // The account may use AI writing help (Copilot feature).
+  aiWriting: boolean;
 }) {
   const [listing, setListing] = useState<Listing | null>(null);
   const [uploads, setUploads] = useState<UploadListing | null>(null);
@@ -198,10 +101,27 @@ export function Studio({
     save: Save;
   } | null>(null);
   const [passRoll, setPassRoll] = useState(true);
-  const [retry, setRetry] = useState<{ path: string; body: unknown } | null>(
-    null,
-  );
+  const [retry, setRetry] = useState<Request | null>(null);
   const [offline, setOffline] = useState(!navigator.onLine);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [focus, setFocus] = useState(0);
+  const [view, setView] = useState<View>("pages");
+  const [back, setBack] = useState<View>("pages");
+  const [pane, setPane] = useState<"page" | "story">("page");
+  const [side, setSide] = useState<"pages" | "library">("pages");
+  const [imageDialog, setImageDialog] = useState(false);
+  const [, setHistoryTick] = useState(0);
+  const draftRef = useRef<DraftRecord | null>(null);
+  draftRef.current = draft;
+  // Counts edits, so a save that returns after newer edits keeps them.
+  const editVersion = useRef(0);
+  const saving = useRef(false);
+  // The edit count the server last confirmed.
+  const savedVersion = useRef(-1);
+  const past = useRef<Snapshot[]>([]);
+  const future = useRef<Snapshot[]>([]);
+  const lastPush = useRef(0);
+
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
     addEventListener("online", update);
@@ -216,6 +136,17 @@ export function Studio({
       removeEventListener("beforeunload", leave);
     };
   }, [dirty]);
+  // The editor takes the whole window; the footer and phone tabs step aside.
+  useEffect(() => {
+    document.documentElement.classList.toggle("studio-editing", !!draft);
+    return () => document.documentElement.classList.remove("studio-editing");
+  }, [!!draft]);
+  // Editor messages clear themselves after a moment.
+  useEffect(() => {
+    if (!notice || !draft) return;
+    const timer = setTimeout(() => setNotice(""), 8000);
+    return () => clearTimeout(timer);
+  }, [notice, !!draft]);
   const work = async (fn: () => Promise<void>) => {
     setBusy(true);
     setNotice("");
@@ -248,9 +179,48 @@ export function Studio({
       ? uploads?.items.find((clip) => clip.id === assetId)?.media
       : resolveFixtureMedia(video ?? "");
   };
-  const change = (story: StoryData) => {
-    setDraft((d) => d && { ...d, story });
+  const snapshot = (d: DraftRecord): Snapshot => ({
+    story: d.story,
+    description: d.description,
+    pagePositions: d.pagePositions,
+  });
+  // Every edit goes through here: it marks the draft for autosave and keeps
+  // undo history (quick successive edits, like typing, share one step).
+  const edit = (update: (d: DraftRecord) => DraftRecord) => {
+    const current = draftRef.current;
+    if (!current) return;
+    if (Date.now() - lastPush.current > 800) {
+      past.current = [...past.current, snapshot(current)].slice(-60);
+      future.current = [];
+      setHistoryTick((t) => t + 1);
+    }
+    lastPush.current = Date.now();
+    const next = update(current);
+    draftRef.current = next;
+    setDraft(next);
+    editVersion.current++;
     setDirty(true);
+    if (saveState === "saved") setSaveState("idle");
+  };
+  const restore = (from: typeof past, to: typeof future) => {
+    const current = draftRef.current;
+    const target = from.current.at(-1);
+    if (!current || !target) return;
+    from.current = from.current.slice(0, -1);
+    to.current = [...to.current, snapshot(current)];
+    lastPush.current = 0;
+    const next = { ...current, ...target };
+    draftRef.current = next;
+    setDraft(next);
+    editVersion.current++;
+    setDirty(true);
+    setHistoryTick((t) => t + 1);
+    if (!next.story.pages[selected]) setSelected(next.story.entryPageId);
+  };
+  const undo = () => restore(past, future);
+  const redo = () => restore(future, past);
+  const change = (story: StoryData) => {
+    edit((d) => ({ ...d, story }));
     setNotice("");
   };
   const page = draft?.story.pages[selected];
@@ -260,65 +230,205 @@ export function Studio({
       ...draft.story,
       pages: { ...draft.story.pages, [value.id]: value },
     });
-  const send = async (request: { path: string; body: unknown }) => {
+
+  // Saves the current draft (or resends an unanswered save with its key).
+  // Resolves with the saved record, or null if nothing was saved.
+  const saveNow = useCallback(async (): Promise<DraftRecord | null> => {
+    const current = draftRef.current;
+    if (!current || saving.current || !navigator.onLine) return null;
+    const request: Request = retry ?? {
+      path: `/studio/${current.story.id}`,
+      version: editVersion.current,
+      body: {
+        idempotencyKey: crypto.randomUUID(),
+        expectedRevision: current.revision,
+        draft: {
+          story: current.story,
+          description: current.description,
+          pagePositions: Object.fromEntries(
+            Object.entries(current.pagePositions ?? {}).filter(
+              ([id]) => current.story.pages[id],
+            ),
+          ),
+        },
+      },
+    };
+    saving.current = true;
+    setSaveState("saving");
     setRetry(request);
-    let result: DraftRecord;
     try {
-      result = await api<DraftRecord>(request.path, request.body);
+      const saved = await api<DraftRecord>(request.path, request.body);
+      setRetry(null);
+      savedVersion.current = request.version;
+      if (editVersion.current === request.version) {
+        draftRef.current = saved;
+        setDraft(saved);
+        setDirty(false);
+      } else
+        setDraft((d) => {
+          const next = d && {
+            ...d,
+            revision: saved.revision,
+            publishedVersionId: saved.publishedVersionId,
+          };
+          draftRef.current = next;
+          return next;
+        });
+      setSaveState("saved");
+      if (!listing?.items.some((item) => item.id === saved.story.id))
+        void loadList().catch(() => {});
+      return saved;
     } catch (error) {
       if (error instanceof ApiError && error.code !== "UNAVAILABLE")
         setRetry(null);
-      throw error;
+      if (error instanceof ApiError && error.code === "STALE_REVISION") {
+        setSaveState("conflict");
+        setNotice(error.message);
+      } else setSaveState("error");
+      return null;
+    } finally {
+      saving.current = false;
     }
-    setDraft(result);
-    setDirty(false);
-    setRetry(null);
-    setNotice(
-      request.path.endsWith("/publish")
-        ? `Published ${result.publishedVersionId}. Your story is now in Discover.`
-        : "Draft saved privately.",
+  }, [retry, listing]);
+  // Waits for a save in flight, then saves anything newer.
+  const flush = async () => {
+    while (saving.current) await new Promise((r) => setTimeout(r, 150));
+    const current = draftRef.current;
+    if (!current) return null;
+    if (
+      current.revision &&
+      !retry &&
+      savedVersion.current === editVersion.current
+    )
+      return current;
+    return saveNow();
+  };
+  // Autosave shortly after editing stops; retry a failed save more slowly.
+  useEffect(() => {
+    if (!draft || !dirty || offline || saveState === "conflict") return;
+    const timer = setTimeout(
+      () => void saveNow(),
+      saveState === "error" ? RETRY_MS : AUTOSAVE_MS,
     );
-    await loadList();
+    return () => clearTimeout(timer);
+  }, [draft, dirty, offline, saveState, saveNow]);
+  // Ctrl/Cmd+S saves now; Ctrl/Cmd+Z and Shift+Z undo and redo outside text
+  // fields (fields keep their own text undo).
+  useEffect(() => {
+    if (!draft) return;
+    const keys = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "s") {
+        e.preventDefault();
+        void saveNow();
+      } else if (key === "z" && !typing(e.target) && !preview) {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (key === "y" && !typing(e.target) && !preview) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    addEventListener("keydown", keys);
+    return () => removeEventListener("keydown", keys);
+  });
+
+  const resetEditor = (d: DraftRecord, isDirty: boolean) => {
+    draftRef.current = d;
+    setDraft(d);
+    setSelected(d.story.entryPageId);
+    setDirty(isDirty);
+    setPreview(null);
+    setRetry(null);
+    setSaveState(isDirty ? "idle" : "saved");
+    past.current = [];
+    future.current = [];
+    editVersion.current++;
+    savedVersion.current = isDirty ? -1 : editVersion.current;
+    setView("map");
+    setPane("page");
+    setFocus(0);
   };
   const open = (id: string) =>
     void work(async () => {
-      const d = await api<DraftRecord>(`/studio/${id}`);
-      setDraft(d);
-      setSelected(d.story.entryPageId);
-      setDirty(false);
-      setPreview(null);
-      setRetry(null);
+      resetEditor(await api<DraftRecord>(`/studio/${id}`), false);
     });
   const create = (quiz = false) => {
     const id = `story-${crypto.randomUUID()}`;
-    setDraft({
-      revision: 0,
-      publishedVersionId: null,
-      description: "",
-      story: quiz
-        ? quizTemplate(id)
-        : {
-            id,
-            versionId: "draft",
-            rulesetVersion: "prototype-1",
-            title: "Untitled story",
-            entryPageId: "opening",
-            pages: {
-              opening: { ...makePage("opening"), title: "Opening" },
-              ending: {
-                ...makePage("ending"),
-                title: "The end",
-                kind: "ending",
-                choices: [],
-              },
-            },
-          },
-    });
-    setSelected("opening");
-    setDirty(true);
+    resetEditor(
+      {
+        revision: 0,
+        publishedVersionId: null,
+        description: "",
+        story: quiz ? quizTemplate(id) : blankStory(id),
+      },
+      true,
+    );
     setNotice("");
-    setPreview(null);
   };
+  const close = () =>
+    void work(async () => {
+      if (!(await flush())) {
+        setNotice(
+          "This draft isn't saved yet. Try again, or reconnect to save.",
+        );
+        return;
+      }
+      setDraft(null);
+      draftRef.current = null;
+      setDirty(false);
+      setPreview(null);
+      await loadList();
+    });
+  const publish = () =>
+    void work(async () => {
+      validatePublication(draftRef.current!.story);
+      if (!(await flush()))
+        throw new Error(
+          "The draft couldn't be saved, so it wasn't published. Try again.",
+        );
+      const current = draftRef.current!;
+      const published = await api<DraftRecord>(
+        `/studio/${current.story.id}/publish`,
+        {
+          idempotencyKey: crypto.randomUUID(),
+          expectedRevision: current.revision,
+          policyVersion: "creator-alpha-1",
+        },
+      );
+      draftRef.current = published;
+      setDraft(published);
+      setDirty(false);
+      setSaveState("saved");
+      setNotice(
+        `Published ${published.publishedVersionId}. Your story is now in Discover.`,
+      );
+      await loadList();
+    });
+  const startPreview = () => {
+    if (!draft) return;
+    try {
+      const story = validatePublication(draft.story);
+      setPreview({
+        story,
+        save: start(story, "preview", "preview", baseStats, Date.now()),
+      });
+      setNotice("");
+    } catch (e) {
+      setNotice((e as Error).message);
+    }
+  };
+  // Selecting a page edits it: on a phone the settings fill the screen.
+  const select = (id: string, from: View) => {
+    setSelected(id);
+    setPane("page");
+    setBack(from);
+    setView("panel");
+    if (from !== "map") setFocus((f) => f + 1);
+  };
+
   const setType = (type: StoryPage["pageType"]) => {
     if (!page || !draft) return;
     const {
@@ -454,102 +564,166 @@ export function Studio({
       );
     change(story);
     setSelected(id);
+    setPane("page");
+    setFocus((f) => f + 1);
     setPreview(null);
   };
-  return (
-    <section className="studio">
-      <div className="studio-head">
-        <div>
-          <h1>Studio</h1>
-          <p className="studio-sub">
-            Write a branching story or a quiz, preview it, then publish an
-            edition. Players keep the edition they started.
-          </p>
-        </div>
-        <div className="studio-head-actions">
-          <Button
-            className="btn btn-primary"
-            disabled={busy || dirty || !!retry}
-            onClick={() => create()}
-          >
-            New story
+  // Accepted AI choices: each becomes an option leading to a new page that
+  // continues where this page's single output went (or to an ending).
+  const addSuggestedChoices = (suggested: AssistChoice[]) => {
+    if (!draft || !page) return;
+    const room = 80 - Object.keys(draft.story.pages).length;
+    const picks = suggested.slice(0, Math.max(0, room));
+    if (!picks.length) {
+      setNotice("This story has the most pages it can hold (80).");
+      return;
+    }
+    const fallback =
+      Object.values(draft.story.pages).find((p) => p.kind === "ending")?.id ??
+      draft.story.entryPageId;
+    const onward =
+      page.choices.length === 1 && page.choices[0].outcome.kind === "direct"
+        ? page.choices[0].outcome.route.targetPageId
+        : fallback;
+    const created = picks.map((pick) => ({
+      ...makePage(`page-${shortId()}`),
+      title: pick.title,
+      transcript: pick.text || "What happens here?",
+      choices: [choice(onward)],
+    }));
+    const { sourcePage: _source, videoAdvance: _advance, ...rest } = page;
+    // A plain page becomes an options page; its old "Continue" is replaced.
+    const keep = page.pageType.endsWith("options") ? page.choices : [];
+    change({
+      ...draft.story,
+      pages: {
+        ...draft.story.pages,
+        ...Object.fromEntries(created.map((p) => [p.id, p])),
+        [page.id]: {
+          ...rest,
+          pageType: page.pageType.startsWith("video")
+            ? "video-options"
+            : "text-options",
+          choices: [
+            ...keep,
+            ...created.map((p, i) => ({
+              ...choice(p.id),
+              label: picks[i].label,
+            })),
+          ].slice(0, 20),
+        },
+      },
+    });
+  };
+
+  const saveLabel = offline
+    ? "Offline"
+    : saveState === "conflict"
+      ? "Changed elsewhere"
+      : saveState === "saving"
+        ? "Saving…"
+        : saveState === "error"
+          ? "Not saved"
+          : dirty
+            ? "Unsaved changes"
+            : draft?.revision
+              ? "All changes saved"
+              : "Not saved yet";
+  const assistReason = aiWriting
+    ? null
+    : "AI writing help isn't enabled for this account yet.";
+
+  const notices = (
+    <div className="app-notices" aria-live="polite">
+      {(notice || offline) && (
+        <div className="notice">
+          {offline
+            ? "You’re offline. Editing can continue; reconnect to save."
+            : notice}
+          <Button onClick={() => setNotice("")} aria-label="Dismiss message">
+            ×
           </Button>
-          <Button
-            className="btn btn-secondary"
-            disabled={busy || dirty || !!retry}
-            onClick={() => create(true)}
-          >
-            New quiz
-          </Button>
         </div>
-      </div>
-      <div className="app-notices" aria-live="polite">
-        {(notice || offline) && (
-          <div className="notice">
-            {offline
-              ? "You’re offline. Editing can continue; reconnect to save."
-              : notice}
-            <Button onClick={() => setNotice("")} aria-label="Dismiss message">
-              ×
+      )}
+      {busy && (
+        <div className="loading-overlay" role="status">
+          <span className="loading-card">Working on your story…</span>
+        </div>
+      )}
+    </div>
+  );
+
+  if (!draft)
+    return (
+      <section className="studio">
+        <div className="studio-head">
+          <div>
+            <h1>Studio</h1>
+            <p className="studio-sub">
+              Write a branching story or a quiz, preview it, then publish an
+              edition. Players keep the edition they started.
+            </p>
+          </div>
+          <div className="studio-head-actions">
+            <Button
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={() => create()}
+            >
+              New story
+            </Button>
+            <Button
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => create(true)}
+            >
+              New quiz
             </Button>
           </div>
+        </div>
+        {notices}
+        {!listing && !busy && (
+          <Button onClick={() => void work(() => loadList())}>
+            Retry loading drafts
+          </Button>
         )}
-        {busy && (
-          <div className="loading-overlay" role="status">
-            <span className="loading-card">Working on your story…</span>
+        {listing && !listing.canPublish && (
+          <p className="studio-note">
+            Publishing is invite-only during alpha. Drafts and previews are
+            available; ask the Storybranch team to turn on publishing for your
+            account.
+          </p>
+        )}
+        <h2 className="studio-drafts-title">Your drafts</h2>
+        {!listing ? (
+          <div className="studio-draft-grid" aria-hidden="true">
+            <div className="placeholder-block" />
+            <div className="placeholder-block" />
+            <div className="placeholder-block" />
           </div>
-        )}
-      </div>
-      {!listing && !busy && (
-        <Button onClick={() => void work(() => loadList())}>
-          Retry loading drafts
-        </Button>
-      )}
-      {listing && !listing.canPublish && (
-        <p className="studio-note">
-          Publishing is invite-only during alpha. Drafts and previews are
-          available; ask the Storybranch team to turn on publishing for your
-          account.
-        </p>
-      )}
-      <div className="studio-layout">
-        <aside className="studio-library">
-          <h2>Your drafts</h2>
-          <div className="studio-draft-stack">
-            {listing?.items.map((d) => (
+        ) : listing.items.length ? (
+          <div className="studio-draft-grid">
+            {listing.items.map((d) => (
               <Button
                 key={d.id}
                 className="studio-draft-card"
-                aria-current={draft?.story.id === d.id ? "true" : undefined}
-                disabled={busy || dirty || !!retry}
+                disabled={busy}
                 onClick={() => open(d.id)}
               >
                 <span className="studio-draft-title" title={d.title}>
                   {d.title}
                 </span>
-                <small>{d.publishedVersionId ?? "Private draft"}</small>
+                <small>
+                  {d.publishedVersionId
+                    ? `Published · ${d.publishedVersionId}`
+                    : "Private draft"}
+                </small>
               </Button>
             ))}
           </div>
-          {listing?.nextCursor && (
-            <Button
-              disabled={busy}
-              onClick={() => void work(() => loadList(listing.nextCursor!))}
-            >
-              More drafts
-            </Button>
-          )}
-          {listing && !listing.items.length && (
-            <p className="studio-sub">No drafts yet.</p>
-          )}
-        </aside>
-        {!draft && listing && (
+        ) : (
           <div className="studio-start">
-            <h2>
-              {listing.items.length
-                ? "Open a draft or start something new"
-                : "Start your first story"}
-            </h2>
+            <h2>Start your first story</h2>
             <p className="studio-sub">
               A story is a set of pages linked by choices: text, video, dice
               rolls and quiz results. Start from a blank story or a ready-made
@@ -557,210 +731,355 @@ export function Studio({
             </p>
           </div>
         )}
-        {draft && (
-          <div className="studio-editor">
-            {/* Sticky so saving and publishing stay in reach while editing. */}
-            <div className="studio-actions studio-toolbar">
-              <Button
-                className="btn btn-primary btn-small"
-                disabled={busy || offline || !!retry}
-                onClick={() =>
-                  void work(() =>
-                    send({
-                      path: `/studio/${draft.story.id}`,
-                      body: {
-                        idempotencyKey: crypto.randomUUID(),
-                        expectedRevision: draft.revision,
-                        draft: {
-                          story: draft.story,
-                          description: draft.description,
-                          pagePositions: Object.fromEntries(
-                            Object.entries(draft.pagePositions ?? {}).filter(
-                              ([id]) => draft.story.pages[id],
-                            ),
-                          ),
+        {listing?.nextCursor && (
+          <Button
+            className="btn btn-secondary studio-more"
+            disabled={busy}
+            onClick={() => void work(() => loadList(listing.nextCursor!))}
+          >
+            More drafts
+          </Button>
+        )}
+      </section>
+    );
+
+  const canUndo = past.current.length > 0;
+  const canRedo = future.current.length > 0;
+  return (
+    <section className="studio studio-shell" data-view={view}>
+      {notices}
+      <header className="studio-bar">
+        <Button
+          className="studio-bar-back"
+          disabled={busy}
+          aria-label="Back to drafts"
+          title="Back to drafts"
+          onClick={close}
+        >
+          ←
+        </Button>
+        <input
+          className="studio-title-input"
+          aria-label="Story title"
+          maxLength={160}
+          value={draft.story.title}
+          disabled={busy}
+          onChange={(e) => change({ ...draft.story, title: e.target.value })}
+        />
+        <span
+          className={`studio-status is-${saveState} ${dirty ? "is-dirty" : ""}`}
+          role="status"
+          title="Drafts save automatically. Ctrl/Cmd+S saves now."
+        >
+          {saveLabel}
+        </span>
+        {(saveState === "error" || saveState === "conflict" || retry) &&
+          !busy && (
+            <Button
+              className="btn btn-secondary btn-small"
+              disabled={offline || saving.current}
+              onClick={() =>
+                saveState === "conflict"
+                  ? confirm(
+                      "Discard your unsaved edits and load the saved draft?",
+                    ) && open(draft.story.id)
+                  : void saveNow()
+              }
+            >
+              {saveState === "conflict" ? "Reload saved draft" : "Retry save"}
+            </Button>
+          )}
+        <div className="studio-bar-actions">
+          <div className="studio-history" role="group" aria-label="History">
+            <Button
+              aria-label="Undo"
+              title="Undo (Ctrl/Cmd+Z)"
+              disabled={!canUndo || busy}
+              onClick={undo}
+            >
+              ↶
+            </Button>
+            <Button
+              aria-label="Redo"
+              title="Redo (Ctrl/Cmd+Shift+Z)"
+              disabled={!canRedo || busy}
+              onClick={redo}
+            >
+              ↷
+            </Button>
+          </div>
+          <Button
+            className="btn btn-secondary btn-small studio-save"
+            disabled={busy || offline || saveState === "saving"}
+            title="Ctrl/Cmd+S"
+            onClick={() => void saveNow()}
+          >
+            Save draft
+          </Button>
+          <Button
+            className="btn btn-secondary btn-small"
+            disabled={busy}
+            onClick={startPreview}
+          >
+            Preview
+          </Button>
+          {draft.publishedVersionId && (
+            <Button
+              className="btn btn-secondary btn-small studio-play"
+              disabled={busy || dirty}
+              onClick={() => onPlay(draft.story.id)}
+            >
+              Play published story
+            </Button>
+          )}
+          <Button
+            className="btn btn-coral btn-small"
+            disabled={busy || offline || !listing?.canPublish}
+            title={
+              listing?.canPublish
+                ? "Saves, then publishes a new edition"
+                : "Publishing is invite-only during alpha"
+            }
+            onClick={publish}
+          >
+            Publish edition
+          </Button>
+        </div>
+      </header>
+
+      <nav className="studio-views" aria-label="Editor views">
+        {(
+          [
+            ["pages", "Pages"],
+            ["map", "Map"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            aria-pressed={view === value}
+            onClick={() => setView(value)}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          aria-pressed={view === "panel"}
+          onClick={() => {
+            setBack(view === "panel" ? back : view);
+            setView("panel");
+          }}
+        >
+          {pane === "story" ? "Story" : "Edit page"}
+        </button>
+      </nav>
+
+      <div className="studio-body">
+        <aside className="studio-side" aria-label="Pages and library">
+          <div className="studio-tabs" role="group" aria-label="Side panel">
+            <button
+              aria-pressed={side === "pages"}
+              onClick={() => setSide("pages")}
+            >
+              Pages
+            </button>
+            <button
+              aria-pressed={side === "library"}
+              onClick={() => setSide("library")}
+            >
+              Library
+            </button>
+          </div>
+          <div className="studio-scroll">
+            {side === "pages" ? (
+              <>
+                <StoryOutline
+                  story={draft.story}
+                  selected={selected}
+                  onSelect={(id) => select(id, "pages")}
+                />
+                <Button
+                  className="btn btn-secondary btn-small studio-story-link"
+                  onClick={() => {
+                    setPane("story");
+                    setBack("pages");
+                    setView("panel");
+                  }}
+                >
+                  Story details
+                </Button>
+              </>
+            ) : (
+              <PageLibrary
+                api={api}
+                uploads={uploads}
+                page={page}
+                disabled={busy || Object.keys(draft.story.pages).length >= 80}
+                key={draft.story.id}
+                onSaved={(record, instanceId) => {
+                  edit((current) => {
+                    const instance = current.story.pages[instanceId];
+                    if (!instance) return current;
+                    return {
+                      ...current,
+                      story: {
+                        ...current.story,
+                        pages: {
+                          ...current.story.pages,
+                          [instanceId]: {
+                            ...instance,
+                            sourcePage: {
+                              id: record.id,
+                              revision: record.revision,
+                            },
+                          },
                         },
                       },
-                    }),
-                  )
-                }
-              >
-                Save draft
-              </Button>
-              <Button
-                className="btn btn-secondary btn-small"
-                disabled={busy || !!retry}
-                onClick={() => {
-                  try {
-                    const story = validatePublication(draft.story);
-                    setPreview({
-                      story,
-                      save: start(
-                        story,
-                        "preview",
-                        "preview",
-                        baseStats,
-                        Date.now(),
-                      ),
-                    });
-                    setNotice("");
-                  } catch (e) {
-                    setNotice((e as Error).message);
+                    };
+                  });
+                }}
+                onInsert={(instance) => {
+                  const target = Object.values(draft.story.pages).find(
+                    (p) => p.kind === "ending",
+                  )?.id;
+                  if (!target) {
+                    setNotice("Add an ending before placing a reusable page.");
+                    return;
                   }
+                  instance.choices = instance.choices.map((c) => ({
+                    ...c,
+                    outcome: { kind: "direct", route: route(target) },
+                  }));
+                  change({
+                    ...draft.story,
+                    pages: { ...draft.story.pages, [instance.id]: instance },
+                  });
+                  setSelected(instance.id);
+                  setFocus((f) => f + 1);
                 }}
-              >
-                Preview
-              </Button>
-              <Button
-                className="btn btn-coral btn-small"
-                disabled={
-                  busy ||
-                  offline ||
-                  dirty ||
-                  !draft.revision ||
-                  !listing?.canPublish ||
-                  !!retry
-                }
-                onClick={() =>
-                  void work(() =>
-                    send({
-                      path: `/studio/${draft.story.id}/publish`,
-                      body: {
-                        idempotencyKey: crypto.randomUUID(),
-                        expectedRevision: draft.revision,
-                        policyVersion: "creator-alpha-1",
-                      },
-                    }),
-                  )
-                }
-              >
-                Publish edition
-              </Button>
-              {draft.publishedVersionId && (
-                <Button
-                  disabled={busy || dirty || !!retry}
-                  onClick={() => onPlay(draft.story.id)}
-                >
-                  Play published story
-                </Button>
-              )}
-              <span className={`studio-status ${dirty ? "is-dirty" : ""}`}>
-                {dirty ? "Unsaved changes" : `Saved revision ${draft.revision}`}
-              </span>
-              {draft.revision > 0 && (
-                <Button
-                  disabled={busy || offline}
-                  onClick={() => {
-                    if (
-                      !dirty ||
-                      confirm(
-                        "Discard unsaved edits and reload the saved draft?",
-                      )
-                    )
-                      open(draft.story.id);
-                  }}
-                >
-                  Reload saved draft
-                </Button>
-              )}
-              {retry && (
-                <Button
-                  disabled={busy || offline}
-                  onClick={() => void work(() => send(retry))}
-                >
-                  Retry same request
-                </Button>
-              )}
-            </div>
-            <p className="studio-publish-note">
-              Publish makes this story public in Discover. Only publish content
-              you have rights to share. Sample clips are placeholders. Uploaded
-              clips become public when you publish a story that uses them.
-            </p>
-            <fieldset
-              className="studio-story-settings"
-              disabled={busy || !!retry}
-            >
-              <label>
-                Story title
-                <input
-                  maxLength={160}
-                  value={draft.story.title}
-                  onChange={(e) =>
-                    change({ ...draft.story, title: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Description
-                <textarea
-                  aria-label="Description"
-                  maxLength={500}
-                  value={draft.description}
-                  onChange={(e) => {
-                    setDraft({ ...draft, description: e.target.value });
-                    setDirty(true);
-                  }}
-                />
-              </label>
-              {targetSelect(
-                "First page",
-                draft.story.entryPageId,
-                (entryPageId) => change({ ...draft.story, entryPageId }),
-              )}
-            </fieldset>
-            <div className="studio-workspace">
-              <StoryGraph
-                key={draft.story.id}
-                story={draft.story}
-                positions={draft.pagePositions}
-                selected={selected}
-                disabled={busy || !!retry}
-                onSelect={(id) => {
-                  setSelected(id);
-                  setPreview(null);
-                }}
-                onMove={(pagePositions) => {
-                  setDraft(
-                    (current) => current && { ...current, pagePositions },
-                  );
-                  setDirty(true);
-                }}
-                onConnect={(source, edge, target) => {
-                  try {
-                    change(connectPage(draft.story, source, edge, target));
-                    setPreview(null);
-                  } catch (e) {
-                    setNotice((e as Error).message);
-                  }
-                }}
-                onAdd={(type) => addGraphPage(type)}
-                onBranch={() => addGraphPage("text", true)}
               />
-              <fieldset
-                className="studio-page-inspector"
-                disabled={busy || !!retry}
-              >
+            )}
+          </div>
+        </aside>
+
+        <div className="studio-canvas">
+          <StoryGraph
+            key={draft.story.id}
+            story={draft.story}
+            positions={draft.pagePositions}
+            selected={selected}
+            disabled={busy}
+            focus={focus}
+            onSelect={(id) => select(id, "map")}
+            onMove={(pagePositions) =>
+              edit((current) => ({ ...current, pagePositions }))
+            }
+            onConnect={(source, edge, target) => {
+              try {
+                change(connectPage(draft.story, source, edge, target));
+                setPreview(null);
+              } catch (e) {
+                setNotice((e as Error).message);
+              }
+            }}
+            onAdd={(type) => addGraphPage(type)}
+            onBranch={() => addGraphPage("text", true)}
+          />
+        </div>
+
+        <aside className="studio-panel" aria-label="Settings">
+          <div className="studio-tabs" role="group" aria-label="Settings panel">
+            <button
+              className="studio-panel-back"
+              aria-label="Back"
+              onClick={() => setView(back)}
+            >
+              ←
+            </button>
+            <button
+              aria-pressed={pane === "page"}
+              onClick={() => setPane("page")}
+            >
+              Page
+            </button>
+            <button
+              aria-pressed={pane === "story"}
+              onClick={() => setPane("story")}
+            >
+              Story
+            </button>
+          </div>
+          <div className="studio-scroll">
+            {pane === "story" ? (
+              <fieldset className="studio-story-settings" disabled={busy}>
+                <legend>Story details</legend>
+                <label>
+                  Description
+                  <textarea
+                    aria-label="Description"
+                    rows={4}
+                    maxLength={500}
+                    value={draft.description}
+                    onChange={(e) =>
+                      edit((d) => ({ ...d, description: e.target.value }))
+                    }
+                  />
+                </label>
+                {targetSelect(
+                  "First page",
+                  draft.story.entryPageId,
+                  (entryPageId) => change({ ...draft.story, entryPageId }),
+                )}
+                <p className="studio-publish-note">
+                  Publish makes this story public in Discover. Only publish
+                  content you have rights to share. Sample clips are
+                  placeholders. Uploaded clips become public when you publish a
+                  story that uses them.
+                </p>
+                <p className="studio-publish-note">
+                  {draft.publishedVersionId
+                    ? `Published as ${draft.publishedVersionId}. Players keep the edition they started; publishing again makes a new one.`
+                    : "Not published yet."}{" "}
+                  Saved revision {draft.revision}.
+                </p>
+                {draft.revision > 0 && (
+                  <Button
+                    className="btn btn-secondary btn-small"
+                    disabled={busy || offline}
+                    onClick={() => {
+                      if (
+                        !dirty ||
+                        confirm(
+                          "Discard unsaved edits and reload the saved draft?",
+                        )
+                      )
+                        open(draft.story.id);
+                    }}
+                  >
+                    Reload saved draft
+                  </Button>
+                )}
+              </fieldset>
+            ) : (
+              <fieldset className="studio-page-inspector" disabled={busy}>
                 <legend>Page settings</legend>
-                <div className="studio-actions">
-                  <label>
-                    Edit page
-                    <select
-                      aria-label="Edit page"
-                      value={selected}
-                      onChange={(e) => {
-                        setSelected(e.target.value);
-                        setPreview(null);
-                      }}
-                    >
-                      {Object.values(draft.story.pages).map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.title} ({p.id})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+                <label>
+                  Edit page
+                  <select
+                    aria-label="Edit page"
+                    value={selected}
+                    onChange={(e) => {
+                      setSelected(e.target.value);
+                      setFocus((f) => f + 1);
+                      setPreview(null);
+                    }}
+                  >
+                    {Object.values(draft.story.pages).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title} ({p.id})
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 {page && (
                   <>
                     <label>
@@ -794,18 +1113,30 @@ export function Studio({
                         ))}
                       </select>
                     </label>
-                    <label>
-                      Text / transcript
-                      <textarea
-                        aria-label="Text / transcript"
-                        rows={6}
-                        maxLength={10000}
-                        value={page.transcript}
-                        onChange={(e) =>
-                          updatePage({ ...page, transcript: e.target.value })
-                        }
-                      />
-                    </label>
+                    <PageAssist
+                      api={api}
+                      story={draft.story}
+                      description={draft.description}
+                      page={page}
+                      reason={assistReason}
+                      onText={(transcript) =>
+                        updatePage({ ...page, transcript })
+                      }
+                      onChoices={addSuggestedChoices}
+                    >
+                      <label>
+                        Text / transcript
+                        <textarea
+                          aria-label="Text / transcript"
+                          rows={8}
+                          maxLength={10000}
+                          value={page.transcript}
+                          onChange={(e) =>
+                            updatePage({ ...page, transcript: e.target.value })
+                          }
+                        />
+                      </label>
+                    </PageAssist>
                     {page.pageType.startsWith("video") && (
                       <ClipPicker
                         api={api}
@@ -870,6 +1201,13 @@ export function Studio({
                         )
                       }
                     />
+                    <button
+                      className="assist-button studio-image-button"
+                      disabled={busy}
+                      onClick={() => setImageDialog(true)}
+                    >
+                      ✦ Generate a page image
+                    </button>
                     {page.sourcePage && (
                       <p>
                         Library revision {page.sourcePage.revision}. Save
@@ -1207,155 +1545,138 @@ export function Studio({
                   </>
                 )}
               </fieldset>
-            </div>
-            <PageLibrary
-              api={api}
-              uploads={uploads}
-              page={page}
-              disabled={
-                busy || !!retry || Object.keys(draft.story.pages).length >= 80
-              }
-              key={draft.story.id}
-              onSaved={(record, instanceId) => {
-                setDraft((current) => {
-                  const instance = current?.story.pages[instanceId];
-                  if (
-                    !current ||
-                    !instance ||
-                    current.story.id !== draft.story.id
-                  )
-                    return current;
-                  return {
-                    ...current,
-                    story: {
-                      ...current.story,
-                      pages: {
-                        ...current.story.pages,
-                        [instanceId]: {
-                          ...instance,
-                          sourcePage: {
-                            id: record.id,
-                            revision: record.revision,
-                          },
-                        },
-                      },
-                    },
-                  };
-                });
-                setDirty(true);
-              }}
-              onInsert={(instance) => {
-                const target = Object.values(draft.story.pages).find(
-                  (p) => p.kind === "ending",
-                )?.id;
-                if (!target) {
-                  setNotice("Add an ending before placing a reusable page.");
-                  return;
-                }
-                instance.choices = instance.choices.map((c) => ({
-                  ...c,
-                  outcome: { kind: "direct", route: route(target) },
-                }));
-                change({
-                  ...draft.story,
-                  pages: { ...draft.story.pages, [instance.id]: instance },
-                });
-                setSelected(instance.id);
-              }}
-            />
-            {preview && (
-              <section className="studio-preview">
-                <div className="section-heading">
-                  <h2>Private preview</h2>
-                  <Button onClick={() => setPreview(null)}>
-                    Close preview
-                  </Button>
-                </div>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      {imageDialog && page && (
+        <PageImageDialog
+          api={api}
+          story={draft.story}
+          description={draft.description}
+          page={page}
+          assistReason={assistReason}
+          onClose={() => setImageDialog(false)}
+          onAttach={(asset) => {
+            setUploads(
+              (old) =>
+                old && {
+                  ...old,
+                  items: [asset, ...old.items.filter((a) => a.id !== asset.id)],
+                },
+            );
+            const current = draftRef.current?.story.pages[page.id];
+            if (current) updatePage({ ...current, image: assetRef(asset.id) });
+            setNotice("Image generated and placed on this page.");
+          }}
+        />
+      )}
+
+      {preview && (
+        <div className="studio-preview-backdrop">
+          <section
+            className="studio-preview"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studio-preview-title"
+          >
+            <div className="studio-preview-head">
+              <div>
+                <h2 id="studio-preview-title">Private preview</h2>
                 <p>
                   Test only — progress is not saved. Dice can be forced to test
                   routes.
                 </p>
-                <label>
-                  Preview dice result
-                  <select
-                    aria-label="Preview dice result"
-                    value={passRoll ? "pass" : "fail"}
-                    onChange={(e) => setPassRoll(e.target.value === "pass")}
-                  >
-                    <option value="pass">Highest roll</option>
-                    <option value="fail">Lowest roll</option>
-                  </select>
-                </label>
-                <Story
-                  story={preview.story}
-                  save={preview.save}
-                  user={{
-                    id: "preview",
-                    stats: baseStats,
-                    achievements: [],
-                    saveSpots: [],
+              </div>
+              <label>
+                Preview dice result
+                <select
+                  aria-label="Preview dice result"
+                  value={passRoll ? "pass" : "fail"}
+                  onChange={(e) => setPassRoll(e.target.value === "pass")}
+                >
+                  <option value="pass">Highest roll</option>
+                  <option value="fail">Lowest roll</option>
+                </select>
+              </label>
+              <Button
+                className="btn btn-secondary btn-small"
+                onClick={() => setPreview(null)}
+              >
+                Close preview
+              </Button>
+            </div>
+            <div className="studio-preview-stage">
+              <Story
+                story={preview.story}
+                save={preview.save}
+                user={{
+                  id: "preview",
+                  stats: baseStats,
+                  achievements: [],
+                  saveSpots: [],
+                }}
+              >
+                <Page
+                  page={preview.story.pages[preview.save.pageId]}
+                  result={isResultPage(preview.story, preview.save.pageId)}
+                  media={mediaFor(
+                    preview.story.pages[preview.save.pageId].video,
+                  )}
+                  image={
+                    uploads?.items.find(
+                      (a) =>
+                        a.id ===
+                        assetIdOf(
+                          preview.story.pages[preview.save.pageId].image,
+                        ),
+                    )?.url
+                  }
+                  disabled={false}
+                  transitioning={false}
+                  onPlaybackChange={() => {}}
+                  onOutput={(output) => {
+                    try {
+                      const moved = transition(
+                        preview.story,
+                        preview.save,
+                        output.choiceId,
+                        preview.save.revision,
+                        Date.now(),
+                        (sides) => (passRoll ? sides : 1),
+                        output.action,
+                      );
+                      setPreview({ ...preview, save: moved.save });
+                    } catch (e) {
+                      setNotice((e as Error).message);
+                    }
                   }}
                 >
-                  <Page
-                    page={preview.story.pages[preview.save.pageId]}
-                    result={isResultPage(preview.story, preview.save.pageId)}
-                    media={mediaFor(
-                      preview.story.pages[preview.save.pageId].video,
-                    )}
-                    image={
-                      uploads?.items.find(
-                        (a) =>
-                          a.id ===
-                          assetIdOf(
-                            preview.story.pages[preview.save.pageId].image,
+                  {preview.save.status === "completed" && (
+                    <Button
+                      onClick={() =>
+                        setPreview({
+                          ...preview,
+                          save: start(
+                            preview.story,
+                            "preview",
+                            "preview",
+                            baseStats,
+                            Date.now(),
                           ),
-                      )?.url
-                    }
-                    disabled={false}
-                    transitioning={false}
-                    onPlaybackChange={() => {}}
-                    onOutput={(output) => {
-                      try {
-                        const moved = transition(
-                          preview.story,
-                          preview.save,
-                          output.choiceId,
-                          preview.save.revision,
-                          Date.now(),
-                          (sides) => (passRoll ? sides : 1),
-                          output.action,
-                        );
-                        setPreview({ ...preview, save: moved.save });
-                      } catch (e) {
-                        setNotice((e as Error).message);
+                        })
                       }
-                    }}
-                  >
-                    {preview.save.status === "completed" && (
-                      <Button
-                        onClick={() =>
-                          setPreview({
-                            ...preview,
-                            save: start(
-                              preview.story,
-                              "preview",
-                              "preview",
-                              baseStats,
-                              Date.now(),
-                            ),
-                          })
-                        }
-                      >
-                        Play preview again
-                      </Button>
-                    )}
-                  </Page>
-                </Story>
-              </section>
-            )}
-          </div>
-        )}
-      </div>
+                    >
+                      Play preview again
+                    </Button>
+                  )}
+                </Page>
+              </Story>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

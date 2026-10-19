@@ -83,13 +83,13 @@ pnpm features grant someone@example.com admin
 pnpm features revoke someone@example.com generate
 ```
 
-The account must have signed up; a profile is created for it if it has never opened the app. `generate` and `copilot` also need `FAL_KEY` and `ANTHROPIC_API_KEY` on the deployment; the app only shows a feature the account can actually use. Emulator accounts, seeded or created locally, get every feature except admin, and the seeded `player` account is the local admin; `STORYBRANCH_MODE=emulator pnpm features ...` changes them. These flags are an alpha access policy, not a finished moderation, verification or billing system; paid plans would add entitlements alongside them.
+The account must have signed up; a profile is created for it if it has never opened the app. `generate` and `copilot` also need `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` on the deployment; the app only shows a feature the account can actually use. Emulator accounts, seeded or created locally, get every feature except admin, and the seeded `player` account is the local admin; `STORYBRANCH_MODE=emulator pnpm features ...` changes them. These flags are an alpha access policy, not a finished moderation, verification or billing system; paid plans would add entitlements alongside them.
 
 ## Vercel
 
 `vercel.json` builds with `pnpm build:vercel`, serves `dist`, and routes every `/api/*` request to `api/index.js`. That function re-exports a Vite bundle of the same handler (`vite.api.config.ts` → `dist-api/`), because Vercel compiles TypeScript functions file by file and cannot resolve this project's extensionless ESM imports.
 
-In Project → Settings → Environment Variables, add `FIREBASE_SERVICE_ACCOUNT_JSON` (entire JSON, marked Sensitive), `ENABLE_EXPERIMENTAL_COREPACK=1`, and optionally `FAL_KEY` (AI generation) and `ANTHROPIC_API_KEY` (Copilot), so the install uses the pinned pnpm version. Add the `*.vercel.app` and any custom domain to Firebase Authentication → Settings → Authorized domains. Redeploy after changing variables.
+In Project → Settings → Environment Variables, add `FIREBASE_SERVICE_ACCOUNT_JSON` (entire JSON, marked Sensitive), `ENABLE_EXPERIMENTAL_COREPACK=1`, and optionally `OPENAI_API_KEY` (AI image generation) and `ANTHROPIC_API_KEY` (Copilot), so the install uses the pinned pnpm version. Add the `*.vercel.app` and any custom domain to Firebase Authentication → Settings → Authorized domains. Redeploy after changing variables.
 
 The default server mode is `firebase`; an explicit `STORYBRANCH_MODE=firebase` is also supported. Keep emulator overrides (`STORYBRANCH_MODE=emulator`, `FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`, `STORYBRANCH_PHONE_PREVIEW`, `VITE_PHONE_PREVIEW`, `VITE_STORYBRANCH_MODE=emulator`) out of the production deployment. After credentials and seed are in place, `/api/catalogue` should return HTTP 200 with Glass Harbor; sign in, begin a journey, choose a route, reload and check the saved scene.
 

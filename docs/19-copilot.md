@@ -15,8 +15,8 @@ Copilot is a chat assistant that works alongside a signed-in user: it explains S
 | Phase | Scope | Tools | Status |
 |---|---|---|---|
 | 1. Navigate and explain | Read-only help in the dashboard, Discover, Adventures, Studio and Assets | `navigate`, `list_catalogue`, `list_my_adventures`, `list_my_drafts`, `get_draft`, `list_my_assets` | Built |
-| 2. Co-author | Proposes story, page, choice and quiz changes in Studio; the user applies them through Studio's normal save (revision-checked) | adds `propose_draft_change` | Planned |
-| 3. Generate | Writes image and video prompts from story context and reference images; the user approves each job, which runs through `/api/generation` (fal) and its daily limit | adds `propose_generation` | Planned; model test paused after stills (below) |
+| 2. Co-author | Proposes story, page, choice and quiz changes in Studio; the user applies them through Studio's normal save (revision-checked) | adds `propose_draft_change` | In-editor buttons built (Write, Rewrite, Suggest choices; see [Studio AI help](17-creator-studio.md#ai-help)); chat proposals planned |
+| 3. Generate | Writes image and video prompts from story context and reference images; the user approves each job, which runs through `/api/generation` (OpenAI images) and its daily limit | adds `propose_generation` | Page images from Studio built (AI-written prompt, images only); chat proposals and story reference images planned |
 
 Copilot is not available during play (`/play/`, `/p/`): it could reveal routes, conditions or endings.
 
@@ -45,7 +45,7 @@ Copilot is not available during play (`/play/`, `/p/`): it could reveal routes, 
 
 ## Image and video generation
 
-fal remains the generation provider (`services/api/generation.ts`); Claude writes and refines prompts but does not generate images. Before phase 3:
+OpenAI `gpt-image-2` is the image generation provider (`services/api/generation.ts`); Claude writes and refines prompts but does not generate images. The video model test below still runs on fal with its own `FAL_KEY`. Before phase 3:
 
 1. **Model test** (`scripts/model-test.ts`, output in `test-results/model-test/`). Run scenes from a real story through Kling, Veo and Seedance on fal from the same start stills, and compare quality, character consistency, speed and cost per clip. This settles the default models and the clip-length question in `10-decisions-and-open-questions.md`.
    - **Stills: done (2026-10-18, $0.60).** A courier reference image and three Glass Harbor stills (docks, the courier's favor, the lantern market) from Nano Banana Pro (`fal-ai/nano-banana-pro`, `/edit` with the reference, $0.15 an image). The courier stayed consistent across scenes (hair, scar, coat, satchel, gloves) and so did the world's look. Small misses: the reference sheet has garbled text labels (its prompt lacked "no text"), the dock's beacon is lit rather than broken, and the edit instruction placed the courier in the market scene too. Takeaway: reference-image editing is a workable basis for consistent characters.

@@ -22,6 +22,7 @@ import { pageMedia, pageImage, uploads } from "./uploads";
 import { pageLibrary, sharedPage } from "./page-library";
 import { generation } from "./generation";
 import { copilot } from "./copilot";
+import { assist } from "./assist";
 import { admin } from "./admin";
 import { profileRoutes } from "./profile";
 import { edition } from "./story-store";
@@ -129,6 +130,8 @@ export async function handle(request: Request): Promise<Response> {
       return json(await uploads(request, uid, segments, features));
     if (segments[1] === "generation")
       return json(await generation(request, uid, segments, features));
+    if (segments[1] === "assist")
+      return json(await assist(request, uid, segments, features));
     if (segments[1] === "admin")
       return json(await admin(request, uid, segments, features));
     // Streams its reply, so it builds its own response.
@@ -289,7 +292,10 @@ export async function handle(request: Request): Promise<Response> {
           );
         // A hidden story takes no new players; existing saves keep playing.
         if (listing.data()!.hidden === true)
-          throw new GameError("FORBIDDEN", "This story isn't available right now.");
+          throw new GameError(
+            "FORBIDDEN",
+            "This story isn't available right now.",
+          );
         const latest = await tx.get(db.doc(`stories/${c.payload.storyId}`));
         const v = c.payload.versionId ?? latest.data()?.publishedVersionId;
         if (!v) throw new GameError("NOT_FOUND", "Story not found.");

@@ -84,7 +84,10 @@ try {
   await page.getByRole("button", { name: "Add result", exact: true }).click();
   await page.getByRole("button", { name: "Remove result 4" }).waitFor();
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await page.getByText("Draft saved privately.", { exact: false }).waitFor();
+  await page
+    .locator(".studio-status")
+    .getByText("All changes saved", { exact: true })
+    .waitFor();
   await page.getByRole("button", { name: "Preview", exact: true }).click();
   const preview = page.locator(".studio-preview");
   await preview.getByRole("button", { name: /Start the quiz/ }).click();

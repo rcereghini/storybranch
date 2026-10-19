@@ -17,12 +17,15 @@ import type { Features } from "../../packages/contracts/profile";
 const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
 function access(features: Features) {
-  if (!process.env.FAL_KEY)
+  if (!process.env.OPENAI_API_KEY)
     return "AI generation is not connected yet. You can still upload photos and videos.";
   if (!features.generate)
     return "AI generation is not enabled for this account.";
   return null;
 }
+// Generation runs inside the submitting request, so a job still unfinished
+// after the function's time limit was cut off and needs checking.
+const staleAfter = 300000;
 function view(id: string, data: DocumentData): GenerationJob {
   return {
     id,
@@ -32,154 +35,125 @@ function view(id: string, data: DocumentData): GenerationJob {
     ...(data.aspect ? { aspect: data.aspect } : {}),
     createdAt: data.createdAt,
     status:
-      data.status === "submitting" && Date.now() - data.createdAt > 60000
-        ? "uncertain"
-        : data.status,
+      ["ready", "failed", "uncertain"].includes(data.status) ||
+      Date.now() - data.createdAt <= staleAfter
+        ? data.status
+        : "uncertain",
     ...(data.message ? { message: data.message } : {}),
     ...(data.asset ? { asset: data.asset } : {}),
   };
 }
-async function fal(url: string, body?: unknown) {
-  if (new URL(url).origin !== "https://queue.fal.run")
-    throw new Error("Invalid provider endpoint.");
-  const response = await fetch(url, {
-    method: body ? "POST" : "GET",
+// A definite refusal from OpenAI (bad request, moderation) is not billed;
+// any other failure may have been, so it is reported as uncertain.
+class Refused extends Error {}
+async function openai(path: "generations" | "edits", body: FormData | object) {
+  const form = body instanceof FormData;
+  const response = await fetch(`https://api.openai.com/v1/images/${path}`, {
+    method: "POST",
     redirect: "error",
     headers: {
-      Authorization: `Key ${process.env.FAL_KEY}`,
-      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      ...(form ? {} : { "Content-Type": "application/json" }),
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-    signal: AbortSignal.timeout(25000),
+    body: form ? body : JSON.stringify(body),
+    signal: AbortSignal.timeout(240000),
   });
+  if (response.status === 400) {
+    const error = (await response.json().catch(() => null))?.error;
+    throw new Refused(
+      error?.code === "moderation_blocked"
+        ? "The safety system blocked this prompt or reference. Change it before trying again."
+        : "The provider could not generate this image. Review your prompt before trying again.",
+    );
+  }
   if (!response.ok)
     throw new Error(`Generation provider returned ${response.status}.`);
-  return response.json();
+  const image = (await response.json()).data?.[0]?.b64_json;
+  if (typeof image !== "string")
+    throw new Error("The provider did not return an image.");
+  return Buffer.from(image, "base64");
 }
+const referenceTypes = ["image/png", "image/jpeg", "image/webp"];
 async function reference(uid: string, assetId: string) {
   const asset = (await db.doc(paths.clip(uid, assetId)).get()).data();
   if (
     !asset ||
     asset.status !== "ready" ||
-    !asset.contentType.startsWith("image/")
+    !referenceTypes.includes(asset.contentType)
   )
     throw new GameError(
       "VALIDATION_FAILED",
-      "Choose a ready image from your own asset library.",
+      "Choose a ready PNG, JPEG or WebP image from your own asset library.",
     );
   if (asset.bytes > 10 * 1024 * 1024)
     throw new GameError("VALIDATION_FAILED", "Reference image is too large.");
   const [bytes] = await bucket.file(asset.path).download();
-  return `data:${asset.contentType};base64,${bytes.toString("base64")}`;
+  return { assetId, bytes, contentType: asset.contentType as string };
 }
+// gpt-image-2 takes any size in multiples of 16, so every shape is exact.
 const sizes = {
-  "16:9": { width: 1024, height: 576 },
-  "9:16": { width: 576, height: 1024 },
-  "1:1": { width: 1024, height: 1024 },
+  "16:9": "1536x864",
+  "9:16": "864x1536",
+  "1:1": "1024x1024",
 } as const;
-// Draft: Flux Schnell, nearly free. High: Nano Banana Pro, which also
-// follows reference images (the edit endpoint) for consistent characters.
+// One model, two tiers: low quality is a quick, cheap draft; high quality
+// can also follow reference images (the edit endpoint) for consistent
+// characters.
 async function input(uid: string, command: ImageCommand) {
-  if (command.quality === "draft")
-    return {
-      model: "fal-ai/flux/schnell",
-      input: {
-        prompt: command.prompt,
-        image_size: sizes[command.aspect],
-        num_images: 1,
-        output_format: "jpeg",
-        enable_safety_checker: true,
-      },
-    };
+  const settings = {
+    model: "gpt-image-2",
+    prompt: command.prompt,
+    size: sizes[command.aspect],
+    quality: command.quality === "draft" ? "low" : "high",
+    n: 1,
+    output_format: "jpeg",
+    output_compression: 90,
+  };
   const references = await Promise.all(
     (command.referenceIds ?? []).map((assetId) => reference(uid, assetId)),
   );
-  return references.length
-    ? {
-        model: "fal-ai/nano-banana-pro/edit",
-        input: {
-          prompt: command.prompt,
-          image_urls: references,
-          aspect_ratio: command.aspect,
-          num_images: 1,
-          output_format: "jpeg",
-        },
-      }
-    : {
-        model: "fal-ai/nano-banana-pro",
-        input: {
-          prompt: command.prompt,
-          aspect_ratio: command.aspect,
-          num_images: 1,
-          output_format: "jpeg",
-        },
-      };
+  if (!references.length)
+    return { path: "generations" as const, body: settings };
+  const form = new FormData();
+  for (const [key, value] of Object.entries(settings))
+    form.append(key, String(value));
+  for (const image of references)
+    form.append(
+      "image[]",
+      new Blob([new Uint8Array(image.bytes)], { type: image.contentType }),
+      `${image.assetId}.${image.contentType.split("/")[1]}`,
+    );
+  return { path: "edits" as const, body: form };
 }
-async function importResult(id: string, job: DocumentData, result: any) {
-  const source =
-    job.kind === "video" ? result.video?.url : result.images?.[0]?.url;
-  if (result.has_nsfw_concepts?.some(Boolean) || !source)
-    throw new Error("The provider did not return an eligible asset.");
-  const url = new URL(source);
-  if (
-    url.protocol !== "https:" ||
-    !(url.hostname === "fal.media" || url.hostname.endsWith(".fal.media"))
-  )
-    throw new Error("Unexpected generation media host.");
-  const response = await fetch(url, {
-    redirect: "error",
-    signal: AbortSignal.timeout(45000),
-  });
-  if (!response.ok || !response.body)
-    throw new Error("Generated media could not be downloaded.");
-  const max = job.kind === "video" ? uploadLimits.maxBytes : 10 * 1024 * 1024;
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  const reader = response.body.getReader();
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      size += chunk.value.length;
-      if (size > max)
-        throw new Error("Generated asset exceeds the library limit.");
-      chunks.push(chunk.value);
-    }
-  } finally {
-    await reader.cancel();
-  }
-  const bytes = Buffer.concat(chunks);
+async function saveResult(id: string, ownerUid: string, bytes: Buffer) {
+  if (bytes.length > 10 * 1024 * 1024)
+    throw new Error("Generated asset exceeds the library limit.");
   const contentType = sniffAsset(bytes.subarray(0, 64));
-  if (
-    !contentType ||
-    !contentType.startsWith(job.kind === "video" ? "video/" : "image/")
-  )
+  if (!contentType?.startsWith("image/"))
     throw new Error("Invalid generated media format.");
-  // A deterministic asset ID makes repeated completion checks safe.
+  // A deterministic asset ID makes a repeated save safe.
   const assetId = `generated-${id}`;
-  const path = paths.clipFile(job.ownerUid, assetId);
-  const record = db.doc(paths.clip(job.ownerUid, assetId));
+  const path = paths.clipFile(ownerUid, assetId);
+  const record = db.doc(paths.clip(ownerUid, assetId));
   const existing = (await record.get()).data();
   if (existing) return assetView(assetId, existing);
   const token = randomUUID();
-  await bucket
-    .file(path)
-    .save(bytes, {
-      metadata: {
-        contentType,
-        metadata: { firebaseStorageDownloadTokens: token },
-      },
-    });
+  await bucket.file(path).save(bytes, {
+    metadata: {
+      contentType,
+      metadata: { firebaseStorageDownloadTokens: token },
+    },
+  });
   const asset = {
-    ownerUid: job.ownerUid,
+    ownerUid,
     path,
     token,
     status: "ready",
     published: false,
-    fileName: `Generated ${job.kind} ${id.slice(0, 8)}.${contentType.split("/")[1]}`,
+    fileName: `Generated image ${id.slice(0, 8)}.${contentType.split("/")[1]}`,
     contentType,
-    bytes: size,
-    durationSeconds: job.kind === "video" ? 81 / 16 : 0,
+    bytes: bytes.length,
+    durationSeconds: 0,
     createdAt: Date.now(),
   };
   await record.set(asset);
@@ -278,72 +252,43 @@ export async function generation(
       return true;
     });
     if (created) {
+      let bytes: Buffer | null = null;
       try {
-        const result = await fal(
-          `https://queue.fal.run/${prepared.model}`,
-          prepared.input,
-        );
-        if (!result.request_id || !result.status_url || !result.response_url)
-          throw new Error("Missing provider receipt.");
-        await ref.update({
-          status: "queued",
-          requestId: result.request_id,
-          statusUrl: result.status_url,
-          responseUrl: result.response_url,
-        });
-      } catch {
+        bytes = await openai(prepared.path, prepared.body);
+      } catch (error) {
         // Never automatically resubmit a possibly billed request.
-        await ref.update({
-          status: "uncertain",
-          message:
-            "Submission could not be confirmed. Check the fal dashboard before making another request.",
-        });
+        await ref.update(
+          error instanceof Refused
+            ? { status: "failed", message: error.message }
+            : {
+                status: "uncertain",
+                message:
+                  "Generation could not be confirmed. Check your OpenAI usage before making another request.",
+              },
+        );
+      }
+      if (bytes) {
+        try {
+          await ref.update({
+            status: "ready",
+            asset: await saveResult(id, uid, bytes),
+          });
+        } catch (error) {
+          await ref.update({
+            status: "failed",
+            message: (error as Error).message,
+          });
+        }
       }
     }
     return view(id, (await ref.get()).data()!);
   }
+  // Status of a job that another request is still generating.
   if (request.method === "POST" && segments.length === 3) {
-    const ref = db.doc(`generationJobs/${segments[2]}`),
-      job = (await ref.get()).data();
+    const job = (await db.doc(`generationJobs/${segments[2]}`).get()).data();
     if (!job || job.ownerUid !== uid)
       throw new GameError("NOT_FOUND", "Generation not found.");
-    if (job.status !== "queued") return view(segments[2], job);
-    const status = await fal(job.statusUrl);
-    if (status.status !== "COMPLETED") return view(segments[2], job);
-    if (status.error) {
-      await ref.update({
-        status: "failed",
-        message:
-          "The provider could not generate this asset. Review your prompt before trying again.",
-      });
-    } else {
-      // Serialize media import across concurrent polling requests using a lease.
-      const lease = randomUUID();
-      const acquired = await db.runTransaction(async (tx) => {
-        const current = (await tx.get(ref)).data()!;
-        if (
-          current.status !== "queued" ||
-          (current.leaseUntil ?? 0) > Date.now()
-        )
-          return false;
-        tx.update(ref, { lease, leaseUntil: Date.now() + 120000 });
-        return true;
-      });
-      if (acquired) {
-        try {
-          const asset = await importResult(
-            segments[2],
-            job,
-            await fal(job.responseUrl),
-          );
-          await ref.update({ status: "ready", asset, leaseUntil: 0 });
-        } catch (error) {
-          await ref.update({ leaseUntil: 0 });
-          throw new GameError("UNAVAILABLE", (error as Error).message);
-        }
-      }
-    }
-    return view(segments[2], (await ref.get()).data()!);
+    return view(segments[2], job);
   }
   throw new GameError("NOT_FOUND", "Route not found.");
 }

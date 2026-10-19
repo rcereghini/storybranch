@@ -41,12 +41,14 @@ describe("generation requests", () => {
     expect(generationCommand.safeParse(image).success).toBe(true);
     expect(imageCommandProblem(image)).toBeNull();
     expect(
-      generationCommand.safeParse({ ...image, referenceIds: ["a", "b", "c", "d"] })
-        .success,
+      generationCommand.safeParse({
+        ...image,
+        referenceIds: ["a", "b", "c", "d"],
+      }).success,
     ).toBe(false);
-    expect(generationCommand.safeParse({ ...image, aspect: "4:3" }).success).toBe(
-      false,
-    );
+    expect(
+      generationCommand.safeParse({ ...image, aspect: "4:3" }).success,
+    ).toBe(false);
     expect(
       generationCommand.safeParse({ ...image, quality: undefined }).success,
     ).toBe(false);

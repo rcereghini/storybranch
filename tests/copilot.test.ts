@@ -1,4 +1,5 @@
-import { expect, it } from "vitest";
+import { assistCommandSchema } from "../packages/contracts/assist";
+import { describe, expect, it } from "vitest";
 import {
   copilotAvailable,
   copilotCommandSchema,
@@ -45,9 +46,7 @@ it("validates the message command", () => {
     context: { path: "/" },
   };
   expect(copilotCommandSchema.parse(ok).text).toBe("Where are my drafts?");
-  expect(() =>
-    copilotCommandSchema.parse({ ...ok, text: "   " }),
-  ).toThrow();
+  expect(() => copilotCommandSchema.parse({ ...ok, text: "   " })).toThrow();
   expect(() =>
     copilotCommandSchema.parse({
       ...ok,
@@ -55,4 +54,42 @@ it("validates the message command", () => {
     }),
   ).toThrow();
   expect(() => copilotCommandSchema.parse({ ...ok, extra: 1 })).toThrow();
+});
+
+describe("Studio writing help requests", () => {
+  const command = {
+    idempotencyKey: "assist-1",
+    action: "rewrite",
+    instruction: "more suspense",
+    story: { title: "The Glass Harbor", description: "" },
+    page: {
+      title: "Arrival",
+      text: "You step off the ferry.",
+      pageType: "text",
+      ending: false,
+      outputs: ["Continue"],
+    },
+    before: [],
+  };
+  it("accepts page context and rejects extra controls or oversized context", () => {
+    expect(assistCommandSchema.safeParse(command).success).toBe(true);
+    expect(
+      assistCommandSchema.safeParse({ ...command, model: "other" }).success,
+    ).toBe(false);
+    expect(
+      assistCommandSchema.safeParse({ ...command, action: "publish" }).success,
+    ).toBe(false);
+    expect(
+      assistCommandSchema.safeParse({
+        ...command,
+        before: Array(4).fill({ title: "a", text: "b" }),
+      }).success,
+    ).toBe(false);
+    expect(
+      assistCommandSchema.safeParse({
+        ...command,
+        page: { ...command.page, text: "x".repeat(10001) },
+      }).success,
+    ).toBe(false);
+  });
 });

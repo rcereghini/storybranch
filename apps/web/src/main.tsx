@@ -342,7 +342,9 @@ function App() {
   );
   return (
     <>
-      <header className={immersive ? "app-header immersive-header" : "app-header"}>
+      <header
+        className={immersive ? "app-header immersive-header" : "app-header"}
+      >
         <div className="app-header-inner">
           <a
             className="brand"
@@ -483,7 +485,13 @@ function App() {
           <SharedPage key={path} path={path} />
         ) : path === "/assets" || path.startsWith("/assets/") ? (
           user ? (
-            <AssetLibrary key={user.uid} api={api} path={path} navigate={navigate} uid={user.uid} />
+            <AssetLibrary
+              key={user.uid}
+              api={api}
+              path={path}
+              navigate={navigate}
+              uid={user.uid}
+            />
           ) : (
             <section className="empty">
               <h1>Your asset library</h1>
@@ -494,7 +502,10 @@ function App() {
           isAdmin ? (
             <Admin api={api} uid={user!.uid} navigate={navigate} />
           ) : user && !profile ? (
-            <div className="placeholder summary-placeholder" aria-hidden="true" />
+            <div
+              className="placeholder summary-placeholder"
+              aria-hidden="true"
+            />
           ) : (
             <section className="empty">
               <h1>Admins only</h1>
@@ -507,6 +518,7 @@ function App() {
               key={user.uid}
               onPlay={start}
               onDirtyChange={setStudioDirty}
+              aiWriting={!!profile?.features?.copilot}
             />
           ) : (
             <section className="empty">

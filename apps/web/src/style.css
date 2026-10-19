@@ -441,9 +441,6 @@ hr {
   .studio {
     padding: 20px 16px 40px;
   }
-  .studio-toolbar {
-    top: 68px;
-  }
   .hero {
     min-height: 630px;
   }
@@ -633,60 +630,6 @@ hr {
   margin: 0;
   font: 700 22px/1.3 var(--font-display);
 }
-.studio-layout {
-  display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
-  gap: 32px;
-}
-.studio-library button {
-  display: block;
-  width: 100%;
-  margin: 8px 0;
-  text-align: left;
-}
-.studio-library {
-  min-width: 0;
-}
-.studio-layout > .studio-library {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  align-self: start;
-}
-.studio-library h2 {
-  margin: 0 0 12px;
-  font: 700 16px/1.3 var(--font-ui);
-}
-.studio-draft-stack {
-  padding: 0;
-  margin: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  box-shadow: var(--shadow);
-}
-.studio-draft-stack:empty {
-  display: none;
-}
-.studio-draft-stack .studio-draft-card {
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  padding: 16px;
-  width: 100%;
-  box-shadow: none;
-}
-.studio-draft-stack .studio-draft-card + .studio-draft-card {
-  border-top: 1px solid var(--line);
-}
-.studio-draft-stack .studio-draft-card[aria-current="true"] {
-  background: var(--primary-soft);
-  box-shadow: inset 3px 0 var(--accent);
-}
-.studio-draft-stack .studio-draft-card:focus-visible {
-  outline-offset: -3px;
-}
 .studio-draft-title {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -821,10 +764,6 @@ hr {
   margin-top: auto;
   padding-top: 4px;
 }
-.studio-library small {
-  display: block;
-  margin-top: 8px;
-}
 .studio fieldset {
   border: 0;
   border-radius: var(--radius-lg);
@@ -844,17 +783,6 @@ hr {
 }
 .studio fieldset > legend + * {
   clear: both;
-}
-.studio-toolbar {
-  position: sticky;
-  top: 76px;
-  z-index: 6;
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  gap: 8px;
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  box-shadow: var(--shadow);
 }
 .studio-status {
   margin-left: auto;
@@ -954,16 +882,10 @@ input[type="file"]::file-selector-button {
   padding: 0 16px 16px;
   margin: 20px 0;
 }
-.studio-preview {
-  margin-top: 32px;
-}
 .studio code {
   overflow-wrap: anywhere;
 }
 @media (max-width: 760px) {
-  .studio-layout {
-    grid-template-columns: 1fr;
-  }
   .studio fieldset {
     padding: 16px;
   }

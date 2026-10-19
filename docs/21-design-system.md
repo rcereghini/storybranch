@@ -28,6 +28,7 @@ Fonts are bundled with the app (`@fontsource-variable/*`), so no request goes to
 - **Shell** (`shell.css`): sticky header with the main sections (Home, Discover, Adventures, Create), Copilot and the account menu (profile, Assets, Admin, appearance, sign out). Below 801px the sections move to a bottom tab bar; the story player keeps a compact header with a way back.
 - **Buttons**: `.btn` with `.btn-primary`, `.btn-secondary`, `.btn-coral`, `.btn-small`, and `.btn-link` for text actions. Touch targets are at least 44px tall on phones.
 - **Pages** use a 1240px max width with 32px side padding (16px on phones), cards with `--radius-lg` and `--shadow`, and headings in `--font-display`.
+- **Studio editor** (`studio.css`, `story-graph.css`): a full-window workspace with its own bar and three panes (pages, map, settings) that scroll independently with thin theme-colored scrollbars; one pane at a time at 1100px and below. The map is a pan-and-zoom canvas with floating tools, so nothing on it uses page scrolling. Editor notices sit at the bottom center and clear after eight seconds; AI suggestions cover the field they would change.
 - **Story covers** (`StoryCover`): shipped art where it exists, otherwise the title on a color field from `cover-palette.ts` (thumbnails show the first letter).
 - **No layout shift**: status lines and loading placeholders reserve their space; notices replace each other rather than push content (see `AGENTS.md`).
 

@@ -17,7 +17,7 @@ try {
       .getByRole("button", { name: "Sign in ↗" })
       .click();
     await page.getByRole("dialog").waitFor({ state: "hidden" });
-    // Without a fal key the generator says so and never simulates a result.
+    // Without an OpenAI key the generator says so and never simulates a result.
     await page
       .getByRole("button", { name: "Generate image", exact: true })
       .click();
@@ -181,7 +181,9 @@ try {
         .getByRole("button", { name: "Generate image", exact: true })
         .click();
       await page.waitForFunction(() =>
-        document.querySelector(".imagegen-status")?.textContent?.includes("Saved"),
+        document
+          .querySelector(".imagegen-status")
+          ?.textContent?.includes("Saved"),
       );
       await page.waitForTimeout(300);
       assert.equal(submitted.length, 2);

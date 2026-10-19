@@ -88,14 +88,16 @@ export function ImageGenerator({
     );
     if (job.asset) onAsset(job.asset);
   };
+  const progress = (quality: Quality | undefined) =>
+    setNotice(
+      quality === "high"
+        ? "Generating a high-quality image. This can take up to a minute…"
+        : "Generating a quick draft…",
+    );
   const wait = async (job: GenerationJob) => {
     while (job.status === "queued" || job.status === "submitting") {
       if (!alive.current) return;
-      setNotice(
-        job.quality === "high"
-          ? "Generating a high-quality image. This takes about half a minute…"
-          : "Generating a quick draft…",
-      );
+      progress(job.quality);
       await new Promise((resolve) => setTimeout(resolve, 3000));
       if (!alive.current) return;
       job = await api<GenerationJob>(`/generation/${job.id}`, {});
@@ -104,7 +106,7 @@ export function ImageGenerator({
     if (job.status !== "ready" || !job.asset)
       throw new Error(
         job.message ??
-          "The result needs checking in the fal dashboard before retrying.",
+          "The result needs checking in your OpenAI usage before retrying.",
       );
     setNotice("Saved to your assets.");
   };
@@ -123,6 +125,8 @@ export function ImageGenerator({
             ? { referenceIds: references }
             : {}),
         });
+      // The server answers once the image is made.
+      progress(quality);
       const job = await api<GenerationJob>("/generation", pending.current);
       remember(null);
       record(job);
@@ -159,8 +163,7 @@ export function ImageGenerator({
           ? [...current, assetId]
           : current,
     );
-  const ready =
-    !!listing?.enabled && !busy && prompt.trim().length >= 3;
+  const ready = !!listing?.enabled && !busy && prompt.trim().length >= 3;
   const jobs = (listing?.jobs ?? []).filter((job) => job.kind === "image");
 
   return (
@@ -285,7 +288,7 @@ export function ImageGenerator({
           </p>
           <small className="imagegen-muted">
             Up to 20 generations a day. Prompts and reference images are sent to
-            fal.ai to create the image.
+            OpenAI to create the image.
           </small>
         </form>
         <div className="imagegen-results" aria-labelledby="imagegen-recent">
