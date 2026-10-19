@@ -2,8 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import type { DocumentData } from "firebase-admin/firestore";
 import {
   generationCommand,
+  imageCommandProblem,
   type GenerationJob,
-  type GenerationCommand,
+  type ImageCommand,
 } from "../../packages/contracts/generation";
 import { GameError } from "../../packages/contracts/index";
 import { uploadLimits } from "../../packages/contracts/media";
@@ -17,7 +18,7 @@ const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
 function access(features: Features) {
   if (!process.env.FAL_KEY)
-    return "AI generation is not connected yet. You can upload frames and edit videos now.";
+    return "AI generation is not connected yet. You can still upload photos and videos.";
   if (!features.generate)
     return "AI generation is not enabled for this account.";
   return null;
@@ -27,6 +28,8 @@ function view(id: string, data: DocumentData): GenerationJob {
     id,
     kind: data.kind,
     prompt: data.prompt,
+    ...(data.quality ? { quality: data.quality } : {}),
+    ...(data.aspect ? { aspect: data.aspect } : {}),
     createdAt: data.createdAt,
     status:
       data.status === "submitting" && Date.now() - data.createdAt > 60000
@@ -69,40 +72,46 @@ async function reference(uid: string, assetId: string) {
   const [bytes] = await bucket.file(asset.path).download();
   return `data:${asset.contentType};base64,${bytes.toString("base64")}`;
 }
-async function input(uid: string, command: GenerationCommand) {
-  if (command.kind === "video")
+const sizes = {
+  "16:9": { width: 1024, height: 576 },
+  "9:16": { width: 576, height: 1024 },
+  "1:1": { width: 1024, height: 1024 },
+} as const;
+// Draft: Flux Schnell, nearly free. High: Nano Banana Pro, which also
+// follows reference images (the edit endpoint) for consistent characters.
+async function input(uid: string, command: ImageCommand) {
+  if (command.quality === "draft")
     return {
-      model: "fal-ai/wan-flf2v",
+      model: "fal-ai/flux/schnell",
       input: {
         prompt: command.prompt,
-        start_image_url: await reference(uid, command.firstId),
-        end_image_url: await reference(uid, command.lastId),
-        resolution: "480p",
-        num_frames: 81,
-        frames_per_second: 16,
+        image_size: sizes[command.aspect],
+        num_images: 1,
+        output_format: "jpeg",
         enable_safety_checker: true,
       },
     };
-  return command.referenceId
+  const references = await Promise.all(
+    (command.referenceIds ?? []).map((assetId) => reference(uid, assetId)),
+  );
+  return references.length
     ? {
-        model: "fal-ai/flux/dev/image-to-image",
+        model: "fal-ai/nano-banana-pro/edit",
         input: {
           prompt: command.prompt,
-          image_url: await reference(uid, command.referenceId),
-          strength: 0.65,
+          image_urls: references,
+          aspect_ratio: command.aspect,
           num_images: 1,
           output_format: "jpeg",
-          enable_safety_checker: true,
         },
       }
     : {
-        model: "fal-ai/flux/schnell",
+        model: "fal-ai/nano-banana-pro",
         input: {
           prompt: command.prompt,
-          image_size: { width: 1024, height: 576 },
+          aspect_ratio: command.aspect,
           num_images: 1,
           output_format: "jpeg",
-          enable_safety_checker: true,
         },
       };
 }
@@ -211,6 +220,13 @@ export async function generation(
       throw new GameError("VALIDATION_FAILED", "Invalid JSON.");
     }
     const command = generationCommand.parse(body);
+    if (command.kind === "video")
+      throw new GameError(
+        "FORBIDDEN",
+        "Video generation is turned off. Upload your own clips instead.",
+      );
+    const problem = imageCommandProblem(command);
+    if (problem) throw new GameError("VALIDATION_FAILED", problem);
     const id = digest(`${uid}:${command.idempotencyKey}`),
       fingerprint = digest(JSON.stringify(command));
     const ref = db.doc(`generationJobs/${id}`);
@@ -237,6 +253,8 @@ export async function generation(
       fingerprint,
       kind: command.kind,
       prompt: command.prompt,
+      quality: command.quality,
+      aspect: command.aspect,
       status: "submitting",
       createdAt: Date.now(),
     };

@@ -16,7 +16,7 @@ import { copyLink } from "./share";
 import { ApiError } from "../../../packages/api-client/index";
 import { assetIdOf } from "../../../packages/contracts/media";
 import { resolveFixtureMedia } from "../../../fixtures/media";
-import { VideoGenerator } from "./VideoGenerator";
+import { ImageGenerator } from "./ImageGenerator";
 import { VideoEditor } from "./VideoEditor";
 import "./video-workshop.css";
 import "./assets.css";
@@ -321,7 +321,7 @@ export function AssetLibrary({
     );
   if (path === "/assets/generate")
     return (
-      <VideoGenerator
+      <ImageGenerator
         api={api}
         uid={uid}
         uploads={uploads}
@@ -372,7 +372,7 @@ export function AssetLibrary({
         <div>
           <h1 id="assets-title">Assets</h1>
           <p className="assets-muted">
-            Your videos and photos. Upload or generate them once, then use them
+            Your photos and videos. Generate images or upload files, then use them
             on any page.
           </p>
         </div>
@@ -411,7 +411,7 @@ export function AssetLibrary({
           </label>
           <button
             className="btn btn-secondary"
-            aria-label="Generate video"
+            aria-label="Generate image"
             onClick={() => navigate("/assets/generate")}
           >
             Generate with AI

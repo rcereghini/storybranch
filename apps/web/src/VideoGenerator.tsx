@@ -398,7 +398,9 @@ export function VideoGenerator({
                   const asset = await generate({
                     kind: "image",
                     prompt: `${draft.prompt}\n${draft.framePrompt}`,
-                    ...(reference ? { referenceId: reference } : {}),
+                    quality: "high",
+                    aspect: "16:9",
+                    ...(reference ? { referenceIds: [reference] } : {}),
                   });
                   add(asset);
                   setReference(asset.id);
@@ -428,7 +430,9 @@ export function VideoGenerator({
                     if (controller.current?.signal.aborted) break;
                     const asset = await generate({
                       kind: "image",
-                      referenceId,
+                      quality: "high",
+                      aspect: "16:9",
+                      referenceIds: [referenceId],
                       prompt: `${draft.prompt}\n${direction} Preserve the subject, setting and lighting.`,
                     });
                     onAsset(asset);

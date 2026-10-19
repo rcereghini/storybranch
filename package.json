@@ -41,7 +41,7 @@
     "emulators": "tsx scripts/emulators.ts",
     "seed": "tsx scripts/seed.ts",
     "format": "prettier --write apps/web/src packages services fixtures scripts tests *.json *config.ts",
-    "test:video-workshop": "tsx scripts/video-workshop-check.ts"
+    "test:assets": "tsx scripts/assets-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

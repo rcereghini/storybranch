@@ -29,6 +29,7 @@ it("gates paid generation, preserves request receipts, and protects job ownershi
   const originalKey = process.env.FAL_KEY;
   const realFetch = globalThis.fetch;
   let submissions = 0;
+  const requests: { url: string; body: any }[] = [];
   let succeed = false;
   const spy = vi
     .spyOn(globalThis, "fetch")
@@ -45,6 +46,7 @@ it("gates paid generation, preserves request receipts, and protects job ownershi
         return realFetch(input, init);
       if (init?.method === "POST") {
         submissions++;
+        requests.push({ url, body: JSON.parse(String(init.body)) });
         return Response.json({
           request_id: "test-job",
           status_url: "https://queue.fal.run/test/status",
@@ -67,6 +69,8 @@ it("gates paid generation, preserves request receipts, and protects job ownershi
       idempotencyKey: randomUUID(),
       kind: "image",
       prompt: "A quiet harbor",
+      quality: "draft",
+      aspect: "16:9",
     };
     expect((await call("/generation", command)).status).toBe(403);
     process.env.FAL_KEY = "test-key-not-real";
@@ -74,10 +78,27 @@ it("gates paid generation, preserves request receipts, and protects job ownershi
     await setFeature("progressed", "generate", false);
     expect((await call("/generation", command, "progressed")).status).toBe(403);
     expect((await call("/generation", undefined, "progressed")).data.enabled).toBe(false);
+    const high = { ...command, quality: "high" };
     expect(
-      (await call("/generation", { ...command, referenceId: "not-owned" }))
+      (await call("/generation", { ...high, referenceIds: ["not-owned"] }))
         .status,
     ).toBe(400);
+    // References need the high-quality model; video generation is off.
+    expect(
+      (await call("/generation", { ...command, referenceIds: ["any"] })).status,
+    ).toBe(400);
+    expect(
+      (
+        await call("/generation", {
+          idempotencyKey: randomUUID(),
+          kind: "video",
+          prompt: "A gate opens",
+          firstId: "a",
+          lastId: "b",
+        })
+      ).status,
+    ).toBe(403);
+    expect(submissions).toBe(0);
     const first = await call("/generation", command);
     expect(first.status).toBe(200);
     expect(first.data.status).toBe("queued");
@@ -112,6 +133,19 @@ it("gates paid generation, preserves request receipts, and protects job ownershi
     expect(stored.published).toBe(false);
     expect((await bucket.file(stored.path).exists())[0]).toBe(true);
     expect(submissions).toBe(2);
+    expect(requests[0].url).toContain("fal-ai/flux/schnell");
+    // High quality follows an owned reference through the edit endpoint.
+    const referenced = await call("/generation", {
+      ...high,
+      aspect: "9:16",
+      idempotencyKey: randomUUID(),
+      referenceIds: [completed.data.asset.id],
+    });
+    expect(referenced.status).toBe(200);
+    expect(referenced.data.quality).toBe("high");
+    expect(requests[2].url).toContain("fal-ai/nano-banana-pro/edit");
+    expect(requests[2].body.aspect_ratio).toBe("9:16");
+    expect(requests[2].body.image_urls).toHaveLength(1);
   } finally {
     spy.mockRestore();
     if (originalKey === undefined) delete process.env.FAL_KEY;

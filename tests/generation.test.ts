@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { generationCommand } from "../packages/contracts/generation";
+import {
+  generationCommand,
+  imageCommandProblem,
+  type ImageCommand,
+} from "../packages/contracts/generation";
 import { cropRect } from "../apps/web/src/video-export";
 describe("generation requests", () => {
   it("requires owned-asset IDs instead of client URLs and rejects extra provider controls", () => {
@@ -24,6 +28,31 @@ describe("generation requests", () => {
     expect(
       generationCommand.safeParse({ ...command, lastId: undefined }).success,
     ).toBe(false);
+  });
+  it("offers two image tiers and keeps references to high quality", () => {
+    const image: ImageCommand = {
+      idempotencyKey: "request-2",
+      kind: "image",
+      prompt: "A courier under a broken lighthouse",
+      quality: "high",
+      aspect: "9:16",
+      referenceIds: ["a", "b", "c"],
+    };
+    expect(generationCommand.safeParse(image).success).toBe(true);
+    expect(imageCommandProblem(image)).toBeNull();
+    expect(
+      generationCommand.safeParse({ ...image, referenceIds: ["a", "b", "c", "d"] })
+        .success,
+    ).toBe(false);
+    expect(generationCommand.safeParse({ ...image, aspect: "4:3" }).success).toBe(
+      false,
+    );
+    expect(
+      generationCommand.safeParse({ ...image, quality: undefined }).success,
+    ).toBe(false);
+    expect(imageCommandProblem({ ...image, quality: "draft" })).toBe(
+      "Reference images need High quality.",
+    );
   });
   it("computes portrait crop and respects framing at either edge", () => {
     const left = cropRect(1920, 1080, { aspect: "9:16", x: 0, y: 50 });
