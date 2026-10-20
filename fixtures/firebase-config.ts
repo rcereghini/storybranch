@@ -8,3 +8,8 @@ export const firebaseConfig = {
   appId: "1:75646560281:web:4892628f2dc298a2762288",
   measurementId: "G-JBFN1VZ45F",
 };
+// Production serves Firebase's sign-in handler from its own domain
+// (vercel.json proxies /__/auth/), so browsers that block third-party
+// storage, like every iPhone browser, keep the sign-in state. Other hosts
+// (local, previews) use the firebaseapp.com handler.
+export const ownAuthDomain = "www.storybranch.com";

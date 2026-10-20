@@ -1,7 +1,10 @@
 import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import type { FirebaseStorage } from "firebase/storage";
-import { firebaseConfig } from "../../../fixtures/firebase-config";
+import {
+  firebaseConfig,
+  ownAuthDomain,
+} from "../../../fixtures/firebase-config";
 export const emulatorMode =
   import.meta.env.VITE_STORYBRANCH_MODE === "emulator" ||
   import.meta.env.VITE_PHONE_PREVIEW === "1";
@@ -15,7 +18,9 @@ const app = initializeApp(
             : "demo-storybranch",
         authDomain: "demo-storybranch.firebaseapp.com",
       }
-    : firebaseConfig,
+    : location.host === ownAuthDomain
+      ? { ...firebaseConfig, authDomain: ownAuthDomain }
+      : firebaseConfig,
 );
 export const auth = getAuth(app);
 // Loaded on demand so only Studio pays for the Storage SDK.

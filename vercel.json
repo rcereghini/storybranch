@@ -5,6 +5,14 @@
   "framework": null,
   "functions": { "api/index.js": { "maxDuration": 300 } },
   "rewrites": [
+    {
+      "source": "/__/auth/:path*",
+      "destination": "https://storybranch-f77a3.firebaseapp.com/__/auth/:path*"
+    },
+    {
+      "source": "/__/firebase/:path*",
+      "destination": "https://storybranch-f77a3.firebaseapp.com/__/firebase/:path*"
+    },
     { "source": "/api/:path*", "destination": "/api" },
     {
       "source": "/s/:story/ending/:page",
