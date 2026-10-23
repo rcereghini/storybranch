@@ -1,5 +1,10 @@
 import { it, expect } from "vitest";
 import { draftSchema } from "../packages/contracts/authoring";
+import {
+  assistCommandSchema,
+  clampComicScript,
+  comicBriefSchema,
+} from "../packages/contracts/assist";
 import { pageSchema, type Story } from "../packages/contracts/index";
 import { validatePublication } from "../packages/domain/authoring";
 import {
@@ -9,10 +14,12 @@ import {
   transition,
 } from "../packages/domain/index";
 import {
+  applyComicScript,
   castInPanel,
   castPrompt,
   comicPanel,
   comicTemplate,
+  drawPlan,
   panelPrompt,
 } from "../apps/web/src/studio-model";
 
@@ -164,4 +171,138 @@ it("writes panel prompts that carry the style and cast and ask for no text", () 
   expect(castPrompt(cast[0], "x".repeat(2000)).length).toBeLessThanOrEqual(
     1800,
   );
+});
+
+const brief = {
+  premise: "My cat knocks my phone off the table during a work call.",
+  style: "Bold cartoon",
+  layout: "grid" as const,
+  panelCount: 4,
+};
+
+it("asks the companion for a comic only with a brief that fits a layout", () => {
+  expect(comicBriefSchema.safeParse(brief).success).toBe(true);
+  expect(comicBriefSchema.safeParse({ ...brief, panelCount: 6 }).success).toBe(
+    false,
+  );
+  expect(
+    comicBriefSchema.safeParse({ ...brief, layout: "scroll", panelCount: 12 })
+      .success,
+  ).toBe(true);
+  expect(
+    comicBriefSchema.safeParse({ ...brief, layout: "scroll", panelCount: 13 })
+      .success,
+  ).toBe(false);
+  expect(comicBriefSchema.safeParse({ ...brief, premise: "cat" }).success).toBe(
+    false,
+  );
+  const command = {
+    idempotencyKey: "assist-comic",
+    action: "comic-script",
+    story: { title: "Untitled comic", description: "" },
+    page: {
+      title: "Untitled comic",
+      text: "",
+      pageType: "comic",
+      ending: true,
+      outputs: [],
+    },
+    before: [],
+    comic: brief,
+  };
+  expect(assistCommandSchema.safeParse(command).success).toBe(true);
+  const { comic: _, ...bare } = command;
+  expect(assistCommandSchema.safeParse(bare).success).toBe(false);
+  expect(
+    assistCommandSchema.safeParse({ ...command, action: "write" }).success,
+  ).toBe(false);
+});
+
+it("clamps a model's script to the panels asked for and the cast limit", () => {
+  const panel = (n: number) => ({ alt: `Beat ${n}`, caption: `Line ${n}` });
+  expect(
+    clampComicScript({ panels: [panel(1), panel(2), panel(3)] }, brief),
+  ).toBeNull();
+  const script = clampComicScript(
+    {
+      title: "",
+      description: "x".repeat(900),
+      cast: [
+        { name: "Mo", description: "Orange cat" },
+        { name: "mo", description: "Duplicate" },
+        ...Array.from({ length: 8 }, (_, i) => ({
+          name: `Extra ${i}`,
+          description: "",
+        })),
+      ],
+      panels: [1, 2, 3, 4, 5].map(panel).concat([{ alt: "", caption: "x" }]),
+    },
+    brief,
+  )!;
+  expect(script.title).toBe("Untitled comic");
+  expect(script.description).toHaveLength(500);
+  expect(script.cast.map((c) => c.name).slice(0, 2)).toEqual(["Mo", "Extra 0"]);
+  expect(script.cast).toHaveLength(6);
+  expect(script.panels).toEqual([1, 2, 3, 4].map(panel));
+});
+
+it("puts a script into the draft and plans only the missing images", () => {
+  const story = comicTemplate("story-comic");
+  const draft = {
+    story,
+    description: "",
+    revision: 1,
+    publishedVersionId: null,
+    comic: {
+      style: "",
+      cast: [
+        {
+          id: "cast-mo",
+          name: "Mo",
+          description: "Old look",
+          image: "asset:generated-mo",
+        },
+      ],
+    },
+  };
+  const script = {
+    title: "Mute Button",
+    description: "A cat ends a meeting.",
+    cast: [
+      { name: "mo", description: "Orange cat, torn ear" },
+      { name: "Dana", description: "Tired, green hoodie" },
+    ],
+    panels: Array.from({ length: 9 }, (_, i) => ({
+      alt: `Mo and Dana, beat ${i + 1}`,
+      caption: "",
+    })),
+  };
+  const next = applyComicScript(draft, "comic", script, {
+    layout: "grid",
+    style: "Manga",
+  });
+  expect(next.story.title).toBe("Mute Button");
+  expect(next.description).toBe("A cat ends a meeting.");
+  expect(next.comic!.style).toBe("Manga");
+  // Mo keeps the reference image already drawn; Dana is new.
+  expect(next.comic!.cast[0]).toMatchObject({
+    id: "cast-mo",
+    image: "asset:generated-mo",
+    description: "Orange cat, torn ear",
+  });
+  const panels = next.story.pages.comic.comic!.panels;
+  expect(new Set(panels.map((p) => p.id)).size).toBe(9);
+  expect(comicIssue(next.story.pages.comic)).toBe("Add an image to panel 1.");
+  expect(draftSchema.safeParse(next).success).toBe(false); // has record fields
+  const { revision: _r, publishedVersionId: _p, ...plain } = next;
+  expect(draftSchema.safeParse(plain).success).toBe(true);
+  const plan = drawPlan(next, "comic");
+  expect(plan.cast.map((c) => c.name)).toEqual(["Dana"]);
+  expect(plan.panels).toHaveLength(9);
+  // A creator's own title is kept.
+  const named = { ...draft, story: { ...story, title: "Office Cats" } };
+  expect(
+    applyComicScript(named, "comic", script, { layout: "grid", style: "" })
+      .story.title,
+  ).toBe("Office Cats");
 });

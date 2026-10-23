@@ -5,6 +5,7 @@ import type {
 } from "../../../packages/contracts/media";
 import {
   generationCommand,
+  generationLimits,
   imageAspects,
   maxReferences,
   type GenerationCommand,
@@ -287,8 +288,8 @@ export function ImageGenerator({
             {notice}
           </p>
           <small className="imagegen-muted">
-            Up to 20 generations a day. Prompts and reference images are sent to
-            OpenAI to create the image.
+            Up to {generationLimits.daily} generations a day. Prompts and
+            reference images are sent to OpenAI to create the image.
           </small>
         </form>
         <div className="imagegen-results" aria-labelledby="imagegen-recent">

@@ -4,7 +4,14 @@ import type {
   Story as StoryData,
   StoryPage,
 } from "../../../packages/contracts/index";
-import type { CastMember } from "../../../packages/contracts/authoring";
+import type {
+  CastMember,
+  DraftRecord,
+} from "../../../packages/contracts/authoring";
+import type {
+  ComicBrief,
+  ComicScript,
+} from "../../../packages/contracts/assist";
 import { maxReferences } from "../../../packages/contracts/generation";
 import { sceneMedia } from "../../../fixtures/media";
 
@@ -239,3 +246,86 @@ export const castPrompt = (member: CastMember, style: string) =>
     .filter(Boolean)
     .join(" ")
     .slice(0, 1800);
+
+// The companion's style choices, each with the prompt text it stands for.
+export const comicStyles = [
+  ["Cartoon", defaultComicStyle],
+  [
+    "Realistic",
+    "Photorealistic, natural light, cinematic framing, real textures",
+  ],
+  [
+    "Manga",
+    "Black-and-white manga, clean ink lines, screentone shading, dynamic angles",
+  ],
+  [
+    "Pixel art",
+    "16-bit pixel art, limited palette, crisp pixels, retro game look",
+  ],
+  [
+    "Watercolor",
+    "Soft watercolor illustration, loose brushwork, warm paper texture",
+  ],
+  [
+    "3D animated",
+    "Polished 3D animated film look, soft lighting, expressive characters",
+  ],
+  [
+    "Newspaper strip",
+    "Classic newspaper comic strip, simple ink lines, flat muted colors",
+  ],
+] as const;
+
+// Puts a companion script into the draft: new panels in the chosen layout,
+// the cast (keeping the reference image of any character already there by
+// name) and the style. A blank title or listing description is filled in.
+export function applyComicScript(
+  draft: DraftRecord,
+  pageId: string,
+  script: ComicScript,
+  brief: Pick<ComicBrief, "layout" | "style">,
+): DraftRecord {
+  const page = draft.story.pages[pageId];
+  if (!page?.comic) return draft;
+  const previous = draft.comic?.cast ?? [];
+  const cast = script.cast.map((c) => {
+    const same = previous.find(
+      (p) => p.name.trim().toLowerCase() === c.name.toLowerCase(),
+    );
+    return { ...(same ?? { id: `cast-${shortId()}` }), ...c };
+  });
+  const untitled = (title: string) =>
+    /^untitled/i.test(title.trim()) || !title.trim();
+  return {
+    ...draft,
+    description: draft.description.trim()
+      ? draft.description
+      : script.description,
+    comic: { style: brief.style, cast },
+    story: {
+      ...draft.story,
+      title: untitled(draft.story.title) ? script.title : draft.story.title,
+      pages: {
+        ...draft.story.pages,
+        [pageId]: {
+          ...page,
+          title: untitled(page.title) ? script.title : page.title,
+          comic: {
+            layout: brief.layout,
+            panels: script.panels.map((p) => ({ ...comicPanel(), ...p })),
+          },
+        },
+      },
+    },
+  };
+}
+
+// What drawing a comic takes: a sheet for each named character without a
+// reference image, then each panel without an image.
+export function drawPlan(draft: DraftRecord, pageId: string) {
+  const comic = draft.story.pages[pageId]?.comic;
+  return {
+    cast: (draft.comic?.cast ?? []).filter((c) => !c.image && c.name.trim()),
+    panels: (comic?.panels ?? []).filter((p) => !p.image),
+  };
+}

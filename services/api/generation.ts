@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { DocumentData } from "firebase-admin/firestore";
 import {
   generationCommand,
+  generationLimits,
   imageCommandProblem,
   type GenerationJob,
   type ImageCommand,
@@ -23,6 +24,10 @@ function access(features: Features) {
     return "AI generation is not enabled for this account.";
   return null;
 }
+const quotaOf = (uid: string) =>
+  db.doc(
+    `generationQuotas/${digest(uid)}-${Math.floor(Date.now() / 86400000)}`,
+  );
 // Generation runs inside the submitting request, so a job still unfinished
 // after the function's time limit was cut off and needs checking.
 const staleAfter = 300000;
@@ -172,9 +177,11 @@ export async function generation(
       .where("ownerUid", "==", uid)
       .get();
     const reason = access(features);
+    const used = (await quotaOf(uid).get()).data()?.count ?? 0;
     return {
       enabled: !reason,
       reason,
+      remaining: Math.max(0, generationLimits.daily - used),
       jobs: records.docs
         .map((d) => view(d.id, d.data()))
         .sort((a, b) => b.createdAt - a.createdAt)
@@ -220,8 +227,7 @@ export async function generation(
         "VALIDATION_FAILED",
         "Your asset library is full. Generation was not submitted.",
       );
-    const day = Math.floor(Date.now() / 86400000);
-    const quota = db.doc(`generationQuotas/${digest(uid)}-${day}`);
+    const quota = quotaOf(uid);
     const data = {
       ownerUid: uid,
       fingerprint,
@@ -242,10 +248,10 @@ export async function generation(
           );
         return false;
       }
-      if ((used.data()?.count ?? 0) >= 20)
+      if ((used.data()?.count ?? 0) >= generationLimits.daily)
         throw new GameError(
           "VALIDATION_FAILED",
-          "Daily generation limit reached (20 requests). Try again tomorrow.",
+          `Daily generation limit reached (${generationLimits.daily} requests). Try again tomorrow.`,
         );
       tx.create(ref, data);
       tx.set(quota, { count: (used.data()?.count ?? 0) + 1 });

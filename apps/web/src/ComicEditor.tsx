@@ -14,6 +14,7 @@ import {
 import { comicIssue } from "../../../packages/domain/index";
 import { comicLimits } from "../../../packages/contracts/index";
 import { ClipPicker } from "./ClipPicker";
+import { ComicCompanion } from "./ComicCompanion";
 import { ComicStrip } from "./ComicStrip";
 import { PageImageDialog } from "./StudioAssist";
 import {
@@ -58,6 +59,8 @@ export function ComicEditor({
   onSelectPanel,
   onEdit,
   onUploaded,
+  companion,
+  onCompanion,
 }: {
   api: Api;
   draft: DraftRecord;
@@ -69,6 +72,9 @@ export function ComicEditor({
   onSelectPanel: (panelId: string | null) => void;
   onEdit: Edit;
   onUploaded: (asset: ClipAsset) => void;
+  // Whether the AI companion is open; Studio opens it for a new comic.
+  companion: boolean;
+  onCompanion: (open: boolean) => void;
 }) {
   const [dialog, setDialog] = useState<{
     kind: "panel" | "cast";
@@ -140,6 +146,20 @@ export function ComicEditor({
   return (
     <div className="comic-editor">
       <h3>Comic</h3>
+      <div className="comic-companion-start">
+        <p>
+          Describe the situation and the joke, pick a style, and AI writes the
+          script and draws every panel.
+        </p>
+        <button
+          type="button"
+          className="assist-button"
+          disabled={busy}
+          onClick={() => onCompanion(true)}
+        >
+          ✦ Make it with AI
+        </button>
+      </div>
       <div className="disc-filter" role="group" aria-label="Comic layout">
         {layouts.map(([value, label]) => (
           <button
@@ -384,6 +404,18 @@ export function ComicEditor({
         Add character
       </button>
 
+      {companion && (
+        <ComicCompanion
+          api={api}
+          draft={draft}
+          page={page}
+          uploads={uploads}
+          assistReason={assistReason}
+          onEdit={onEdit}
+          onUploaded={onUploaded}
+          onClose={() => onCompanion(false)}
+        />
+      )}
       {panelIndex >= 0 && (
         <PageImageDialog
           api={api}

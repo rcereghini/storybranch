@@ -115,7 +115,7 @@ try {
           url = new URL(request.url());
         if (request.method() === "GET")
           return route.fulfill({
-            json: { enabled: true, reason: null, jobs: Object.values(jobs) },
+            json: { enabled: true, reason: null, remaining: 100, jobs: Object.values(jobs) },
           });
         if (url.pathname === "/api/generation") {
           const command = request.postDataJSON();

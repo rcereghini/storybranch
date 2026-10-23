@@ -120,6 +120,7 @@ export function Studio({
   // Comics: the panel being edited, and whether a comic draft shows the map.
   const [panel, setPanel] = useState<string | null>(null);
   const [comicMap, setComicMap] = useState(false);
+  const [companion, setCompanion] = useState(false);
   const [, setHistoryTick] = useState(0);
   const draftRef = useRef<DraftRecord | null>(null);
   draftRef.current = draft;
@@ -371,6 +372,7 @@ export function Studio({
     setPane("page");
     setFocus(0);
     setPanel(null);
+    setCompanion(false);
     setComicMap(false);
   };
   const open = (id: string) =>
@@ -394,6 +396,8 @@ export function Studio({
       },
       true,
     );
+    // A new comic starts with the companion, when AI help is available.
+    setCompanion(kind === "comic" && !assistReason);
     setNotice("");
   };
   const close = () =>
@@ -1266,6 +1270,8 @@ export function Studio({
                         onSelectPanel={setPanel}
                         onEdit={edit}
                         onUploaded={addUpload}
+                        companion={companion}
+                        onCompanion={setCompanion}
                       />
                     ) : (
                       <>

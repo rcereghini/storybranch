@@ -315,6 +315,25 @@ export function PageAssist({
   );
 }
 
+// Submits one image request and waits for it; null when the caller went
+// away first. A failed job throws its message. Resubmitting the same command
+// is safe: the server answers a repeated key with the existing job.
+export async function generateImage(
+  api: Api,
+  command: ImageCommand,
+  alive: () => boolean = () => true,
+) {
+  let job = await api<GenerationJob>("/generation", command);
+  while (job.status === "queued" || job.status === "submitting") {
+    await new Promise((r) => setTimeout(r, 3000));
+    if (!alive()) return null;
+    job = await api<GenerationJob>(`/generation/${job.id}`, {});
+  }
+  if (job.status !== "ready" || !job.asset)
+    throw new Error(job.message ?? "The image could not be generated.");
+  return job.asset;
+}
+
 const aspectLabels = {
   "16:9": "Landscape",
   "9:16": "Portrait",
@@ -436,22 +455,14 @@ export function PageImageDialog({
           ? { referenceIds: references }
           : {}),
       };
-      let job = await api<GenerationJob>("/generation", pending.current);
+      const asset = await generateImage(
+        api,
+        pending.current,
+        () => alive.current,
+      );
       pending.current = null;
-      while (job.status === "queued" || job.status === "submitting") {
-        if (!alive.current) return;
-        setStatus(
-          job.quality === "high"
-            ? "Generating a high-quality image (up to a minute)…"
-            : "Generating a quick draft…",
-        );
-        await new Promise((r) => setTimeout(r, 3000));
-        if (!alive.current) return;
-        job = await api<GenerationJob>(`/generation/${job.id}`, {});
-      }
-      if (job.status !== "ready" || !job.asset)
-        throw new Error(job.message ?? "The image could not be generated.");
-      onAttach(job.asset);
+      if (!asset) return;
+      onAttach(asset);
       onClose();
     } catch (e) {
       if (e instanceof ApiError && e.code !== "UNAVAILABLE")

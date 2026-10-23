@@ -7,6 +7,9 @@ import type { ClipAsset } from "./media";
 export const imageQualities = ["draft", "high"] as const;
 export const imageAspects = ["16:9", "9:16", "1:1"] as const;
 export const maxReferences = 3;
+// Per creator per day. A comic drawn by the companion takes one image per
+// character sheet and per panel, so a few comics fit comfortably.
+export const generationLimits = { daily: 100 } as const;
 const imageCommand = z
   .object({
     idempotencyKey: id,
@@ -51,5 +54,7 @@ export type GenerationJob = {
 export type GenerationListing = {
   enabled: boolean;
   reason: string | null;
+  // Generations left today.
+  remaining: number;
   jobs: GenerationJob[];
 };

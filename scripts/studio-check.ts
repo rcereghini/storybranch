@@ -274,7 +274,7 @@ try {
       const url = new URL(request.url());
       if (request.method() === "GET")
         return route.fulfill({
-          json: { enabled: true, reason: null, jobs: [] },
+          json: { enabled: true, reason: null, remaining: 100, jobs: [] },
         });
       if (url.pathname === "/api/generation") {
         generated.push(request.postDataJSON());

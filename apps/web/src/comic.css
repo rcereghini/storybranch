@@ -49,7 +49,11 @@
   place-items: center;
   color: #6b6b78;
   font: 600 0.85rem var(--font-ui);
-  background: repeating-linear-gradient(-45deg, #f3f1ea 0 10px, #ebe8df 10px 20px);
+  background: repeating-linear-gradient(
+    -45deg,
+    #f3f1ea 0 10px,
+    #ebe8df 10px 20px
+  );
 }
 .comic-panel > button {
   display: block;
@@ -186,13 +190,139 @@
   min-height: 0;
   height: auto;
 }
-.studio-dialog-cast {
-  margin: 10px 0 4px;
+/* Plain groups inside dialogs, not Studio's fieldset cards. */
+.studio .studio-dialog fieldset.studio-dialog-cast {
+  margin: 14px 0 4px;
   padding: 0;
   border: 0;
+  background: none;
+  box-shadow: none;
 }
-.studio-dialog-cast legend {
+.studio .studio-dialog fieldset.studio-dialog-cast > legend {
   margin-bottom: 6px;
+  font: 600 14px/1.3 var(--font-ui);
+  color: var(--text);
+}
+
+/* The AI companion: a start card in the editor and its dialog. */
+.comic-companion-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+}
+.comic-companion-start p {
+  flex: 1 1 200px;
+  margin: 0;
+  color: var(--primary-soft-text);
   font-size: 13px;
+}
+.studio .comic-companion {
+  max-width: 640px;
+}
+.comic-companion h3 {
+  margin: 18px 0 6px;
+  font-size: 15px;
+}
+.studio .comic-companion input,
+.studio .comic-companion select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+.comic-companion-count select {
+  width: auto;
+  margin-left: 8px;
+}
+.comic-companion-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.comic-companion-list li {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.comic-companion-list strong {
+  font-size: 13px;
+}
+.comic-companion-list textarea,
+.studio .comic-companion-list input {
+  margin: 0;
+}
+/* Script lines grow to show all their text where the browser can. */
+.comic-companion-list textarea {
+  field-sizing: content;
+  min-height: 3lh;
+}
+.comic-companion-change {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.comic-companion-change input {
+  flex: 1;
+  margin: 0;
+}
+.comic-companion-jobs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.comic-companion-jobs li {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.comic-companion-jobs img,
+.comic-companion-jobs .comic-empty {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+.comic-companion-jobs .comic-empty {
+  background: var(--surface-2);
+}
+.comic-companion-jobs li[data-status="drawing"] .comic-empty {
+  animation: comic-drawing 1.4s ease-in-out infinite alternate;
+}
+.comic-companion-jobs li[data-status="failed"] small {
+  color: var(--danger, #c0392b);
+}
+.comic-companion-jobs span {
+  display: grid;
+}
+.comic-companion-jobs small {
   color: var(--muted);
+}
+@keyframes comic-drawing {
+  to {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .comic-companion-jobs li[data-status="drawing"] .comic-empty {
+    animation: none;
+  }
 }
