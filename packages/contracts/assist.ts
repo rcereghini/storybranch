@@ -40,6 +40,7 @@ export const assistCommandSchema = z
           "video-options",
           "dice",
           "reveal",
+          "comic",
         ]),
         ending: z.boolean(),
         // Labels of the page's existing outputs, for continuity.

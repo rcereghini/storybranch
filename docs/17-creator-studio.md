@@ -1,6 +1,6 @@
 # Creator Studio alpha
 
-Open **Create** in the main navigation (or `/studio`) and sign in. The Studio page lists your drafts; **New story**, **New quiz** or a draft opens the editor, which fills the window below the app header (the footer and phone tab bar step aside, and **←** returns to the drafts after saving). Each new story starts with an opening and an ending. An ending closes the story and uses the existing replay/recommendation shell.
+Open **Create** in the main navigation (or `/studio`) and sign in. The Studio page lists your drafts; **New story**, **New quiz**, **New comic** or a draft opens the editor, which fills the window below the app header (the footer and phone tab bar step aside, and **←** returns to the drafts after saving). Each new story starts with an opening and an ending. An ending closes the story and uses the existing replay/recommendation shell.
 
 ## Editor layout
 
@@ -38,7 +38,19 @@ Suggestions open over the text field, so the panel never shifts, and change noth
 
 The graph edits the same authored routing contracts as the destination selectors. Publication still rejects missing destinations, unreachable pages and branches with no route to an ending. Layout is private draft metadata and never becomes gameplay state or part of a published edition.
 
-Supported types are Text, Text with Options, Video, Video with Options, Dice and Reveal. Video pages use a shipped sample clip (with portrait renditions and audio) or a clip you upload; see [Clip uploads](#clip-uploads). Dice pages configure sides, threshold and separate pass/fail destinations; Roll reveals the result and Next follows its route. Advanced output/effect JSON uses the contracts in `packages/contracts/index.ts`; it supports stat/key/roll conditions, checks and namespaced story effects. Visual condition builders are not implemented yet.
+Supported types are Text, Text with Options, Video, Video with Options, Dice, Reveal and Comic. Video pages use a shipped sample clip (with portrait renditions and audio) or a clip you upload; see [Clip uploads](#clip-uploads). Dice pages configure sides, threshold and separate pass/fail destinations; Roll reveals the result and Next follows its route. Advanced output/effect JSON uses the contracts in `packages/contracts/index.ts`; it supports stat/key/roll conditions, checks and namespaced story effects. Visual condition builders are not implemented yet.
+
+## Comics
+
+**New comic** starts a draft with one comic page: a 2×2 square grid of empty panels that ends the story, so a reader gets replay and sharing as soon as they finish it. In a comic draft the center of the editor shows the comic as it will read instead of the map; select a panel to edit it, and **Story map** switches to the map (**Back to the comic** returns). Any page in any story can also become a comic through **Page type**.
+
+Page settings for a comic hold:
+
+- **Square grid / Scrolling strip.** A grid publishes with exactly 4 or 9 panels; a strip with 4 to 12. The line below says what is still missing before it can publish.
+- **Panels**, each with **What's in this panel** (alt text, and the start of the image prompt), **Caption or dialogue**, **Panel image** (any of your photos) and **✦ Generate panel image**. Panels can be reordered, removed and added (up to 12).
+- **Cast and style**: an art style and up to six characters, each with a name, a **Looks like** description and a **Reference image**. **✦ Generate character sheet** makes a full-body reference on a plain background.
+
+Generating a panel drafts a square prompt from the panel description, the art style and the characters named in the panel's description or caption, and asks for no text or speech bubbles. Named characters with a reference image are preselected as references (up to three) and the quality defaults to High, because quick drafts can't follow references. Generation uses the same `/api/generation` endpoint, daily limit and asset library as page images. The cast and style save with the draft but are never published.
 
 ## Quizzes
 

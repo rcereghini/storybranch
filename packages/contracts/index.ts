@@ -162,6 +162,31 @@ export const choiceSchema = z
     ]),
   })
   .strict();
+const assetImage = z.string().regex(/^asset:[a-zA-Z0-9_-]{8,80}$/);
+// A comic is a square grid of 4 or 9 panels, or a scrolling strip of 4–12.
+// Drafts may hold fewer panels and panels without images; publication checks.
+export const comicLimits = { grid: [4, 9], scroll: [4, 12] } as const;
+export const comicSchema = z
+  .object({
+    layout: z.enum(["grid", "scroll"]),
+    panels: z
+      .array(
+        z
+          .object({
+            id,
+            image: assetImage.optional(),
+            // Caption or dialogue, shown over the image rather than baked in.
+            caption: z.string().max(200).optional(),
+            // What the panel shows: alt text, and the seed of its image prompt.
+            alt: z.string().max(400).optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(comicLimits.scroll[1]),
+  })
+  .strict();
+export type Comic = z.infer<typeof comicSchema>;
 export const pageSchema = z
   .object({
     id,
@@ -175,12 +200,11 @@ export const pageSchema = z
       "video-options",
       "dice",
       "reveal",
+      "comic",
     ]),
     videoAdvance: z.enum(["auto", "continue"]).optional(),
-    image: z
-      .string()
-      .regex(/^asset:[a-zA-Z0-9_-]{8,80}$/)
-      .optional(),
+    image: assetImage.optional(),
+    comic: comicSchema.optional(),
     sourcePage: z
       .object({ id, revision: z.number().int().positive() })
       .strict()

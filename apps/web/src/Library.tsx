@@ -202,7 +202,8 @@ export function PageLibrary({
           !!pending ||
           !page ||
           page.pageType === "dice" ||
-          page.pageType === "reveal"
+          page.pageType === "reveal" ||
+          page.pageType === "comic"
         }
         onClick={() => {
           if (!page) return;

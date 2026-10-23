@@ -22,6 +22,7 @@ export function ClipPicker({
   onChange,
   onUploaded,
   kind = "video",
+  label = kind === "video" ? "Video clip" : "Page photo",
 }: {
   api: Api;
   value: string | undefined;
@@ -30,6 +31,7 @@ export function ClipPicker({
   onChange: (video: string) => void;
   onUploaded: (asset: ClipAsset) => void;
   kind?: "video" | "image";
+  label?: string;
 }) {
   const [status, setStatus] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -65,9 +67,9 @@ export function ClipPicker({
   return (
     <div className="clip-picker">
       <label>
-        {kind === "video" ? "Video clip" : "Page photo"}
+        {label}
         <select
-          aria-label={kind === "video" ? "Video clip" : "Page photo"}
+          aria-label={label}
           value={value ?? ""}
           disabled={disabled || uploading}
           onChange={(e) => onChange(e.target.value)}

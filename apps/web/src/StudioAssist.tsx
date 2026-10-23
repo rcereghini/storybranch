@@ -7,6 +7,7 @@ import type {
 } from "../../../packages/contracts/assist";
 import {
   imageAspects,
+  maxReferences,
   type GenerationJob,
   type GenerationListing,
   type ImageCommand,
@@ -322,7 +323,8 @@ const aspectLabels = {
 
 // Generates an image for a page: a prompt drafted from the page (or by AI),
 // then the asset generator. The result is attached to the page and saved to
-// the creator's assets.
+// the creator's assets. Comics pass their own heading and prompt, plus the
+// cast, whose reference images keep characters consistent.
 export function PageImageDialog({
   api,
   story,
@@ -331,6 +333,12 @@ export function PageImageDialog({
   assistReason,
   onAttach,
   onClose,
+  heading = "Generate a page image",
+  initialPrompt,
+  initialAspect = "16:9",
+  cast = [],
+  initialCast = [],
+  placement = "placed on this page",
 }: {
   api: Api;
   story: Story;
@@ -339,19 +347,34 @@ export function PageImageDialog({
   assistReason: string | null;
   onAttach: (asset: ClipAsset) => void;
   onClose: () => void;
+  heading?: string;
+  initialPrompt?: string;
+  initialAspect?: ImageCommand["aspect"];
+  // Characters offered as reference images: an asset ID and a name.
+  cast?: Array<{ assetId: string; name: string }>;
+  initialCast?: string[];
+  placement?: string;
 }) {
   const [listing, setListing] = useState<GenerationListing | null>(null);
-  const [prompt, setPrompt] = useState(() =>
-    [
-      page.title,
-      page.transcript === placeholderText ? "" : page.transcript.slice(0, 600),
-      `From the story "${story.title}". Cinematic illustration, no text.`,
-    ]
-      .filter(Boolean)
-      .join(". "),
+  const [prompt, setPrompt] = useState(
+    () =>
+      initialPrompt ??
+      [
+        page.title,
+        page.transcript === placeholderText
+          ? ""
+          : page.transcript.slice(0, 600),
+        `From the story "${story.title}". Cinematic illustration, no text.`,
+      ]
+        .filter(Boolean)
+        .join(". "),
   );
-  const [quality, setQuality] = useState<ImageCommand["quality"]>("draft");
-  const [aspect, setAspect] = useState<ImageCommand["aspect"]>("16:9");
+  const [references, setReferences] = useState(initialCast);
+  // References only steer High quality, so a cast defaults to it.
+  const [quality, setQuality] = useState<ImageCommand["quality"]>(
+    initialCast.length ? "high" : "draft",
+  );
+  const [aspect, setAspect] = useState<ImageCommand["aspect"]>(initialAspect);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   // An unanswered request keeps its key so Retry cannot bill twice.
@@ -409,6 +432,9 @@ export function PageImageDialog({
         prompt: prompt.trim(),
         quality,
         aspect,
+        ...(quality === "high" && references.length
+          ? { referenceIds: references }
+          : {}),
       };
       let job = await api<GenerationJob>("/generation", pending.current);
       pending.current = null;
@@ -454,7 +480,7 @@ export function PageImageDialog({
         >
           ×
         </button>
-        <h2 id="page-image-title">Generate a page image</h2>
+        <h2 id="page-image-title">{heading}</h2>
         {listing && !listing.enabled && (
           <p className="studio-dialog-off">{listing.reason}</p>
         )}
@@ -468,7 +494,7 @@ export function PageImageDialog({
             onChange={(e) => setPrompt(e.target.value)}
           />
         </label>
-        {!assistReason && (
+        {!assistReason && !initialPrompt && (
           <button
             className="assist-button"
             disabled={busy}
@@ -508,11 +534,42 @@ export function PageImageDialog({
             ))}
           </div>
         </div>
+        {cast.length > 0 && (
+          <fieldset className="studio-dialog-cast">
+            <legend>
+              Characters in this image ({references.length}/{maxReferences})
+            </legend>
+            <div className="disc-filter" role="group" aria-label="Characters">
+              {cast.map((c) => (
+                <button
+                  key={c.assetId}
+                  aria-pressed={references.includes(c.assetId)}
+                  disabled={
+                    busy ||
+                    (!references.includes(c.assetId) &&
+                      references.length >= maxReferences)
+                  }
+                  onClick={() =>
+                    setReferences((current) =>
+                      current.includes(c.assetId)
+                        ? current.filter((id) => id !== c.assetId)
+                        : [...current, c.assetId],
+                    )
+                  }
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <small className="studio-dialog-note">
           {quality === "draft"
-            ? "Quick draft: fast and nearly free."
+            ? references.length
+              ? "Quick drafts can't follow character references; choose High quality to keep characters consistent."
+              : "Quick draft: fast and nearly free."
             : "High quality: about $0.15 per image."}{" "}
-          The image is saved to your assets and placed on this page.
+          The image is saved to your assets and {placement}.
         </small>
         <p className="studio-dialog-status" role="status">
           {status}

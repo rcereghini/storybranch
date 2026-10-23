@@ -229,6 +229,14 @@ export async function handle(request: Request): Promise<Response> {
               ? pageMedia(next.video, clips)
               : undefined,
             image: pageImage(page.image, clips),
+            // Comic panel images, in panel order.
+            ...(page.comic
+              ? {
+                  panels: page.comic.panels.map((p) =>
+                    pageImage(p.image, clips),
+                  ),
+                }
+              : {}),
             branches,
             featuredId,
           });

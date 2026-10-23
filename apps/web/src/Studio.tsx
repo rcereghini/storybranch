@@ -27,19 +27,23 @@ import { PageLibrary } from "./Library";
 import { StoryGraph } from "./StoryGraph";
 import { StoryOutline } from "./StoryOutline";
 import { PageAssist, PageImageDialog } from "./StudioAssist";
+import { ComicEditor, ComicWorkspace, panelImages } from "./ComicEditor";
 import { connectPage } from "../../../packages/domain/story-graph";
 import {
   assetIdOf,
   assetRef,
+  type ClipAsset,
   type UploadListing,
 } from "../../../packages/contracts/media";
 import {
   blankStory,
   choice,
+  comicTemplate,
   countToward,
   ending,
   makePage,
   media,
+  newComic,
   quizTemplate,
   result,
   revealChoice,
@@ -64,7 +68,10 @@ type Listing = {
   canPublish: boolean;
 };
 // What undo restores: everything the creator edits in a draft.
-type Snapshot = Pick<DraftRecord, "story" | "description" | "pagePositions">;
+type Snapshot = Pick<
+  DraftRecord,
+  "story" | "description" | "pagePositions" | "comic"
+>;
 type Request = { path: string; body: unknown; version: number };
 type SaveState = "idle" | "saving" | "saved" | "error" | "conflict";
 // Phone layout: which part of the editor fills the screen.
@@ -110,6 +117,9 @@ export function Studio({
   const [pane, setPane] = useState<"page" | "story">("page");
   const [side, setSide] = useState<"pages" | "library">("pages");
   const [imageDialog, setImageDialog] = useState(false);
+  // Comics: the panel being edited, and whether a comic draft shows the map.
+  const [panel, setPanel] = useState<string | null>(null);
+  const [comicMap, setComicMap] = useState(false);
   const [, setHistoryTick] = useState(0);
   const draftRef = useRef<DraftRecord | null>(null);
   draftRef.current = draft;
@@ -183,6 +193,7 @@ export function Studio({
     story: d.story,
     description: d.description,
     pagePositions: d.pagePositions,
+    comic: d.comic,
   });
   // Every edit goes through here: it marks the draft for autosave and keeps
   // undo history (quick successive edits, like typing, share one step).
@@ -224,6 +235,14 @@ export function Studio({
     setNotice("");
   };
   const page = draft?.story.pages[selected];
+  const addUpload = (asset: ClipAsset) =>
+    setUploads(
+      (old) =>
+        old && {
+          ...old,
+          items: [asset, ...old.items.filter((a) => a.id !== asset.id)],
+        },
+    );
   const updatePage = (value: StoryPage) =>
     draft &&
     change({
@@ -250,6 +269,7 @@ export function Studio({
               ([id]) => current.story.pages[id],
             ),
           ),
+          ...(current.comic ? { comic: current.comic } : {}),
         },
       },
     };
@@ -350,19 +370,27 @@ export function Studio({
     setView("map");
     setPane("page");
     setFocus(0);
+    setPanel(null);
+    setComicMap(false);
   };
   const open = (id: string) =>
     void work(async () => {
       resetEditor(await api<DraftRecord>(`/studio/${id}`), false);
     });
-  const create = (quiz = false) => {
+  const create = (kind: "story" | "quiz" | "comic" = "story") => {
     const id = `story-${crypto.randomUUID()}`;
     resetEditor(
       {
         revision: 0,
         publishedVersionId: null,
         description: "",
-        story: quiz ? quizTemplate(id) : blankStory(id),
+        story:
+          kind === "quiz"
+            ? quizTemplate(id)
+            : kind === "comic"
+              ? comicTemplate(id)
+              : blankStory(id),
+        ...(kind === "comic" ? { comic: { style: "", cast: [] } } : {}),
       },
       true,
     );
@@ -435,8 +463,20 @@ export function Studio({
       video: _,
       videoAdvance: _advance,
       sourcePage: _source,
+      comic: _comic,
       ...rest
     } = page;
+    if (type === "comic") {
+      // Panels replace the page photo; the page keeps its one output.
+      const { image: _image, ...plain } = rest;
+      updatePage({
+        ...plain,
+        pageType: type,
+        comic: page.comic ?? newComic(),
+        choices: page.kind === "ending" ? [] : [choice()],
+      });
+      return;
+    }
     if (type === "reveal") {
       // A reveal needs at least two results; start with two new endings.
       const ids = [`result-${shortId()}`, `result-${shortId()}`];
@@ -660,8 +700,8 @@ export function Studio({
           <div>
             <h1>Studio</h1>
             <p className="studio-sub">
-              Write a branching story or a quiz, preview it, then publish an
-              edition. Players keep the edition they started.
+              Write a branching story, a quiz or a comic, preview it, then
+              publish an edition. Players keep the edition they started.
             </p>
           </div>
           <div className="studio-head-actions">
@@ -675,9 +715,16 @@ export function Studio({
             <Button
               className="btn btn-secondary"
               disabled={busy}
-              onClick={() => create(true)}
+              onClick={() => create("quiz")}
             >
               New quiz
+            </Button>
+            <Button
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => create("comic")}
+            >
+              New comic
             </Button>
           </div>
         </div>
@@ -726,8 +773,8 @@ export function Studio({
             <h2>Start your first story</h2>
             <p className="studio-sub">
               A story is a set of pages linked by choices: text, video, dice
-              rolls and quiz results. Start from a blank story or a ready-made
-              quiz.
+              rolls, quiz results and comics. Start from a blank story, a
+              ready-made quiz or a four-panel comic.
             </p>
           </div>
         )}
@@ -743,6 +790,8 @@ export function Studio({
       </section>
     );
 
+  // A comic draft edits its comic on the canvas instead of the story map.
+  const comicView = !!draft.comic && page?.pageType === "comic" && !comicMap;
   const canUndo = past.current.length > 0;
   const canRedo = future.current.length > 0;
   return (
@@ -851,7 +900,7 @@ export function Studio({
         {(
           [
             ["pages", "Pages"],
-            ["map", "Map"],
+            ["map", comicView ? "Comic" : "Map"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -961,29 +1010,55 @@ export function Studio({
           </div>
         </aside>
 
-        <div className="studio-canvas">
-          <StoryGraph
-            key={draft.story.id}
-            story={draft.story}
-            positions={draft.pagePositions}
-            selected={selected}
-            disabled={busy}
-            focus={focus}
-            onSelect={(id) => select(id, "map")}
-            onMove={(pagePositions) =>
-              edit((current) => ({ ...current, pagePositions }))
-            }
-            onConnect={(source, edge, target) => {
-              try {
-                change(connectPage(draft.story, source, edge, target));
-                setPreview(null);
-              } catch (e) {
-                setNotice((e as Error).message);
+        <div className={`studio-canvas${draft.comic ? " is-comic" : ""}`}>
+          {draft.comic && comicMap && page?.pageType === "comic" && (
+            <div className="comic-workspace-bar">
+              <p className="muted">Story map</p>
+              <button
+                className="btn btn-secondary btn-small"
+                onClick={() => setComicMap(false)}
+              >
+                Back to the comic
+              </button>
+            </div>
+          )}
+          {comicView && page ? (
+            <ComicWorkspace
+              page={page}
+              uploads={uploads}
+              selectedPanel={panel}
+              onSelectPanel={(id) => {
+                setPanel(id);
+                setPane("page");
+                setBack("map");
+                setView("panel");
+              }}
+              onShowMap={() => setComicMap(true)}
+            />
+          ) : (
+            <StoryGraph
+              key={draft.story.id}
+              story={draft.story}
+              positions={draft.pagePositions}
+              selected={selected}
+              disabled={busy}
+              focus={focus}
+              onSelect={(id) => select(id, "map")}
+              onMove={(pagePositions) =>
+                edit((current) => ({ ...current, pagePositions }))
               }
-            }}
-            onAdd={(type) => addGraphPage(type)}
-            onBranch={() => addGraphPage("text", true)}
-          />
+              onConnect={(source, edge, target) => {
+                try {
+                  change(connectPage(draft.story, source, edge, target));
+                  setPreview(null);
+                } catch (e) {
+                  setNotice((e as Error).message);
+                }
+              }}
+              onAdd={(type) => addGraphPage(type)}
+              onBranch={() => addGraphPage("text", true)}
+            />
+          )}
         </div>
 
         <aside className="studio-panel" aria-label="Settings">
@@ -1108,6 +1183,7 @@ export function Studio({
                           "video-options",
                           "dice",
                           "reveal",
+                          "comic",
                         ].map((t) => (
                           <option key={t}>{t}</option>
                         ))}
@@ -1178,36 +1254,42 @@ export function Studio({
                         </select>
                       </label>
                     )}
-                    <ClipPicker
-                      kind="image"
-                      api={api}
-                      value={page.image}
-                      uploads={uploads}
-                      disabled={busy}
-                      onChange={(image) => {
-                        const { image: _, ...rest } = page;
-                        updatePage(image ? { ...rest, image } : rest);
-                      }}
-                      onUploaded={(asset) =>
-                        setUploads(
-                          (old) =>
-                            old && {
-                              ...old,
-                              items: [
-                                asset,
-                                ...old.items.filter((a) => a.id !== asset.id),
-                              ],
-                            },
-                        )
-                      }
-                    />
-                    <button
-                      className="assist-button studio-image-button"
-                      disabled={busy}
-                      onClick={() => setImageDialog(true)}
-                    >
-                      ✦ Generate a page image
-                    </button>
+                    {page.pageType === "comic" ? (
+                      <ComicEditor
+                        api={api}
+                        draft={draft}
+                        page={page}
+                        uploads={uploads}
+                        busy={busy}
+                        assistReason={assistReason}
+                        selectedPanel={panel}
+                        onSelectPanel={setPanel}
+                        onEdit={edit}
+                        onUploaded={addUpload}
+                      />
+                    ) : (
+                      <>
+                        <ClipPicker
+                          kind="image"
+                          api={api}
+                          value={page.image}
+                          uploads={uploads}
+                          disabled={busy}
+                          onChange={(image) => {
+                            const { image: _, ...rest } = page;
+                            updatePage(image ? { ...rest, image } : rest);
+                          }}
+                          onUploaded={addUpload}
+                        />
+                        <button
+                          className="assist-button studio-image-button"
+                          disabled={busy}
+                          onClick={() => setImageDialog(true)}
+                        >
+                          ✦ Generate a page image
+                        </button>
+                      </>
+                    )}
                     {page.sourcePage && (
                       <p>
                         Library revision {page.sourcePage.revision}. Save
@@ -1633,6 +1715,11 @@ export function Studio({
                         ),
                     )?.url
                   }
+                  panels={(() => {
+                    const comic =
+                      preview.story.pages[preview.save.pageId].comic;
+                    return comic && panelImages(comic, uploads);
+                  })()}
                   disabled={false}
                   transitioning={false}
                   onPlaybackChange={() => {}}

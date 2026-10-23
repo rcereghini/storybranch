@@ -39,6 +39,7 @@ type Player = {
   media?: SceneMedia;
   nextMedia?: SceneMedia;
   image?: string;
+  panels?: Array<string | undefined>;
   save: Save;
   page: Story["pages"][string];
   result?: boolean;
@@ -588,6 +589,7 @@ function App() {
                       media={player.media}
                       nextMedia={player.nextMedia}
                       image={player.image}
+                      panels={player.panels}
                     >
                       <section className="choices" aria-label="Story choices">
                         {player.save.status === "completed" && (

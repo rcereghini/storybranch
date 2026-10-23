@@ -4,6 +4,7 @@ import type { StoryPage, PageOutput } from "../../../packages/contracts/index";
 import { evaluate } from "../../../packages/domain/index";
 import type { SceneMedia } from "../../../packages/contracts/media";
 import { ScenePlayer } from "./ScenePlayer";
+import { ComicStrip } from "./ComicStrip";
 import { useStory } from "./Story";
 
 // Every renderer shares the same persisted input and server-validated outputs.
@@ -12,6 +13,7 @@ export function Page({
   media,
   nextMedia,
   image,
+  panels,
   children,
   onPlaybackChange,
   onOutput,
@@ -24,6 +26,8 @@ export function Page({
   media?: SceneMedia;
   nextMedia?: SceneMedia;
   image?: string;
+  // Comic panel images, in panel order.
+  panels?: Array<string | undefined>;
   children: ReactNode;
   onPlaybackChange: (playing: boolean) => void;
   onOutput: (output: PageOutput) => void;
@@ -165,12 +169,18 @@ export function Page({
                 ? "QUIZ"
                 : result
                   ? "YOUR RESULT"
-                  : "STORY PAGE"}
+                  : type === "comic"
+                    ? "COMIC"
+                    : "STORY PAGE"}
           </p>
           <h1 ref={heading} tabIndex={-1}>
             {page.title}
           </h1>
-          {image && <img className="page-photo" src={image} alt="" />}
+          {type === "comic" && page.comic ? (
+            <ComicStrip comic={page.comic} images={panels ?? []} />
+          ) : (
+            image && <img className="page-photo" src={image} alt="" />
+          )}
           <p className="page-copy">{page.transcript}</p>
           {type === "dice" && (
             <div

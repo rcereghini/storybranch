@@ -15,12 +15,39 @@ export const pagePositionsSchema = z
     "At most 80 page positions.",
   );
 export type PagePositions = z.infer<typeof pagePositionsSchema>;
+// Draft-only comic help: a shared art style and recurring characters, each
+// with a reference image that keeps them consistent across generated panels.
+// Like page positions, it never becomes part of a published edition.
+export const maxCast = 6;
+export const comicStudioSchema = z
+  .object({
+    style: z.string().max(300),
+    cast: z
+      .array(
+        z
+          .object({
+            id,
+            name: z.string().max(60),
+            description: z.string().max(400),
+            image: z
+              .string()
+              .regex(/^asset:[a-zA-Z0-9_-]{8,80}$/)
+              .optional(),
+          })
+          .strict(),
+      )
+      .max(maxCast),
+  })
+  .strict();
+export type ComicStudio = z.infer<typeof comicStudioSchema>;
+export type CastMember = ComicStudio["cast"][number];
 
 export const draftSchema = z
   .object({
     story: storySchema,
     description: z.string().max(500),
     pagePositions: pagePositionsSchema.optional(),
+    comic: comicStudioSchema.optional(),
   })
   .strict()
   .superRefine((draft, ctx) => {

@@ -1,8 +1,11 @@
 import type {
   Choice,
+  Comic,
   Story as StoryData,
   StoryPage,
 } from "../../../packages/contracts/index";
+import type { CastMember } from "../../../packages/contracts/authoring";
+import { maxReferences } from "../../../packages/contracts/generation";
 import { sceneMedia } from "../../../fixtures/media";
 
 // Building blocks for Studio's story edits: new pages, choices, quiz scoring.
@@ -158,3 +161,81 @@ export function blankStory(id: string): StoryData {
     },
   };
 }
+
+// Comics: panels, the starter comic, and image prompts that carry the cast
+// and art style so every panel draws the same characters.
+export const comicPanel = (): Comic["panels"][number] => ({
+  id: `panel-${shortId()}`,
+  caption: "",
+  alt: "",
+});
+export const newComic = (): Comic => ({
+  layout: "grid",
+  panels: [comicPanel(), comicPanel(), comicPanel(), comicPanel()],
+});
+// A comic story is one comic page that ends the story, so the player offers
+// replay and sharing as soon as it is read.
+export function comicTemplate(id: string): StoryData {
+  return {
+    id,
+    versionId: "draft",
+    rulesetVersion: "prototype-1",
+    title: "Untitled comic",
+    entryPageId: "comic",
+    pages: {
+      comic: {
+        ...makePage("comic"),
+        title: "Untitled comic",
+        transcript: "",
+        pageType: "comic",
+        kind: "ending",
+        choices: [],
+        comic: newComic(),
+      },
+    },
+  };
+}
+export const defaultComicStyle =
+  "Bold-outlined cartoon, flat colors, expressive faces";
+// Reference images steer the high-quality model; three is its limit.
+export const castInPanel = (
+  cast: CastMember[],
+  panel: Comic["panels"][number],
+) => {
+  const text = `${panel.alt ?? ""} ${panel.caption ?? ""}`.toLowerCase();
+  return cast
+    .filter((c) => c.image && c.name.trim())
+    .filter((c) => text.includes(c.name.trim().toLowerCase()))
+    .slice(0, maxReferences);
+};
+export function panelPrompt(
+  comic: Comic,
+  index: number,
+  style: string,
+  cast: CastMember[],
+) {
+  const panel = comic.panels[index];
+  return [
+    `Panel ${index + 1} of ${comic.panels.length} in a comic strip.`,
+    panel.alt?.trim() || "Describe what happens in this panel.",
+    cast.length
+      ? `Characters: ${cast.map((c) => `${c.name.trim()}: ${c.description.trim()}`).join("; ")}. Draw each one exactly as in their reference image.`
+      : "",
+    `Art style: ${style.trim() || defaultComicStyle}.`,
+    "One single panel. No text, no speech bubbles, no captions, no panel borders.",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 1800);
+}
+export const castPrompt = (member: CastMember, style: string) =>
+  [
+    `Character reference sheet for a comic: ${member.name.trim() || "a character"}.`,
+    member.description.trim(),
+    "Full body, front view, neutral pose, plain white background.",
+    `Art style: ${style.trim() || defaultComicStyle}.`,
+    "No text.",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 1800);

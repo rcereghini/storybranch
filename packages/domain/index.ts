@@ -1,5 +1,6 @@
 import {
   storySchema,
+  comicLimits,
   GameError,
   type Story,
   type Save,
@@ -243,6 +244,23 @@ export function transition(
     },
   };
 }
+// A comic's panels replace the page's video and photo; every panel needs an
+// image, and a grid must stay square. Studio shows the same message inline.
+export function comicIssue(page: Story["pages"][string]): string | null {
+  const { comic } = page;
+  if (!comic || page.video || page.image)
+    return "A comic page shows only its panels.";
+  const count = comic.panels.length;
+  const [min, max] = comicLimits.scroll;
+  if (comic.layout === "grid" && !comicLimits.grid.includes(count as 4 | 9))
+    return "A square grid needs 4 or 9 panels.";
+  if (count < min || count > max)
+    return `A strip needs ${min} to ${max} panels.`;
+  if (new Set(comic.panels.map((p) => p.id)).size !== count)
+    return "Each panel needs its own ID.";
+  const empty = comic.panels.findIndex((p) => !p.image);
+  return empty >= 0 ? `Add an image to panel ${empty + 1}.` : null;
+}
 export function validateStory(value: unknown): Story {
   const story = storySchema.parse(value);
   const pages = Object.values(story.pages);
@@ -264,8 +282,12 @@ export function validateStory(value: unknown): Story {
       );
     if (pageType.startsWith("video") && !n.video)
       throw new Error("Video page requires media");
+    if (n.comic && pageType !== "comic")
+      throw new Error("Only a comic page can have panels");
+    const comic = pageType === "comic" && comicIssue(n);
+    if (comic) throw new Error(`${n.title}: ${comic}`);
     if (
-      (pageType === "text" || pageType === "video") &&
+      (pageType === "text" || pageType === "video" || pageType === "comic") &&
       n.kind !== "ending" &&
       (n.choices.length !== 1 ||
         n.choices[0].outcome.kind !== "direct" ||

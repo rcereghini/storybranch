@@ -8,6 +8,7 @@ export const pageTypeNames: Record<StoryPage["pageType"], string> = {
   "video-options": "Video · options",
   dice: "Dice roll",
   reveal: "Quiz result",
+  comic: "Comic",
 };
 
 // Pages in reading order: breadth-first from the first page, then any page

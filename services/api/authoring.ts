@@ -141,11 +141,20 @@ export async function authoring(
               `${page.title}: the linked page revision does not match. Save it to the library again.`,
             );
         }
-        const imageId = assetIdOf(page.image);
-        if (imageId) {
+        // The page photo and every comic panel.
+        for (const ref of [
+          page.image,
+          ...(page.comic?.panels.map((p) => p.image) ?? []),
+        ]) {
+          const imageId = assetIdOf(ref);
+          if (!imageId || published[imageId]?.contentType.startsWith("image/"))
+            continue;
           const image = db.doc(paths.clip(uid, imageId));
           const asset = (await tx.get(image)).data();
-          if (asset?.status !== "ready" || !asset.contentType.startsWith("image/"))
+          if (
+            asset?.status !== "ready" ||
+            !asset.contentType.startsWith("image/")
+          )
             throw new GameError(
               "VALIDATION_FAILED",
               `${page.title}: choose one of your finished photos.`,
