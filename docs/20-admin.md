@@ -46,6 +46,10 @@ All routes need the `admin` feature.
 
 Unit tests cover admin implying every feature and hidden stories on the dashboard. An emulator integration test covers member refusal on every route, feature changes, retries and key conflicts, the self-lockout rules, disabling and re-enabling, hiding (Discover, new starts refused, existing saves still play, dashboard kept but not recommended) and the audit log. `scripts/admin-check.ts`, run in CI, drives the admin view as the local admin: navigation, overview, a feature toggle, locked self controls, hide and show, activity, no horizontal overflow at 1024 and 390 px, and a member seeing neither the nav item nor the admin view.
 
+## Site analytics
+
+Page views go to Vercel Web Analytics (enabled on the Vercel project; the app loads it through `@vercel/analytics` in `apps/web/src/main.tsx`) and are viewed in Vercel's dashboard. It sets no cookies. Paths carrying private IDs are counted under one shared path before sending (`/play/[saveId]`, `/assets/edit/[assetId]`), and query strings and hashes are dropped (`apps/web/src/analytics.ts`). `vercel.json` keeps `/_vercel/*` out of the app's catch-all rewrite so the analytics script is served.
+
 ## Next
 
 This is the first slice, to grow as needs come up: candidate additions are viewing a user's stories and saves, Copilot and generation usage and spend, story moderation beyond hiding, and paid-plan entitlements.
