@@ -372,3 +372,20 @@
   background: none;
   text-decoration: underline;
 }
+
+/* Email confirmation prompt in the account menu. */
+.account-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.account-confirm-button {
+  min-height: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}

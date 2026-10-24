@@ -266,3 +266,28 @@ export async function passwordReset(request: Request) {
   }
   return { ok: true };
 }
+
+// POST /api/account/verify-email: the signed-in player asks for another
+// confirmation email. Already-confirmed accounts get none; 3 an hour.
+export async function resendVerification(uid: string) {
+  const user = await auth.getUser(uid);
+  if (!user.email)
+    throw new GameError(
+      "VALIDATION_FAILED",
+      "Your account has no email address.",
+    );
+  if (user.emailVerified) return { sent: false, alreadyConfirmed: true };
+  await limit(
+    `verify:${uid}`,
+    3,
+    "You can ask for 3 confirmation emails an hour. Please try again later.",
+  );
+  await sendSystemEmail({
+    template: "verify-email",
+    to: user.email,
+    uid,
+    name: user.displayName ?? null,
+    link: actionLink(await auth.generateEmailVerificationLink(user.email)),
+  });
+  return { sent: true, alreadyConfirmed: false };
+}

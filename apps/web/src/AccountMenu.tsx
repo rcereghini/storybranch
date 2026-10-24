@@ -15,6 +15,8 @@ export function AccountMenu({
   avatar,
   name,
   email,
+  unconfirmed,
+  onResendConfirmation,
   isAdmin,
   onNavigate,
   onSignOut,
@@ -22,12 +24,18 @@ export function AccountMenu({
   avatar: ReactNode;
   name: string;
   email: string | null;
+  // An email-and-password account that hasn't confirmed its address yet.
+  unconfirmed: boolean;
+  onResendConfirmation: () => Promise<string>;
   isAdmin: boolean;
   onNavigate: (path: string) => void;
   onSignOut: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<ThemeMode>(storedThemeMode);
+  // The resend result replaces the prompt in place.
+  const [resend, setResend] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
@@ -81,6 +89,26 @@ export function AccountMenu({
           <div className="account-menu-who">
             <strong>{name}</strong>
             {email && <span>{email}</span>}
+            {unconfirmed && (
+              <span className="account-confirm" role="status">
+                {resend ?? "Email not confirmed."}
+                {!resend && (
+                  <button
+                    className="account-confirm-button"
+                    disabled={sending}
+                    onClick={() => {
+                      setSending(true);
+                      onResendConfirmation()
+                        .then(setResend)
+                        .catch((error) => setResend((error as Error).message))
+                        .finally(() => setSending(false));
+                    }}
+                  >
+                    {sending ? "Sending…" : "Resend"}
+                  </button>
+                )}
+              </span>
+            )}
           </div>
           {item("profile", "Your profile", () => onNavigate("/"))}
           {item("assets", "Assets", () => onNavigate("/assets"))}

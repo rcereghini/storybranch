@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { createApi } from "../../../packages/api-client/index";
 import {
+  adminUserSorts,
   adminUserStatuses,
   type AdminAuditEntry,
   type AdminUser,
@@ -147,6 +148,8 @@ export function AdminUsers({
   const [status, setStatus] =
     useState<(typeof adminUserStatuses)[number]>("all");
   const [feature, setFeature] = useState<FeatureId | "">("");
+  const [sort, setSort] =
+    useState<(typeof adminUserSorts)[number]>("lastActive");
   const [page, setPage] = useState<AdminUsersPage | null>(null);
   const [items, setItems] = useState<AdminUser[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -160,6 +163,7 @@ export function AdminUsers({
       status,
       cursor: String(cursor),
       ...(feature ? { feature } : {}),
+      sort,
     });
     const result = await api<AdminUsersPage>(`/admin/users?${params}`);
     setPage(result);
@@ -174,7 +178,7 @@ export function AdminUsers({
       q ? 250 : 0,
     );
     return () => clearTimeout(timer);
-  }, [q, status, feature]);
+  }, [q, status, feature, sort]);
 
   const openDetail = async (target: string) => {
     setOpen(target);
@@ -491,6 +495,18 @@ export function AdminUsers({
               </option>
             ))}
           </select>
+          <select
+            className="admin-search"
+            aria-label="Sort"
+            value={sort}
+            onChange={(e) =>
+              setSort(e.target.value as (typeof adminUserSorts)[number])
+            }
+          >
+            <option value="lastActive">Recently active</option>
+            <option value="lastSignIn">Recently signed in</option>
+            <option value="newest">Newest accounts</option>
+          </select>
         </div>
       </div>
       {items && page ? (
@@ -506,7 +522,7 @@ export function AdminUsers({
               <tr>
                 <th>Account</th>
                 <th>Status</th>
-                <th>Last sign-in</th>
+                <th>Last active</th>
                 <th>Access</th>
                 <th />
               </tr>
@@ -533,7 +549,7 @@ export function AdminUsers({
                         : user.status}
                     </span>
                   </td>
-                  <td>{when(user.lastSignIn)}</td>
+                  <td>{when(user.lastActive)}</td>
                   <td colSpan={2}>
                     <Access
                       user={user}

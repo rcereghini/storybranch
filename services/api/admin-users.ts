@@ -98,6 +98,14 @@ export async function listUsers(
         u.features[query.feature] ||
         (query.feature !== "admin" && u.features.admin)),
   );
+  // Newest first by the chosen time; accounts without one go last.
+  const key = (u: AdminUser) =>
+    (query.sort === "newest"
+      ? u.createdAt
+      : query.sort === "lastSignIn"
+        ? u.lastSignIn
+        : u.lastActive) ?? "";
+  matching.sort((a, b) => key(b).localeCompare(key(a)));
   const items = matching.slice(query.cursor, query.cursor + pageSize);
   return {
     items,

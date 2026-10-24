@@ -10,7 +10,7 @@ Storybranch sends a small set of account emails through SendGrid. They are trans
 | `welcome` (Welcome) | An account without a password, such as Google sign-in, makes its first request | Discover |
 | `password-reset` (Password reset) | Someone uses "Forgot password?" in the sign-in dialog | Our `/account/action` page, where they choose a new password |
 
-Each is sent once, when `ensurePlayerProfile` creates the profile (`services/api/handler.ts`); seeded and admin-created profiles get none. Definitions and default wording live in `packages/contracts/email.ts`.
+Each is sent once, when `ensurePlayerProfile` creates the profile (`services/api/handler.ts`); seeded and admin-created profiles get none. An unconfirmed email-and-password account also sees "Email not confirmed" with **Resend** in the account menu (`POST /api/account/verify-email`, signed in): it sends another confirmation, nothing to an already-confirmed account, and at most 3 an hour. Definitions and default wording live in `packages/contracts/email.ts`.
 
 ## Branding and content
 

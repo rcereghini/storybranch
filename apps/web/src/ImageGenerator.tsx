@@ -288,7 +288,9 @@ export function ImageGenerator({
             {notice}
           </p>
           <small className="imagegen-muted">
-            Up to {listing?.daily ?? generationLimits.daily} generations a day. Prompts and
+            {listing && listing.highQualityWeight > 1
+              ? `A daily allowance of ${listing.daily}: a draft uses 1 and high quality uses ${listing.highQualityWeight}.`
+              : `Up to ${listing?.daily ?? generationLimits.daily} generations a day.`} Prompts and
             reference images are sent to OpenAI to create the image.
           </small>
         </form>

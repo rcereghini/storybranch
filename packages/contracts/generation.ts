@@ -56,6 +56,8 @@ export type GenerationListing = {
   reason: string | null;
   // The daily allowance, and generations left today.
   daily: number;
+  // Allowance one high-quality image uses; a draft uses 1.
+  highQualityWeight: number;
   remaining: number;
   jobs: GenerationJob[];
 };
