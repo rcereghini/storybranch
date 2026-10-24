@@ -411,6 +411,20 @@ function App() {
                 }
                 name={profile?.displayName ?? user.displayName ?? "Player"}
                 email={user.email}
+                unconfirmed={
+                  !user.emailVerified &&
+                  user.providerData.some((p) => p.providerId === "password")
+                }
+                onResendConfirmation={async () => {
+                  const result = await api<{ alreadyConfirmed: boolean }>(
+                    "/account/verify-email",
+                    {},
+                  );
+                  if (result.alreadyConfirmed) await user.reload();
+                  return result.alreadyConfirmed
+                    ? "Your email is already confirmed."
+                    : "Sent. Check your inbox and spam folder.";
+                }}
                 isAdmin={isAdmin}
                 onNavigate={navigate}
                 onSignOut={() => {

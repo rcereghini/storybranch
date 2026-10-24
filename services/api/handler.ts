@@ -17,7 +17,7 @@ import {
   transition,
 } from "../../packages/domain/index";
 import { ensurePlayerProfile } from "./player-profile";
-import { passwordReset, sendAccountEmail } from "./email";
+import { passwordReset, resendVerification, sendAccountEmail } from "./email";
 import { appSettings } from "./settings";
 import { effectiveLimits } from "../../packages/contracts/settings";
 import { accountFeatures } from "../../packages/contracts/profile";
@@ -213,6 +213,8 @@ async function handleCanonical(request: Request): Promise<Response> {
       return json(await assist(request, uid, segments, features, limits));
     if (segments[1] === "admin")
       return json(await admin(request, uid, segments, features));
+    if (request.method === "POST" && path === "/api/account/verify-email")
+      return json(await resendVerification(uid));
     // Streams its reply, so it builds its own response.
     if (segments[1] === "copilot")
       return await copilot(request, uid, segments, features, limits);

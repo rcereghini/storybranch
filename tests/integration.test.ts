@@ -25,7 +25,7 @@ import type {
   AdminUserDetail,
   AdminUsersPage,
 } from "../packages/contracts/admin";
-import { aiQuota } from "../services/api/paths";
+import { aiQuota, imageQuota } from "../services/api/paths";
 import type { SiteAnalytics } from "../packages/contracts/analytics";
 import type {
   AdminAuditPage,
@@ -2059,6 +2059,113 @@ it("shows a story's editions and play, and pages and filters admin activity", as
         db.doc(`adminAudit/${target}-${i}`).delete(),
       ),
     );
+  }
+});
+it("resends confirmation, weighs high-quality images, and sorts users", async () => {
+  const sent: EmailMessage[] = [];
+  setEmailSender(async (message) => {
+    sent.push(message);
+  });
+  const openai = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  const signIn = async (email: string) =>
+    (
+      await (
+        await fetch(
+          "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=local-demo-key",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email,
+              password: "HarborDemo123!",
+              returnSecureToken: true,
+            }),
+          },
+        )
+      ).json()
+    ).idToken as string;
+  const as = (token: string, path: string, body?: unknown) =>
+    handle(
+      new Request(`http://localhost/api${path}`, {
+        method: body ? "POST" : "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      }),
+    ).then(async (r) => ({ status: r.status, data: await r.json() }));
+  try {
+    // Resend: an unconfirmed account gets another email, 3 an hour.
+    const email = `unconfirmed-${randomUUID()}@storybranch.test`;
+    await auth.createUser({ email, password: "HarborDemo123!" });
+    const token = await signIn(email);
+    await as(token, "/profile");
+    const before = sent.length;
+    expect((await as(token, "/account/verify-email", {})).data).toEqual({
+      sent: true,
+      alreadyConfirmed: false,
+    });
+    expect(sent.length).toBe(before + 1);
+    expect(sent.at(-1)).toMatchObject({
+      to: email,
+      subject: "Confirm your email for Storybranch",
+    });
+    await as(token, "/account/verify-email", {});
+    await as(token, "/account/verify-email", {});
+    expect(
+      (await as(token, "/account/verify-email", {})).data.error.message,
+    ).toMatch(/3 confirmation emails an hour/);
+    // A confirmed account gets none.
+    const confirmed = await auth.getUserByEmail(email);
+    await auth.updateUser(confirmed.uid, { emailVerified: true });
+    expect((await as(token, "/account/verify-email", {})).data).toEqual({
+      sent: false,
+      alreadyConfirmed: true,
+    });
+
+    // Weight: high quality uses 5 of a 7 allowance; with 3 used it's refused.
+    const settings = (await call("/admin/settings")).data as AdminSettings;
+    const weighted = structuredClone(settings.settings);
+    weighted.limits.imagesPerDay = 7;
+    weighted.limits.highQualityImageWeight = 5;
+    await call("/admin/settings/app", {
+      idempotencyKey: randomUUID(),
+      expectedRevision: settings.revision,
+      settings: weighted,
+    });
+    expect((await call("/generation")).data).toMatchObject({
+      daily: 7,
+      highQualityWeight: 5,
+    });
+    await db.doc(imageQuota("player")).set({ count: 3 });
+    const high = await call("/generation", {
+      idempotencyKey: randomUUID(),
+      kind: "image",
+      prompt: "A lighthouse at dusk",
+      quality: "high",
+      aspect: "1:1",
+    });
+    expect(high.status).toBe(400);
+    expect(high.data.error.message).toMatch(
+      /Not enough of today's image allowance left for high quality (4 of 7 left; it uses 5)/,
+    );
+    expect((await db.doc(imageQuota("player")).get()).data()!.count).toBe(3);
+
+    // Users sort by the chosen time, newest first.
+    const newest = (await call("/admin/users?sort=newest")).data
+      .items as Array<{ createdAt: string | null }>;
+    const times = newest.map((u) => u.createdAt ?? "");
+    expect(times).toEqual([...times].sort().reverse());
+    expect((await call("/admin/users?sort=oldest")).status).toBe(400);
+  } finally {
+    setEmailSender(null);
+    await db.doc(imageQuota("player")).delete();
+    await db.doc("settings/app").delete();
+    clearSettingsCache();
+    if (openai === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = openai;
   }
 });
 it("applies admin settings to AI switches, daily limits and price estimates", async () => {

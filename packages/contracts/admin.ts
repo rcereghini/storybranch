@@ -61,6 +61,8 @@ export type AdminUser = {
   // When a signed-in session last refreshed: when they last used the app.
   lastActive: string | null;
 };
+// Most recently active, most recently signed in, or newest account first.
+export const adminUserSorts = ["lastActive", "lastSignIn", "newest"] as const;
 export const adminUserStatuses = [
   "all",
   "active",
@@ -73,6 +75,7 @@ export const adminUsersQuerySchema = z
     q: z.string().trim().max(120).default(""),
     status: z.enum(adminUserStatuses).default("all"),
     feature: featureId.optional(),
+    sort: z.enum(adminUserSorts).default("lastActive"),
     cursor: z.coerce.number().int().min(0).default(0),
   })
   .strict();

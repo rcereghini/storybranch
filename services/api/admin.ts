@@ -121,6 +121,7 @@ export async function admin(
         q: params.get("q") ?? undefined,
         status: params.get("status") || undefined,
         feature: params.get("feature") || undefined,
+        sort: params.get("sort") || undefined,
         cursor: params.get("cursor") || undefined,
       }),
     );

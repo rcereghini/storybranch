@@ -23,6 +23,9 @@ export const appSettingsSchema = z
         // Copilot messages and Studio writing-help requests, together.
         aiRequestsPerDay: z.number().int().min(0).max(10000),
         imagesPerDay: z.number().int().min(0).max(10000),
+        // How much of the image allowance one high-quality image uses (a
+        // draft uses 1). Records saved before this existed default to 1.
+        highQualityImageWeight: z.number().int().min(1).max(20).default(1),
       })
       .strict(),
     // Turning one off hides it in the app and refuses its requests.
@@ -58,6 +61,7 @@ export const defaultAppSettings: AppSettings = {
   limits: {
     aiRequestsPerDay: copilotLimits.dailyMessages,
     imagesPerDay: generationLimits.daily,
+    highQualityImageWeight: 1,
   },
   ai: { copilot: true, writingHelp: true, imageGeneration: true },
   newAccounts: { publish: false, generate: false, copilot: false },
@@ -124,5 +128,6 @@ export const effectiveLimits = (
   return {
     aiRequestsPerDay: own.aiRequestsPerDay ?? settings.limits.aiRequestsPerDay,
     imagesPerDay: own.imagesPerDay ?? settings.limits.imagesPerDay,
+    highQualityImageWeight: settings.limits.highQualityImageWeight,
   };
 };

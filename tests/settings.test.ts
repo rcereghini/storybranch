@@ -29,6 +29,7 @@ describe("App settings", () => {
     expect(defaultAppSettings.limits).toEqual({
       aiRequestsPerDay: 100,
       imagesPerDay: 100,
+      highQualityImageWeight: 1,
     });
     for (const bad of [
       with_((s) => (s.limits.aiRequestsPerDay = -1)),
@@ -128,13 +129,18 @@ describe("Account limits", () => {
     expect(effectiveLimits(undefined, settings)).toEqual({
       aiRequestsPerDay: 100,
       imagesPerDay: 30,
+      highQualityImageWeight: 1,
     });
     expect(
       effectiveLimits(
         { limits: { aiRequestsPerDay: 0, imagesPerDay: null } },
         settings,
       ),
-    ).toEqual({ aiRequestsPerDay: 0, imagesPerDay: 30 });
+    ).toEqual({
+      aiRequestsPerDay: 0,
+      imagesPerDay: 30,
+      highQualityImageWeight: 1,
+    });
     // A broken stored value is ignored rather than trusted.
     expect(storedAccountLimits({ limits: { aiRequestsPerDay: -5 } })).toEqual({
       aiRequestsPerDay: null,
@@ -163,5 +169,25 @@ describe("Account limits", () => {
         adminUserCommandSchema.safeParse({ idempotencyKey: key, ...bad })
           .success,
       ).toBe(false);
+  });
+});
+
+describe("Settings saved before a field existed", () => {
+  it("keeps an older record, filling in the high-quality image weight", () => {
+    const older = structuredClone(defaultAppSettings) as Record<string, any>;
+    delete older.limits.highQualityImageWeight;
+    older.limits.imagesPerDay = 12;
+    const parsed = appSettingsSchema.parse(older);
+    expect(parsed.limits).toEqual({
+      aiRequestsPerDay: 100,
+      imagesPerDay: 12,
+      highQualityImageWeight: 1,
+    });
+    expect(effectiveLimits(undefined, parsed).highQualityImageWeight).toBe(1);
+    expect(
+      appSettingsSchema.safeParse(
+        with_((s) => (s.limits.highQualityImageWeight = 0)),
+      ).success,
+    ).toBe(false);
   });
 });

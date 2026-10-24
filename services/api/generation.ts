@@ -185,6 +185,7 @@ export async function generation(
       enabled: !reason,
       reason,
       daily: limits.imagesPerDay,
+      highQualityWeight: limits.highQualityImageWeight,
       remaining: Math.max(0, limits.imagesPerDay - used),
       jobs: records.docs
         .map((d) => view(d.id, d.data()))
@@ -253,13 +254,19 @@ export async function generation(
           );
         return false;
       }
-      if ((used.data()?.count ?? 0) >= limits.imagesPerDay)
+      // A high-quality image may use more of the allowance than a draft.
+      const cost =
+        command.quality === "high" ? limits.highQualityImageWeight : 1;
+      const count = used.data()?.count ?? 0;
+      if (count + cost > limits.imagesPerDay)
         throw new GameError(
           "VALIDATION_FAILED",
-          `Daily generation limit reached (${limits.imagesPerDay} requests). Try again tomorrow.`,
+          cost > 1 && count < limits.imagesPerDay
+            ? `Not enough of today's image allowance left for high quality (${limits.imagesPerDay - count} of ${limits.imagesPerDay} left; it uses ${cost}). Try a draft, or try again tomorrow.`
+            : `Daily image allowance reached (${limits.imagesPerDay}). Try again tomorrow.`,
         );
       tx.create(ref, data);
-      tx.set(quota, { count: (used.data()?.count ?? 0) + 1 });
+      tx.set(quota, { count: count + cost });
       return true;
     });
     if (created) {

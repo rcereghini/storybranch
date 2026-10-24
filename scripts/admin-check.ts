@@ -24,10 +24,15 @@ try {
   // Admin is in the account menu, only for admins.
   const menu = tab.getByRole("button", { name: "Account menu" });
   await menu.click();
-  await tab
-    .locator("#account-menu")
-    .getByRole("button", { name: "Admin", exact: true })
-    .click();
+  // The seeded admin signed up with a password and hasn't confirmed, so the
+  // menu offers another confirmation email; the result replaces the prompt.
+  const accountMenu = tab.locator("#account-menu");
+  await accountMenu.getByText("Email not confirmed.").waitFor();
+  await accountMenu.getByRole("button", { name: "Resend" }).click();
+  await accountMenu
+    .getByText("Sent. Check your inbox and spam folder.")
+    .waitFor();
+  await accountMenu.getByRole("button", { name: "Admin", exact: true }).click();
   await tab.waitForURL("**/admin");
   await tab.getByText("Published stories", { exact: true }).waitFor();
   assert.equal(await overflow(), false, "Horizontal overflow on Admin at 1024");

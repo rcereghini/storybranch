@@ -13,6 +13,7 @@ type Api = ReturnType<typeof createApi>;
 export const settingLabels: Record<string, string> = {
   "limits.aiRequestsPerDay": "AI requests per person per day",
   "limits.imagesPerDay": "Images per person per day",
+  "limits.highQualityImageWeight": "High-quality image weight",
   "ai.copilot": "Copilot",
   "ai.writingHelp": "Studio writing help",
   "ai.imageGeneration": "Image generation",
@@ -165,6 +166,29 @@ export function AdminSettings({
                   })
                 }
               />
+            </label>
+            <label className="email-field">
+              High-quality image weight
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={
+                  Number.isNaN(form.limits.highQualityImageWeight)
+                    ? ""
+                    : form.limits.highQualityImageWeight
+                }
+                onChange={(e) =>
+                  update((f) => {
+                    f.limits.highQualityImageWeight = number(e.target.value);
+                    return f;
+                  })
+                }
+              />
+              <small>
+                How much of the image allowance one high-quality image uses; a
+                draft uses 1. Comics draw every panel in high quality.
+              </small>
             </label>
           </div>
         </fieldset>
