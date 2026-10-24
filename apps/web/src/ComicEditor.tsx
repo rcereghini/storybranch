@@ -412,7 +412,6 @@ export function ComicEditor({
           uploads={uploads}
           assistReason={assistReason}
           onEdit={onEdit}
-          onUploaded={onUploaded}
           onClose={() => onCompanion(false)}
         />
       )}

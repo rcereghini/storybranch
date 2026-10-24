@@ -28,6 +28,15 @@ import { StoryGraph } from "./StoryGraph";
 import { StoryOutline } from "./StoryOutline";
 import { PageAssist, PageImageDialog } from "./StudioAssist";
 import { ComicEditor, ComicWorkspace, panelImages } from "./ComicEditor";
+import { DrawingStatus } from "./ComicCompanion";
+import {
+  placeImage,
+  setPlacer,
+  useDrawing,
+  withDrawnImages,
+  type Drawing,
+  type Placer,
+} from "./comic-drawing";
 import { connectPage } from "../../../packages/domain/story-graph";
 import {
   assetIdOf,
@@ -121,6 +130,9 @@ export function Studio({
   const [panel, setPanel] = useState<string | null>(null);
   const [comicMap, setComicMap] = useState(false);
   const [companion, setCompanion] = useState(false);
+  const drawing = useDrawing();
+  // A drawing to show once its draft has loaded.
+  const reopen = useRef<Drawing | null>(null);
   const [, setHistoryTick] = useState(0);
   const draftRef = useRef<DraftRecord | null>(null);
   draftRef.current = draft;
@@ -236,6 +248,17 @@ export function Studio({
     setNotice("");
   };
   const page = draft?.story.pages[selected];
+  // Each background-drawn image goes into the open draft it was drawn for.
+  const placer = useRef<Placer>(() => {});
+  placer.current = (shown, job, image, asset) => {
+    addUpload(asset);
+    if (draftRef.current?.story.id === shown.storyId)
+      edit((d) => placeImage(d, shown, job, image));
+  };
+  useEffect(() => {
+    setPlacer((...args) => placer.current(...args));
+    return () => setPlacer(null);
+  }, []);
   const addUpload = (asset: ClipAsset) =>
     setUploads(
       (old) =>
@@ -356,7 +379,10 @@ export function Studio({
     return () => removeEventListener("keydown", keys);
   });
 
-  const resetEditor = (d: DraftRecord, isDirty: boolean) => {
+  const resetEditor = (loaded: DraftRecord, isDirty: boolean) => {
+    // Images drawn in the background while this draft was closed.
+    const d = withDrawnImages(loaded);
+    if (d !== loaded) isDirty = true;
     draftRef.current = d;
     setDraft(d);
     setSelected(d.story.entryPageId);
@@ -374,6 +400,33 @@ export function Studio({
     setPanel(null);
     setCompanion(false);
     setComicMap(false);
+    const shown = reopen.current;
+    reopen.current = null;
+    if (shown?.storyId === d.story.id && d.story.pages[shown.pageId]) {
+      setSelected(shown.pageId);
+      setCompanion(true);
+    }
+  };
+  // Opens the companion on a background drawing's comic, loading its draft
+  // first when another one (or none) is open.
+  const showDrawing = (shown: Drawing) => {
+    if (draftRef.current?.story.id === shown.storyId) {
+      setSelected(shown.pageId);
+      setComicMap(false);
+      setPane("page");
+      setCompanion(true);
+      return;
+    }
+    void work(async () => {
+      if (draftRef.current && !(await flush())) {
+        setNotice(
+          "This draft isn't saved yet. Try again, or reconnect to save.",
+        );
+        return;
+      }
+      reopen.current = shown;
+      resetEditor(await api<DraftRecord>(`/studio/${shown.storyId}`), false);
+    });
   };
   const open = (id: string) =>
     void work(async () => {
@@ -733,6 +786,7 @@ export function Studio({
           </div>
         </div>
         {notices}
+        <DrawingStatus drawing={drawing} onView={showDrawing} />
         {!listing && !busy && (
           <Button onClick={() => void work(() => loadList())}>
             Retry loading drafts
@@ -801,6 +855,7 @@ export function Studio({
   return (
     <section className="studio studio-shell" data-view={view}>
       {notices}
+      <DrawingStatus drawing={drawing} onView={showDrawing} />
       <header className="studio-bar">
         <Button
           className="studio-bar-back"

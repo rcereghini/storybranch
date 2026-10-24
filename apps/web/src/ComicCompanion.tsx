@@ -7,52 +7,33 @@ import type {
   ComicBrief,
   ComicScript,
 } from "../../../packages/contracts/assist";
-import type {
-  GenerationListing,
-  ImageCommand,
-} from "../../../packages/contracts/generation";
+import type { GenerationListing } from "../../../packages/contracts/generation";
 import {
-  assetIdOf,
-  assetRef,
   uploadLimits,
-  type ClipAsset,
   type UploadListing,
 } from "../../../packages/contracts/media";
 import { ApiError } from "../../../packages/api-client/index";
-import { generateImage } from "./StudioAssist";
 import {
-  applyComicScript,
-  castInPanel,
-  castPrompt,
-  comicStyles,
-  drawPlan,
-  panelPrompt,
-} from "./studio-model";
+  type Drawing,
+  askToNotify,
+  costPerImage,
+  counts,
+  dismissDrawing,
+  retryDrawing,
+  startDrawing,
+  useDrawing,
+} from "./comic-drawing";
+import { applyComicScript, comicStyles } from "./studio-model";
 
 type Api = <T>(path: string, body?: unknown) => Promise<T>;
 type Edit = (update: (d: DraftRecord) => DraftRecord) => void;
 type Shape = "grid-4" | "grid-9" | "scroll";
-type Job = {
-  key: string;
-  kind: "cast" | "panel";
-  targetId: string;
-  label: string;
-  status: "waiting" | "drawing" | "done" | "failed";
-  message?: string;
-  url?: string;
-  // Kept after an unanswered request so Retry reuses its key.
-  command?: ImageCommand;
-};
 const revisions = [
   ["Make it funnier", "make it funnier"],
   ["Sharper punchline", "give it a sharper, more surprising punchline"],
   ["Shorter captions", "make the captions shorter and punchier"],
   ["More absurd", "make it more absurd"],
 ] as const;
-// High quality is the tier that follows character references.
-const costPerImage = 0.15;
-const parallel = 3;
-
 const shapeOf = (page: StoryPage): Shape =>
   page.comic?.layout === "scroll"
     ? "scroll"
@@ -60,55 +41,13 @@ const shapeOf = (page: StoryPage): Shape =>
       ? "grid-9"
       : "grid-4";
 
-// Sets a drawn image on its panel or character, only in the draft it was
-// drawn for: the creator may have opened another draft meanwhile.
-function placeImage(
-  d: DraftRecord,
-  storyId: string,
-  pageId: string,
-  job: Job,
-  image: string,
-): DraftRecord {
-  if (d.story.id !== storyId) return d;
-  if (job.kind === "cast")
-    return d.comic
-      ? {
-          ...d,
-          comic: {
-            ...d.comic,
-            cast: d.comic.cast.map((c) =>
-              c.id === job.targetId ? { ...c, image } : c,
-            ),
-          },
-        }
-      : d;
-  const page = d.story.pages[pageId];
-  if (!page?.comic) return d;
-  return {
-    ...d,
-    story: {
-      ...d.story,
-      pages: {
-        ...d.story.pages,
-        [pageId]: {
-          ...page,
-          comic: {
-            ...page.comic,
-            panels: page.comic.panels.map((p) =>
-              p.id === job.targetId ? { ...p, image } : p,
-            ),
-          },
-        },
-      },
-    },
-  };
-}
-
 // The comic companion: the creator describes the situation and the joke and
 // picks a style; Claude writes a script to review and revise (cheap), and
 // only then are the character sheets and panels drawn (the costly part).
 // Everything lands in the draft through Studio's normal edit, so it saves,
-// undoes and publishes like a hand-made comic.
+// undoes and publishes like a hand-made comic. Drawing runs in the
+// background (comic-drawing.ts): the dialog closes, and reopening it shows
+// the progress.
 export function ComicCompanion({
   api,
   draft,
@@ -116,7 +55,6 @@ export function ComicCompanion({
   uploads,
   assistReason,
   onEdit,
-  onUploaded,
   onClose,
 }: {
   api: Api;
@@ -125,11 +63,15 @@ export function ComicCompanion({
   uploads: UploadListing | null;
   assistReason: string | null;
   onEdit: Edit;
-  onUploaded: (asset: ClipAsset) => void;
   onClose: () => void;
 }) {
   const storyId = draft.story.id;
-  const [step, setStep] = useState<"brief" | "script" | "draw">("brief");
+  const drawing = useDrawing();
+  const mine =
+    drawing?.storyId === storyId && drawing.pageId === page.id ? drawing : null;
+  const [step, setStep] = useState<"brief" | "script" | "draw">(() =>
+    mine ? "draw" : "brief",
+  );
   const [premise, setPremise] = useState("");
   // A preset's index, or -1 for the creator's own description.
   const [style, setStyle] = useState(() =>
@@ -149,7 +91,6 @@ export function ComicCompanion({
   const [script, setScript] = useState<ComicScript | null>(null);
   const [change, setChange] = useState("");
   const [listing, setListing] = useState<GenerationListing | null>(null);
-  const [jobs, setJobs] = useState<Job[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const alive = useRef(true);
@@ -241,126 +182,12 @@ export function ComicCompanion({
     return applied as DraftRecord | null;
   };
 
-  const update = (key: string, patch: Partial<Job>) =>
-    alive.current &&
-    setJobs((all) => all.map((j) => (j.key === key ? { ...j, ...patch } : j)));
-
-  // Draws one job. The draft it reads is the latest one, so panels drawn
-  // after the character sheets use their reference images.
-  const latest = useRef(draft);
-  latest.current = draft;
-  const sheets = useRef(new Map<string, string>());
-  const drawOne = async (job: Job, current: DraftRecord) => {
-    const studio = current.comic ?? { style: "", cast: [] };
-    const comic = current.story.pages[page.id]?.comic;
-    const cast = studio.cast.map((c) => {
-      const image = c.image ?? sheets.current.get(c.id);
-      return image ? { ...c, image } : c;
-    });
-    let command = job.command;
-    if (!command) {
-      let prompt = "";
-      let referenceIds: string[] = [];
-      if (job.kind === "cast") {
-        const member = cast.find((c) => c.id === job.targetId);
-        if (!member)
-          return update(job.key, { status: "failed", message: "Removed" });
-        prompt = castPrompt(member, studio.style);
-      } else {
-        const index = comic?.panels.findIndex((p) => p.id === job.targetId);
-        if (!comic || index === undefined || index < 0)
-          return update(job.key, { status: "failed", message: "Removed" });
-        const inPanel = castInPanel(cast, comic.panels[index]);
-        prompt = panelPrompt(comic, index, studio.style, inPanel);
-        referenceIds = inPanel.map((c) => assetIdOf(c.image)!);
-      }
-      command = {
-        idempotencyKey: crypto.randomUUID(),
-        kind: "image",
-        prompt,
-        quality: "high",
-        aspect: "1:1",
-        ...(referenceIds.length ? { referenceIds } : {}),
-      };
-    }
-    update(job.key, {
-      status: "drawing",
-      message: undefined,
-      command,
-    });
-    try {
-      const asset = await generateImage(api, command);
-      if (!asset) return;
-      const image = assetRef(asset.id);
-      if (job.kind === "cast") sheets.current.set(job.targetId, image);
-      onUploaded(asset);
-      onEdit((d) => placeImage(d, storyId, page.id, job, image));
-      update(job.key, {
-        status: "done",
-        url: asset.url,
-        command: undefined,
-      });
-    } catch (e) {
-      update(job.key, {
-        status: "failed",
-        message: (e as Error).message,
-        // Only an unanswered request keeps its key for Retry.
-        command:
-          e instanceof ApiError && e.code !== "UNAVAILABLE"
-            ? undefined
-            : command,
-      });
-    }
-  };
-  const runAll = async (list: Job[], current: DraftRecord) => {
-    setBusy(true);
-    setStatus("");
-    // Character sheets first, so every panel can follow them.
-    for (const kind of ["cast", "panel"] as const) {
-      const queue = list.filter((j) => j.kind === kind);
-      await Promise.all(
-        Array.from({ length: Math.min(parallel, queue.length) }, async () => {
-          for (let job = queue.shift(); job; job = queue.shift())
-            await drawOne(job, kind === "cast" ? current : latest.current);
-        }),
-      );
-    }
-    if (alive.current) setBusy(false);
-  };
   const draw = () => {
+    askToNotify();
     const current = applyScript();
     if (!current) return;
-    const plan = drawPlan(current, page.id);
-    const list: Job[] = [
-      ...plan.cast.map((c) => ({
-        key: `cast-${c.id}`,
-        kind: "cast" as const,
-        targetId: c.id,
-        label: c.name,
-        status: "waiting" as const,
-      })),
-      ...plan.panels.map((p) => ({
-        key: `panel-${p.id}`,
-        kind: "panel" as const,
-        targetId: p.id,
-        label: `Panel ${current.story.pages[page.id].comic!.panels.indexOf(p) + 1}`,
-        status: "waiting" as const,
-      })),
-    ];
-    setJobs(list);
-    setStep("draw");
-    void runAll(list, current);
-  };
-  const retry = () => {
-    const failed = jobs.filter((j) => j.status === "failed");
-    setJobs((all) =>
-      all.map((j) =>
-        j.status === "failed"
-          ? { ...j, status: "waiting", message: undefined }
-          : j,
-      ),
-    );
-    void runAll(failed, latest.current);
+    startDrawing(api, current, page.id, script?.title || current.story.title);
+    onClose();
   };
 
   // What drawing will take, against today's generations and library room.
@@ -384,8 +211,9 @@ export function ComicCompanion({
       : needed > libraryRoom
         ? `Drawing needs ${needed} images and your asset library has room for ${libraryRoom}.`
         : null;
-  const done = jobs.filter((j) => j.status === "done").length;
-  const failed = jobs.filter((j) => j.status === "failed").length;
+  const { done, failed } = mine ? counts(mine) : { done: 0, failed: 0 };
+  const jobs = mine?.jobs ?? [];
+  const elsewhere = drawing?.running && !mine;
   const editScript = (update: (s: ComicScript) => ComicScript) =>
     setScript((s) => (s ? update(s) : s));
 
@@ -661,12 +489,16 @@ export function ComicCompanion({
               {hasArt && " This replaces the comic's current panels."}
             </small>
             <p className="studio-dialog-status" role="status">
-              {status || short}
+              {status ||
+                short ||
+                (elsewhere
+                  ? `Another comic, ${drawing.title}, is still drawing.`
+                  : "")}
             </p>
             <div className="studio-dialog-actions">
               <button
                 className="btn btn-primary"
-                disabled={busy || !!short}
+                disabled={busy || !!short || !!elsewhere}
                 onClick={draw}
               >
                 ✦ Draw it
@@ -695,8 +527,9 @@ export function ComicCompanion({
         {step === "draw" && (
           <>
             <p className="muted">
-              Each image fills into your comic as soon as it's ready. Keep this
-              open until drawing finishes.
+              Each image fills into your comic as soon as it's ready. You can
+              close this and keep working; you'll get a notification when it's
+              done.
             </p>
             <ul className="comic-companion-jobs">
               {jobs.map((j) => (
@@ -707,9 +540,7 @@ export function ComicCompanion({
                     <span className="comic-empty" aria-hidden="true" />
                   )}
                   <span>
-                    <strong>
-                      {j.kind === "cast" ? `${j.label} (character)` : j.label}
-                    </strong>
+                    <strong>{j.label}</strong>
                     <small>
                       {j.status === "waiting"
                         ? "Waiting"
@@ -724,29 +555,89 @@ export function ComicCompanion({
               ))}
             </ul>
             <p className="studio-dialog-status" role="status">
-              {busy
+              {mine?.running
                 ? `Drawing… ${done} of ${jobs.length} done`
                 : failed
                   ? `${done} of ${jobs.length} drawn. ${failed} could not be drawn; change their description in the panel settings, or retry.`
                   : "Your comic is drawn. Redraw any panel from its settings."}
             </p>
             <div className="studio-dialog-actions">
-              {!busy && failed > 0 && (
-                <button className="btn btn-primary" onClick={retry}>
-                  Retry {failed === 1 ? "it" : `all ${failed}`}
+              {mine?.running ? (
+                <button className="btn btn-primary" onClick={onClose}>
+                  Keep drawing in the background
                 </button>
+              ) : (
+                <>
+                  {failed > 0 && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => retryDrawing(api, draft)}
+                    >
+                      Retry {failed === 1 ? "it" : `all ${failed}`}
+                    </button>
+                  )}
+                  <button
+                    className={failed ? "btn btn-secondary" : "btn btn-primary"}
+                    onClick={() => {
+                      dismissDrawing();
+                      onClose();
+                    }}
+                  >
+                    {failed ? "Done" : "See my comic"}
+                  </button>
+                </>
               )}
-              <button
-                className={failed ? "btn btn-secondary" : "btn btn-primary"}
-                disabled={busy}
-                onClick={onClose}
-              >
-                {failed ? "Close" : "See my comic"}
-              </button>
             </div>
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// A fixed status pill for a background drawing: progress while it runs, the
+// result when it finishes. It never moves the editor's layout. View reopens
+// the companion on the comic.
+export function DrawingStatus({
+  drawing,
+  onView,
+}: {
+  drawing: Drawing | null;
+  onView: (drawing: Drawing) => void;
+}) {
+  if (!drawing) return null;
+  const { done, failed } = counts(drawing);
+  const total = drawing.jobs.length;
+  return (
+    <div className="comic-drawing-status" role="status">
+      <span className="comic-drawing-mark" aria-hidden="true">
+        {drawing.running ? "✦" : failed ? "!" : "✓"}
+      </span>
+      <span>
+        <strong>{drawing.title}</strong>
+        <small>
+          {drawing.running
+            ? `Drawing… ${done} of ${total} done`
+            : failed
+              ? `${done} of ${total} drawn · ${failed} need another try`
+              : `Drawn · all ${total} images are in`}
+        </small>
+      </span>
+      <button
+        className="btn btn-secondary btn-small"
+        onClick={() => onView(drawing)}
+      >
+        View
+      </button>
+      {!drawing.running && (
+        <button
+          className="comic-drawing-dismiss"
+          aria-label="Dismiss"
+          onClick={dismissDrawing}
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }
