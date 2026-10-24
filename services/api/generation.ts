@@ -13,6 +13,7 @@ import { db, bucket } from "./firebase";
 import * as paths from "./paths";
 import { assetView } from "./uploads";
 import { sniffAsset } from "./video-check";
+import { logImageUsage } from "./ai-usage";
 import type { Features } from "../../packages/contracts/profile";
 
 const digest = (text: string) =>
@@ -259,9 +260,19 @@ export async function generation(
     });
     if (created) {
       let bytes: Buffer | null = null;
+      const usage = {
+        quality: command.quality,
+        size: sizes[command.aspect],
+        references: command.referenceIds?.length ?? 0,
+      };
       try {
         bytes = await openai(prepared.path, prepared.body);
+        logImageUsage({ ...usage, outcome: "returned" });
       } catch (error) {
+        logImageUsage({
+          ...usage,
+          outcome: error instanceof Refused ? "refused" : "uncertain",
+        });
         // Never automatically resubmit a possibly billed request.
         await ref.update(
           error instanceof Refused

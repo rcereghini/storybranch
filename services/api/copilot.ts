@@ -17,6 +17,7 @@ import type { Save } from "../../packages/contracts/index";
 import { db, config } from "./firebase";
 import type { Features } from "../../packages/contracts/profile";
 import * as paths from "./paths";
+import { logClaudeUsage } from "./ai-usage";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type Message = Anthropic.Beta.Messages.BetaMessage;
@@ -49,7 +50,9 @@ const claude: CopilotModel = async (request, onText) => {
     ...request,
   });
   stream.on("text", onText);
-  return stream.finalMessage();
+  const message = await stream.finalMessage();
+  logClaudeUsage("copilot", message);
+  return message;
 };
 let model: CopilotModel = claude;
 export const setCopilotModel = (fake: CopilotModel | null) => {
@@ -491,14 +494,16 @@ export async function copilot(
               "STALE_REVISION",
               "This conversation changed in another tab. Reload it.",
             );
-          // Firestore documents hold about 1 MB; a thread that outgrows it
-          // is closed rather than truncated, so history stays append-only.
+          // Every message resends the whole history, so a thread past its
+          // budget is closed rather than truncated, keeping history
+          // append-only. Firestore documents hold about 1 MB.
           const fits = history.length < 900000;
+          const open = fits && history.length < copilotLimits.maxHistoryChars;
           tx.set(
             threadRef,
             {
               history: fits ? history : thread.history,
-              turns: fits ? thread.turns + 1 : copilotLimits.maxTurnsPerThread,
+              turns: open ? thread.turns + 1 : copilotLimits.maxTurnsPerThread,
               updatedAt: Date.now(),
               ...(thread.turns === 0 ? { createdAt: Date.now() } : {}),
             },

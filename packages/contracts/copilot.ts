@@ -4,6 +4,8 @@ import { id } from "./index";
 export const copilotLimits = {
   maxChars: 2000,
   maxTurnsPerThread: 40,
+  // About 50,000 tokens, resent with every message.
+  maxHistoryChars: 200000,
   maxModelTurns: 8,
   dailyMessages: 100,
 } as const;

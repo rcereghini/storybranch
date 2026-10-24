@@ -1,7 +1,7 @@
 import { legacyStoryData } from "../../packages/contracts/legacy-story-format";
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import * as z4 from "zod/v4";
 import { GameError } from "../../packages/contracts/index";
 import {
@@ -16,6 +16,7 @@ import { maxCast } from "../../packages/contracts/authoring";
 import type { Features } from "../../packages/contracts/profile";
 import { db } from "./firebase";
 import * as paths from "./paths";
+import { logClaudeUsage } from "./ai-usage";
 
 // Output shapes per action; the server clamps them again before replying.
 const shapes = {
@@ -44,18 +45,27 @@ export type AssistModel = (request: {
 let client: Anthropic | null = null;
 const claude: AssistModel = async ({ system, user, shape }) => {
   client ??= new Anthropic();
-  const response = await client.messages.parse({
+  const response = await client.beta.messages.parse({
     model: "claude-opus-5-5",
     max_tokens: 8000,
     // Short creative edits stay quick at low effort; a comic's timing and
     // punchline get more thought.
     output_config: {
       effort: shape === "comic" ? "medium" : "low",
-      format: zodOutputFormat(shapes[shape]),
+      format: betaZodOutputFormat(shapes[shape]),
     },
+    // A declined request is retried on Anthropic's recommended fallback.
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
     system,
     messages: [{ role: "user", content: user }],
   });
+  logClaudeUsage("assist", response);
+  if (response.stop_reason === "refusal")
+    throw new GameError(
+      "VALIDATION_FAILED",
+      "The writing assistant can't help with that one. Try changing the request.",
+    );
   if (!response.parsed_output)
     throw new GameError(
       "UNAVAILABLE",
@@ -78,7 +88,8 @@ export function assistAccess(features: Features) {
   return null;
 }
 
-// Stable text only, so it caches across requests.
+// Fixed text, so the prefix stays byte-identical. It is shorter than the
+// minimum Claude caches, so caching it would only add a write charge.
 const SYSTEM = `You help creators write branching interactive stories in Storybranch. A story is a graph of StoryNodes; each StoryNode has a title, text the player reads (or a transcript for a video StoryNode), and outputs: choices that lead to other StoryNodes.
 
 Write in the voice and tense the story already uses. Keep StoryNodes short and vivid: one to three short paragraphs, written for the player to read in under a minute. Second person ("you") unless the story clearly uses another voice. Never break the fourth wall or mention Storybranch, StoryNodes or choices inside story text. Keep content suitable for a general audience unless the story's own text sets a different tone.

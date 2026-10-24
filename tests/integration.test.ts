@@ -1621,6 +1621,23 @@ it("answers through Copilot with the user's own data, retries safely and enforce
     expect((await post(command("More"), "player", full)).error.message).toMatch(
       /conversation is full/,
     );
+    // A reply that takes the history past its budget is kept, then the
+    // thread closes.
+    const long = `t-${randomUUID()}`;
+    script = [
+      () => message([{ type: "text", text: "y".repeat(200000) }], "end_turn"),
+    ];
+    expect(
+      (await post(command("Tell me everything"), "player", long)).events.at(-1),
+    ).toEqual({
+      type: "done",
+    });
+    const closed = (await db.doc(`users/player/copilot/${long}`).get()).data()!;
+    expect(closed.turns).toBe(40);
+    expect(closed.history).toContain("y".repeat(200000));
+    expect((await post(command("More"), "player", long)).error.message).toMatch(
+      /conversation is full/,
+    );
     const day = Math.floor(Date.now() / 86400000);
     const quota = db.doc(
       `copilotQuotas/${createHash("sha256").update("progressed").digest("hex")}-${day}`,
