@@ -181,6 +181,7 @@
    replaces its text without moving anything. */
 .admin-usage {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 .admin-usage .admin-stat {
@@ -269,4 +270,126 @@
   margin-left: 32px;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* Emails: template list, editor beside a live preview, history and log. */
+.admin-emails {
+  display: grid;
+  /* Like .admin: the log table must not widen the panels. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.email-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.email-list button {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+}
+.email-list button span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.email-list button[aria-selected="true"] {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+  background: var(--surface-1);
+}
+.email-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .email-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.email-editor {
+  display: grid;
+  gap: 14px;
+}
+.email-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+.email-field small {
+  color: var(--muted);
+}
+.email-field input,
+.email-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 14px/1.5 var(--font-ui);
+  resize: vertical;
+}
+.email-field .admin-link {
+  justify-self: start;
+  font-size: 13px;
+}
+.email-problem {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+.email-ai {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+.email-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.email-preview {
+  display: grid;
+  gap: 12px;
+  position: sticky;
+  top: 16px;
+}
+.email-frame {
+  display: grid;
+  justify-items: center;
+  height: 680px;
+  padding: 12px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.email-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: #f2f2f7;
+}
+.email-frame-phone iframe {
+  max-width: 375px;
+}
+.email-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }

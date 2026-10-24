@@ -12,15 +12,18 @@ import {
   type Features,
 } from "../../../packages/contracts/profile";
 import { AdminUsage, usd } from "./AdminUsage";
+import { AdminEmails } from "./AdminEmails";
+import { emailTemplates, type EmailTemplateId } from "../../../packages/contracts/email";
 import "./admin.css";
 
 type Api = ReturnType<typeof createApi>;
-type Tab = "overview" | "usage" | "users" | "stories" | "activity";
+type Tab = "overview" | "usage" | "users" | "stories" | "emails" | "activity";
 const tabs: Array<[Tab, string]> = [
   ["overview", "Overview"],
   ["usage", "Usage & spend"],
   ["users", "Users"],
   ["stories", "Stories"],
+  ["emails", "Emails"],
   ["activity", "Activity"],
 ];
 const featureLabels: Record<FeatureId, string> = {
@@ -38,6 +41,19 @@ function describe(entry: AdminAuditEntry) {
     status?: string;
     hidden?: boolean;
   };
+  if (entry.action === "email") {
+    const email = change as { action?: string; version?: number; status?: string };
+    const label = emailTemplates[entry.target as EmailTemplateId]?.label ?? entry.target;
+    return email.action === "publish"
+      ? `published version ${email.version} of the ${label} email`
+      : email.action === "restore"
+        ? `restored ${email.version ? `version ${email.version}` : "the default"} into the ${label} draft`
+        : email.action === "discard"
+          ? `discarded the ${label} draft`
+          : email.action === "test"
+            ? `sent a test of the ${label} email (${email.status})`
+            : `saved a draft of the ${label} email`;
+  }
   if (entry.action === "story")
     return `${change.hidden ? "hid" : "showed"} story ${entry.target} ${change.hidden ? "from" : "in"} Discover`;
   const parts = [
@@ -359,6 +375,8 @@ export function Admin({
           )}
         </section>
       )}
+
+      {tab === "emails" && <AdminEmails api={api} onNotice={setNotice} />}
 
       {tab === "activity" && (
         <section className="panel">

@@ -1,5 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
-import { FieldPath, type Transaction } from "firebase-admin/firestore";
+import { FieldPath } from "firebase-admin/firestore";
 import type { UserRecord } from "firebase-admin/auth";
 import { GameError } from "../../packages/contracts/index";
 import {
@@ -26,10 +25,11 @@ import {
 import { auth, db } from "./firebase";
 import * as paths from "./paths";
 import { aiUsageDays, usageReport } from "./usage-report";
+import { AUDIT, run } from "./admin-audit";
+import { emailCommand, emailLog, listEmails } from "./admin-emails";
 
 // Admin routes: everything here is reached only by accounts whose features
 // include admin; the handler passes the effective flags in.
-const AUDIT = "adminAudit";
 
 async function allAuthUsers() {
   const users: UserRecord[] = [];
@@ -42,9 +42,9 @@ async function allAuthUsers() {
   return users;
 }
 
-async function body(request: Request) {
+async function body(request: Request, max = 4096) {
   const raw = await request.text();
-  if (raw.length > 4096)
+  if (raw.length > max)
     throw new GameError("VALIDATION_FAILED", "Request too large.");
   try {
     return JSON.parse(raw) as unknown;
@@ -53,8 +53,6 @@ async function body(request: Request) {
   }
 }
 
-const digest = (text: string) =>
-  createHash("sha256").update(text).digest("hex");
 
 export async function admin(
   request: Request,
@@ -188,9 +186,17 @@ export async function admin(
     };
   }
 
+  if (request.method === "GET" && area === "emails" && !target)
+    return listEmails();
+  if (request.method === "GET" && area === "email-log" && !target)
+    return emailLog();
+
   if (request.method !== "POST" || !target)
     throw new GameError("NOT_FOUND", "Route not found.");
   const actorEmail = (await auth.getUser(uid)).email ?? null;
+
+  if (area === "emails")
+    return emailCommand(uid, actorEmail, target, await body(request, 16384));
 
   if (area === "users") {
     const command = adminUserCommandSchema.parse(await body(request));
@@ -255,48 +261,4 @@ export async function admin(
     });
   }
   throw new GameError("NOT_FOUND", "Route not found.");
-}
-
-// Runs one admin change in a transaction with an idempotency receipt and an
-// audit entry, so a retry returns the first result instead of acting twice.
-async function run(
-  actorUid: string,
-  actorEmail: string | null,
-  key: string,
-  command: unknown,
-  apply: (tx: Transaction) => Promise<{
-    audit: Pick<AdminAuditEntry, "action" | "target" | "change">;
-    result: unknown;
-  }>,
-) {
-  const fingerprint = digest(JSON.stringify(command));
-  const receipt = db.doc(paths.receipt(actorUid, "admin", key));
-  return db.runTransaction(async (tx) => {
-    const previous = await tx.get(receipt);
-    if (previous.exists) {
-      if (previous.data()!.fingerprint !== fingerprint)
-        throw new GameError(
-          "IDEMPOTENCY_CONFLICT",
-          "This request key was used for another change.",
-        );
-      return previous.data()!.result;
-    }
-    const { audit, result } = await apply(tx);
-    const at = Date.now();
-    tx.create(db.collection(AUDIT).doc(randomUUID()), {
-      at,
-      actorUid,
-      actorEmail,
-      ...audit,
-      change: JSON.parse(JSON.stringify(audit.change)),
-    });
-    tx.create(receipt, {
-      actor: actorUid,
-      fingerprint,
-      result,
-      at,
-      ...paths.receiptExpiry(at),
-    });
-    return result;
-  });
 }

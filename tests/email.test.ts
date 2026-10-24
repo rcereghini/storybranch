@@ -3,6 +3,8 @@ import {
   emailContentSchema,
   emailTemplates,
   unknownPlaceholders,
+  adminEmailCommandSchema,
+  sampleEmailLink,
 } from "../packages/contracts/email";
 import { renderEmail } from "../packages/email/render";
 
@@ -63,5 +65,47 @@ describe("Email rendering", () => {
         siteUrl: site,
       }),
     ).toThrow();
+  });
+});
+
+describe("Admin email commands", () => {
+  it("accepts each action with its fields and rejects the rest", () => {
+    const content = emailTemplates.welcome.defaults;
+    const key = "key-12345678";
+    for (const command of [
+      { action: "save", expectedRevision: 0, content },
+      { action: "publish", expectedRevision: 3 },
+      { action: "restore", expectedRevision: 1, version: 0 },
+      { action: "discard", expectedRevision: 1 },
+      { action: "test", content },
+      { action: "rewrite", content, instruction: "Warmer, please" },
+    ])
+      expect(
+        adminEmailCommandSchema.safeParse({ idempotencyKey: key, ...command })
+          .success,
+      ).toBe(true);
+    for (const command of [
+      { action: "publish" },
+      {
+        action: "save",
+        expectedRevision: 0,
+        content: { ...content, extra: 1 },
+      },
+      { action: "rewrite", content, instruction: "no" },
+      { action: "delete", expectedRevision: 0 },
+    ])
+      expect(
+        adminEmailCommandSchema.safeParse({ idempotencyKey: key, ...command })
+          .success,
+      ).toBe(false);
+  });
+
+  it("points previews and tests at links that never work", () => {
+    expect(sampleEmailLink("https://x.test", "password-reset")).toBe(
+      "https://x.test/account/action?mode=resetPassword&oobCode=example",
+    );
+    expect(sampleEmailLink("https://x.test", "welcome")).toBe(
+      "https://x.test/discover",
+    );
   });
 });

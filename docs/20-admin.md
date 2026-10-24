@@ -21,6 +21,7 @@ The account must have signed up; if it has never opened the app, the command cre
 | Usage & spend | For the last 7, 30 or 90 UTC days: estimated spend, AI requests, images and refusals; requests per day; totals per feature (Copilot, writing help, images); the 20 heaviest users | Nothing |
 | Users | Every sign-up with email, display name, status, last sign-in and stored feature flags (search by email, name or ID) | Turn features on or off; disable or re-enable an account |
 | Stories | Published stories with creator, current edition and Discover status | Hide a story from Discover or show it again |
+| Emails | Each system email with what is being sent, a live preview, version history and the email log | Edit, rewrite with AI, send a test to yourself, save a draft, publish, restore an earlier version or the default (see `22-system-emails.md`) |
 | Activity | The latest 100 admin changes: who, what, to whom, when | Nothing |
 
 ## Rules
@@ -43,6 +44,9 @@ All routes need the `admin` feature.
 | `POST /api/admin/stories/{storyId}` | `{ idempotencyKey, hidden }` |
 | `GET /api/admin/audit` | Latest 100 audit entries |
 | `GET /api/admin/usage?days=7\|30\|90` | AI usage report (`AiUsageReport` in `packages/contracts/usage.ts`) |
+| `GET /api/admin/emails` | Every system email with its draft, published version and history |
+| `POST /api/admin/emails/{id}` | `{ idempotencyKey, action: save \| publish \| restore \| discard \| test \| rewrite, … }` |
+| `GET /api/admin/email-log` | Latest 100 sent, failed or skipped emails |
 
 ## AI usage records
 
