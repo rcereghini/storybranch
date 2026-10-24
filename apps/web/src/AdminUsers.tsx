@@ -286,6 +286,8 @@ export function AdminUsers({
               <dd>{when(user.createdAt)}</dd>
               <dt>Last sign-in</dt>
               <dd>{when(user.lastSignIn)}</dd>
+              <dt>Last active</dt>
+              <dd>{when(user.lastActive)}</dd>
               <dt>Account ID</dt>
               <dd>
                 <code>{user.uid}</code>

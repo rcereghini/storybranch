@@ -9,6 +9,7 @@ import type { FeatureId, Features } from "../../../packages/contracts/profile";
 import type { AccountLimits } from "../../../packages/contracts/settings";
 import { AdminUsers, featureLabels } from "./AdminUsers";
 import { AdminUsage, usd } from "./AdminUsage";
+import { AdminAnalytics } from "./AdminAnalytics";
 import { AdminEmails } from "./AdminEmails";
 import { AdminSettings, settingLabel, settingValue } from "./AdminSettings";
 import { emailTemplates, type EmailTemplateId } from "../../../packages/contracts/email";
@@ -18,6 +19,7 @@ type Api = ReturnType<typeof createApi>;
 type Tab =
   | "overview"
   | "usage"
+  | "analytics"
   | "users"
   | "stories"
   | "emails"
@@ -26,6 +28,7 @@ type Tab =
 const tabs: Array<[Tab, string]> = [
   ["overview", "Overview"],
   ["usage", "Usage & spend"],
+  ["analytics", "Analytics"],
   ["users", "Users"],
   ["stories", "Stories"],
   ["emails", "Emails"],
@@ -195,6 +198,8 @@ export function Admin({
         ))}
 
       {tab === "usage" && <AdminUsage api={api} onError={setNotice} />}
+
+      {tab === "analytics" && <AdminAnalytics api={api} onError={setNotice} />}
 
       {tab === "users" && (
         <AdminUsers

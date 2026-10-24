@@ -493,3 +493,11 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* An outbound link styled as an action. */
+.admin-external {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}

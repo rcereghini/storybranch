@@ -26,6 +26,7 @@ import type {
   AdminUsersPage,
 } from "../packages/contracts/admin";
 import { aiQuota } from "../services/api/paths";
+import type { SiteAnalytics } from "../packages/contracts/analytics";
 import { emailTemplates, type AdminEmails } from "../packages/contracts/email";
 import { handle } from "../services/api/handler";
 import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
@@ -1968,6 +1969,27 @@ it("searches users, shows one account, and applies its own limits and disabling"
     );
     tokens.progressed = (await r.json()).idToken;
   }
+});
+it("reports players, sign-ups and story completion to admins only", async () => {
+  expect(
+    (await call("/admin/analytics?days=30", undefined, "progressed")).status,
+  ).toBe(403);
+  expect((await call("/admin/analytics?days=7")).status).toBe(400);
+  // A playthrough the report should count.
+  await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: "glass-harbor" },
+  });
+  const report = (await call("/admin/analytics?days=30")).data as SiteAnalytics;
+  expect(report.accounts).toBeGreaterThanOrEqual(2);
+  expect(report.signupsByDay).toHaveLength(30);
+  expect(report.active.month).toBeGreaterThanOrEqual(1);
+  const harbor = report.stories.find((s) => s.id === "glass-harbor")!;
+  expect(harbor.title).toBe("The Glass Harbor");
+  expect(harbor.players).toBeGreaterThanOrEqual(1);
+  expect(harbor.activePlayers).toBeGreaterThanOrEqual(1);
+  expect(harbor.finishers).toBeLessThanOrEqual(harbor.players);
+  expect(report.savesCapped).toBe(false);
 });
 it("applies admin settings to AI switches, daily limits and price estimates", async () => {
   const keys = {

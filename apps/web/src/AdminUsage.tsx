@@ -5,6 +5,7 @@ import {
   type AiUsageReport,
   type AiUsageTotals,
 } from "../../../packages/contracts/usage";
+import { DailyBars } from "./DailyBars";
 
 type Api = ReturnType<typeof createApi>;
 type Days = (typeof usageReportDays)[number];
@@ -12,18 +13,6 @@ type Days = (typeof usageReportDays)[number];
 export const usd = (value: number) =>
   value > 0 && value < 0.01 ? "<$0.01" : `$${value.toFixed(2)}`;
 const requests = (t: AiUsageTotals) => t.claudeRequests + t.images;
-const dayLabel = (day: string) =>
-  new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-// A clean axis top: 1, 2 or 5 times a power of ten.
-function niceMax(value: number) {
-  if (value <= 0) return 1;
-  const power = 10 ** Math.floor(Math.log10(value));
-  return ([1, 2, 5, 10].find((step) => step * power >= value) ?? 10) * power;
-}
 
 export function AdminUsage({
   api,
@@ -34,11 +23,9 @@ export function AdminUsage({
 }) {
   const [days, setDays] = useState<Days>(30);
   const [report, setReport] = useState<AiUsageReport | null>(null);
-  const [focused, setFocused] = useState<number | null>(null);
   useEffect(() => {
     let live = true;
     setReport(null);
-    setFocused(null);
     api<AiUsageReport>(`/admin/usage?days=${days}`)
       .then((r) => live && setReport(r))
       .catch((error) => live && onError((error as Error).message));
@@ -47,10 +34,6 @@ export function AdminUsage({
     };
   }, [days]);
 
-  const top = report
-    ? niceMax(Math.max(...report.days.map((d) => requests(d.totals))))
-    : 1;
-  const shown = report && focused !== null ? report.days[focused] : null;
   return (
     <section className="panel admin-usage">
       <div className="row-head">
@@ -85,47 +68,14 @@ export function AdminUsage({
             ))}
           </div>
 
-          <figure className="admin-chart">
-            <figcaption>
-              <span>AI requests per day (UTC)</span>
-              {/* Reserved readout line: hovering a day replaces it in place. */}
-              <span className="admin-readout" aria-live="polite">
-                {shown
-                  ? `${dayLabel(shown.day)}: ${requests(shown.totals)} requests, ${usd(shown.totals.estimatedUsd)} estimated`
-                  : "Hover or focus a day for its numbers"}
-              </span>
-            </figcaption>
-            <div className="admin-plot">
-              <div className="admin-axis" aria-hidden="true">
-                <span>{top}</span>
-                <span>{top / 2}</span>
-                <span>0</span>
-              </div>
-              <div className="admin-bars">
-                {report.days.map((day, i) => (
-                  <button
-                    key={day.day}
-                    className={`admin-bar${focused === i ? " admin-bar-on" : ""}`}
-                    aria-label={`${dayLabel(day.day)}: ${requests(day.totals)} requests, ${usd(day.totals.estimatedUsd)} estimated`}
-                    onPointerEnter={() => setFocused(i)}
-                    onFocus={() => setFocused(i)}
-                    onPointerLeave={() => setFocused(null)}
-                    onBlur={() => setFocused(null)}
-                  >
-                    <span
-                      style={{
-                        height: `${(requests(day.totals) / top) * 100}%`,
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="admin-dates" aria-hidden="true">
-              <span>{dayLabel(report.from)}</span>
-              <span>{dayLabel(report.to)}</span>
-            </div>
-          </figure>
+          <DailyBars
+            caption="AI requests per day (UTC)"
+            points={report.days.map((day) => ({
+              day: day.day,
+              value: requests(day.totals),
+              detail: `${requests(day.totals)} requests, ${usd(day.totals.estimatedUsd)} estimated`,
+            }))}
+          />
 
           <h3 className="admin-subtitle">By feature</h3>
           <div className="admin-table-wrap">

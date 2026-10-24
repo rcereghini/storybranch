@@ -19,6 +19,7 @@ The account must have signed up; if it has never opened the app, the command cre
 |---|---|---|
 | Overview | Users, admins, disabled accounts, published and hidden stories, drafts, playthroughs, AI requests and estimated AI spend over 30 days | Nothing |
 | Usage & spend | For the last 7, 30 or 90 UTC days: estimated spend, AI requests, images and refusals; requests per day; totals per feature (Copilot, writing help, images); the 20 heaviest users | Nothing |
+| Analytics | For the last 30 or 90 UTC days: accounts, new sign-ups (and per day), accounts active in the last day, week and month, players in the period, and per story: players, finishers, completion rate, recent players and last played; plus a link to Vercel for page views | Nothing |
 | Users | Sign-ups, newest sign-in first, 50 at a time: search by email, name or ID and filter by status or access, all on the server. Each opens a detail page: email and whether it's confirmed, sign-in methods, joined and last sign-in, access, daily limits and today's usage, published stories, drafts, playthroughs, 30-day AI usage and spend, recent emails and the admin changes made to it | Turn features on or off; disable or re-enable; set the account's own daily limits; reset today's usage |
 | Stories | Published stories with creator, current edition and Discover status | Hide a story from Discover or show it again |
 | Emails | Each system email with what is being sent, a live preview, version history and the email log | Edit, rewrite with AI, send a test to yourself, save a draft, publish, restore an earlier version or the default (see `22-system-emails.md`) |
@@ -47,6 +48,7 @@ All routes need the `admin` feature.
 | `POST /api/admin/stories/{storyId}` | `{ idempotencyKey, hidden }` |
 | `GET /api/admin/audit` | Latest 100 audit entries |
 | `GET /api/admin/usage?days=7\|30\|90` | AI usage report (`AiUsageReport` in `packages/contracts/usage.ts`) |
+| `GET /api/admin/analytics?days=30|90` | Site analytics (`SiteAnalytics` in `packages/contracts/analytics.ts`) |
 | `GET /api/admin/emails` | Every system email with its draft, published version and history |
 | `POST /api/admin/emails/{id}` | `{ idempotencyKey, action: save \| publish \| restore \| discard \| test \| rewrite, … }` |
 | `GET /api/admin/email-log` | Latest 100 sent, failed or skipped emails |
@@ -78,6 +80,12 @@ Estimated spend (`packages/domain/usage.ts`) multiplies the totals by the prices
 Unit tests cover admin implying every feature and hidden stories on the dashboard. An emulator integration test covers member refusal on every route, feature changes, retries and key conflicts, the self-lockout rules, disabling and re-enabling, hiding (Discover, new starts refused, existing saves still play, dashboard kept but not recommended) and the audit log. Another records Claude usage (including a fallback step at its own model) and image outcomes for a new user and checks the report, the overview totals, the period validation and member refusal; unit tests cover the estimates and UTC day ranges. `scripts/admin-check.ts`, run in CI, drives the admin view as the local admin: navigation, overview, a feature toggle, locked self controls, hide and show, activity, the Usage tab (one bar per day, the period switch, a hover readout that leaves the chart in place), no horizontal overflow at 1024 and 390 px, and a member seeing neither the nav item nor the admin view. A users test covers server search, status and access filters, page size, the detail page, own limits (invalid values refused; 0 stops Copilot), resetting today's count, and disabling (sessions revoked, sign-in blocked, listed as disabled) and enabling; the browser check also searches, filters, opens a member's page, sets and clears an own limit, and checks a phone-width layout.
 
 ## Site analytics
+
+The Analytics tab is built on request from data the app already keeps, so it has history from before it existed (`services/api/analytics.ts`, counting in `packages/domain/analytics.ts`), and is kept for five minutes:
+
+- **Sign-ups** are account creation times. **Active** uses Firebase's last session refresh for each account, which reflects use better than last sign-in because people stay signed in. Both come from the same account read as Users (the first 10,000 sign-ups).
+- **Stories** come from every saved playthrough (`playerUid`, `storyId`, `status`, `updatedAt` only; up to 20,000, after which the page says the numbers are partial). Players and finishers count each account once per story; completion is finishers over players; "played in the period" means the save changed then. Saves don't record when they started, so starts per day aren't available; past the cap, per-day totals like AI usage would be the next step. Catalogue stories are listed even with no players, and other stories with saves, such as side quests, are listed after.
+- **Page views** stay in Vercel (below); the tab links there.
 
 Page views go to Vercel Web Analytics (enabled on the Vercel project; the app loads it through `@vercel/analytics` in `apps/web/src/main.tsx`) and are viewed in Vercel's dashboard. It sets no cookies. Paths carrying private IDs are counted under one shared path before sending (`/play/[saveId]`, `/assets/edit/[assetId]`), and query strings and hashes are dropped (`apps/web/src/analytics.ts`). `vercel.json` keeps `/_vercel/*` out of the app's catch-all rewrite so the analytics script is served.
 

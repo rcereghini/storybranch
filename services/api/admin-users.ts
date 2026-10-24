@@ -58,10 +58,13 @@ export function adminUser(u: UserRecord, profile: DocumentData | undefined) {
     lastSignIn: u.metadata.lastSignInTime
       ? new Date(u.metadata.lastSignInTime).toISOString()
       : null,
+    lastActive: u.metadata.lastRefreshTime
+      ? new Date(u.metadata.lastRefreshTime).toISOString()
+      : null,
   } satisfies AdminUser;
 }
 
-async function allUsers() {
+export async function allUsers() {
   if (cached && Date.now() - cached.at < cacheMs) return cached.users;
   const records: UserRecord[] = [];
   let token: string | undefined;
