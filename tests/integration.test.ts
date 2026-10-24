@@ -1947,6 +1947,20 @@ it("searches users, shows one account, and applies its own limits and disabling"
     await db.doc(aiQuota("progressed")).delete();
     if (anthropic === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = anthropic;
+    // Disabling revoked their sessions, so later tests need a fresh sign-in.
+    const r = await fetch(
+      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=local-demo-key",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "progressed@storybranch.test",
+          password: "HarborDemo123!",
+          returnSecureToken: true,
+        }),
+      },
+    );
+    tokens.progressed = (await r.json()).idToken;
   }
 });
 it("applies admin settings to AI switches, daily limits and price estimates", async () => {
