@@ -134,12 +134,17 @@ function Access({
 export function AdminUsers({
   api,
   uid,
+  open,
+  onOpen,
   onNotice,
   onChanged,
   describe,
 }: {
   api: Api;
   uid: string;
+  // The account whose panel is open (from the address), or null.
+  open: string | null;
+  onOpen: (uid: string | null) => void;
   onNotice: (message: string) => void;
   onChanged: () => void;
   describe: (entry: AdminAuditEntry) => string;
@@ -152,7 +157,6 @@ export function AdminUsers({
     useState<(typeof adminUserSorts)[number]>("lastActive");
   const [page, setPage] = useState<AdminUsersPage | null>(null);
   const [items, setItems] = useState<AdminUser[] | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminUserDetail | null>(null);
   const [limits, setLimits] = useState<AccountLimits | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -181,8 +185,6 @@ export function AdminUsers({
   }, [q, status, feature, sort]);
 
   const openDetail = async (target: string) => {
-    setOpen(target);
-    setDetail(null);
     try {
       const result = await api<AdminUserDetail>(`/admin/users/${target}`);
       setDetail(result);
@@ -191,6 +193,11 @@ export function AdminUsers({
       onNotice((error as Error).message);
     }
   };
+  // The side panel follows the address, so back and shared links work.
+  useEffect(() => {
+    setDetail(null);
+    if (open) void openDetail(open);
+  }, [open]);
   const change = async (target: string, body: UserChange, done?: string) => {
     setBusy(target);
     onNotice("");
@@ -218,6 +225,7 @@ export function AdminUsers({
     }
   };
 
+  let panel = null;
   if (open) {
     const user = detail?.user;
     const limitField = (
@@ -255,10 +263,14 @@ export function AdminUsers({
         </small>
       </div>
     );
-    return (
-      <section className="panel admin-user">
-        <button className="admin-link" onClick={() => setOpen(null)}>
-          ← All users
+    panel = (
+      <aside className="panel admin-user admin-panel" aria-label="Account">
+        <button
+          className="admin-link admin-panel-close"
+          aria-label="Close account panel"
+          onClick={() => onOpen(null)}
+        >
+          Close ✕
         </button>
         {detail && user ? (
           <>
@@ -451,12 +463,12 @@ export function AdminUsers({
         ) : (
           <div className="admin-placeholder" aria-hidden="true" />
         )}
-      </section>
+      </aside>
     );
   }
 
-  return (
-    <section className="panel">
+  const list = (
+    <section className="panel admin-list">
       <div className="row-head">
         <h2 className="panel-title">Users</h2>
         <div className="admin-filters">
@@ -533,7 +545,8 @@ export function AdminUsers({
                   <td>
                     <button
                       className="admin-link"
-                      onClick={() => void openDetail(user.uid)}
+                      aria-current={open === user.uid ? "true" : undefined}
+                      onClick={() => onOpen(user.uid)}
                     >
                       {user.displayName}
                     </button>
@@ -581,5 +594,11 @@ export function AdminUsers({
         <div className="admin-placeholder" aria-hidden="true" />
       )}
     </section>
+  );
+  return (
+    <div className={panel ? "admin-split" : undefined}>
+      {list}
+      {panel}
+    </div>
   );
 }

@@ -12,19 +12,23 @@ const percent = (players: number, finishers: number) =>
 
 export function AdminStories({
   api,
+  open,
+  onOpen,
   navigate,
   onNotice,
   onChanged,
   describe,
 }: {
   api: Api;
+  // The story whose panel is open (from the address), or null.
+  open: string | null;
+  onOpen: (id: string | null) => void;
   navigate: (path: string) => void;
   onNotice: (message: string) => void;
   onChanged: () => void;
   describe: (entry: AdminAuditEntry) => string;
 }) {
   const [stories, setStories] = useState<AdminStory[] | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminStoryDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -34,14 +38,17 @@ export function AdminStories({
     load().catch((error) => onNotice((error as Error).message));
   }, []);
   const openDetail = async (id: string) => {
-    setOpen(id);
-    setDetail(null);
     try {
       setDetail(await api<AdminStoryDetail>(`/admin/stories/${id}`));
     } catch (error) {
       onNotice((error as Error).message);
     }
   };
+  // The side panel follows the address, so back and shared links work.
+  useEffect(() => {
+    setDetail(null);
+    if (open) void openDetail(open);
+  }, [open]);
   const setHidden = async (id: string, hidden: boolean) => {
     setBusy(id);
     onNotice("");
@@ -72,12 +79,17 @@ export function AdminStories({
     </button>
   );
 
+  let panel = null;
   if (open) {
     const story = detail?.story;
-    return (
-      <section className="panel admin-user">
-        <button className="admin-link" onClick={() => setOpen(null)}>
-          ← All stories
+    panel = (
+      <aside className="panel admin-user admin-panel" aria-label="Story">
+        <button
+          className="admin-link admin-panel-close"
+          aria-label="Close story panel"
+          onClick={() => onOpen(null)}
+        >
+          Close ✕
         </button>
         {detail && story ? (
           <>
@@ -210,12 +222,12 @@ export function AdminStories({
         ) : (
           <div className="admin-placeholder" aria-hidden="true" />
         )}
-      </section>
+      </aside>
     );
   }
 
-  return (
-    <section className="panel">
+  const list = (
+    <section className="panel admin-list">
       <h2 className="panel-title">Published stories</h2>
       {stories ? (
         <div className="admin-table-wrap">
@@ -236,7 +248,8 @@ export function AdminStories({
                   <td>
                     <button
                       className="admin-link"
-                      onClick={() => void openDetail(story.id)}
+                      aria-current={open === story.id ? "true" : undefined}
+                      onClick={() => onOpen(story.id)}
                     >
                       {story.title}
                     </button>
@@ -269,5 +282,11 @@ export function AdminStories({
         <div className="admin-placeholder" aria-hidden="true" />
       )}
     </section>
+  );
+  return (
+    <div className={panel ? "admin-split" : undefined}>
+      {list}
+      {panel}
+    </div>
   );
 }

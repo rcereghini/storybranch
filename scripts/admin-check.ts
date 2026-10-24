@@ -40,7 +40,7 @@ try {
 
   // Users: turn a member's Copilot off and back on.
   const sections = tab.getByRole("navigation", { name: "Admin sections" });
-  await sections.getByRole("button", { name: "Users" }).click();
+  await sections.getByRole("link", { name: "Users" }).click();
   // Search runs on the server; both seeded accounts match.
   await tab.getByLabel("Search users").fill("storybranch.test");
   await tab.getByText(/^\d+ accounts?$/).waitFor();
@@ -77,6 +77,8 @@ try {
   await tab.getByText("No accounts match.").waitFor();
   await tab.getByLabel("Status").selectOption("all");
   await row.getByRole("button", { name: "Progressed", exact: false }).click();
+  // The account opens in a drawer with its own address.
+  await tab.waitForURL("**/admin/users/progressed");
   await tab.getByRole("heading", { name: "Daily limits" }).waitFor();
   await tab.getByText("Email and password").waitFor();
   const aiLimit = tab.getByLabel("AI requests per day");
@@ -95,11 +97,21 @@ try {
   await tab.setViewportSize({ width: 390, height: 844 });
   assert.equal(await overflow(), false, "Horizontal overflow on a user at 390");
   await tab.setViewportSize({ width: 1024, height: 900 });
-  await tab.getByRole("button", { name: "← All users" }).click();
+  await tab.getByRole("button", { name: "Close account panel" }).click();
+  await tab.waitForURL("**/admin/users");
   await row.waitFor();
+  // Back reopens it; forward closes it again.
+  await tab.goBack();
+  await tab.getByRole("heading", { name: "Daily limits" }).waitFor();
+  await tab.goForward();
+  await tab.waitForURL("**/admin/users");
+  assert.equal(
+    await tab.getByRole("heading", { name: "Daily limits" }).count(),
+    0,
+  );
 
   // Stories: hide and show a story.
-  await sections.getByRole("button", { name: "Stories" }).click();
+  await sections.getByRole("link", { name: "Stories" }).click();
   const story = tab.getByRole("row", { name: /The Glass Harbor/ });
   await story.getByRole("button", { name: "Hide from Discover" }).click();
   await story.getByText("Hidden", { exact: true }).waitFor();
@@ -124,11 +136,16 @@ try {
     "Horizontal overflow on a story at 390",
   );
   await tab.setViewportSize({ width: 1024, height: 900 });
-  await tab.getByRole("button", { name: "← All stories" }).click();
+  await tab.getByRole("button", { name: "Close story panel" }).click();
   await story.waitFor();
+  // A story's address opens it directly, after a reload too.
+  await tab.goto("http://127.0.0.1:5173/admin/stories/glass-harbor");
+  await tab.getByRole("heading", { name: "Editions" }).waitFor();
+  await tab.getByRole("button", { name: "Close story panel" }).click();
+  await tab.waitForURL("**/admin/stories");
 
   // Activity lists those changes, newest first, and filters by type.
-  await sections.getByRole("button", { name: "Activity" }).click();
+  await sections.getByRole("link", { name: "Activity" }).click();
   await tab
     .getByText("showed story glass-harbor in Discover", { exact: false })
     .first()
@@ -150,7 +167,7 @@ try {
 
   // Usage & spend: one bar per day, the period switch, and a readout that
   // answers hover in place.
-  await sections.getByRole("button", { name: "Usage & spend" }).click();
+  await sections.getByRole("link", { name: "Usage & spend" }).click();
   const bars = tab.locator(".admin-bar");
   await tab.getByRole("heading", { name: "AI usage and spend" }).waitFor();
   await bars.first().waitFor();
@@ -189,7 +206,7 @@ try {
   await tab.screenshot({ path: "test-results/admin-usage.png" });
 
   // Analytics: totals, sign-ups per day, the story table and Vercel's link.
-  await sections.getByRole("button", { name: "Analytics" }).click();
+  await sections.getByRole("link", { name: "Analytics" }).click();
   await tab.getByRole("heading", { name: "Players and stories" }).waitFor();
   await tab.getByText("Active this week").waitFor();
   await tab.waitForFunction(
@@ -223,7 +240,7 @@ try {
   await tab.setViewportSize({ width: 1024, height: 900 });
 
   // Emails: edit with a live preview, save a draft, publish, see history.
-  await sections.getByRole("button", { name: "Emails" }).click();
+  await sections.getByRole("link", { name: "Emails" }).click();
   await tab.getByRole("tab", { name: /Password reset/ }).click();
   const editor = tab.getByRole("region", { name: "Edit Password reset" });
   const subject = editor.getByLabel("Subject", { exact: true });
@@ -267,7 +284,7 @@ try {
   });
 
   // Settings: a change is summarized before saving, saved, and audited.
-  await sections.getByRole("button", { name: "Settings" }).click();
+  await sections.getByRole("link", { name: "Settings" }).click();
   await tab.getByText("Using the built-in defaults").waitFor();
   const imageSwitch = tab.getByRole("checkbox", { name: /Image generation/ });
   assert.equal(await imageSwitch.isChecked(), true);
@@ -287,7 +304,7 @@ try {
     path: "test-results/admin-settings.png",
     fullPage: true,
   });
-  await sections.getByRole("button", { name: "Activity" }).click();
+  await sections.getByRole("link", { name: "Activity" }).click();
   await tab
     .getByText("changed settings: Image generation on → off", {
       exact: false,
@@ -295,7 +312,7 @@ try {
     .first()
     .waitFor();
   // Back to the defaults, so later checks see the usual app.
-  await sections.getByRole("button", { name: "Settings" }).click();
+  await sections.getByRole("link", { name: "Settings" }).click();
   await tab.getByRole("button", { name: "Restore defaults" }).click();
   await tab.getByRole("button", { name: "Save settings" }).click();
   await tab.getByText("Settings saved.", { exact: false }).waitFor();
@@ -305,7 +322,7 @@ try {
     false,
     "Horizontal overflow on Settings at 390",
   );
-  await sections.getByRole("button", { name: "Emails" }).click();
+  await sections.getByRole("link", { name: "Emails" }).click();
   await tab.getByRole("tab", { name: /Password reset/ }).waitFor();
 
   await tab.setViewportSize({ width: 390, height: 844 });
@@ -330,10 +347,10 @@ try {
     false,
     `Horizontal overflow on Emails at 390: ${wide.join(", ")}`,
   );
-  await sections.getByRole("button", { name: "Usage & spend" }).click();
+  await sections.getByRole("link", { name: "Usage & spend" }).click();
   await tab.locator(".admin-bar").first().waitFor();
   assert.equal(await overflow(), false, "Horizontal overflow on Usage at 390");
-  await sections.getByRole("button", { name: "Users" }).click();
+  await sections.getByRole("link", { name: "Users" }).click();
   await tab.getByRole("table").waitFor();
   assert.equal(await overflow(), false, "Horizontal overflow on Admin at 390");
   await tab.screenshot({ path: "test-results/admin-users-phone.png" });

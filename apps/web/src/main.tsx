@@ -91,6 +91,7 @@ function App() {
   const isAdmin = !!user && !!profile?.features?.admin;
   const immersive =
     path.startsWith("/play/") || path.startsWith("/story-nodes/");
+  const adminView = path === "/admin" || path.startsWith("/admin/");
   // Main sections: the desktop header nav and the phone tab bar.
   const tabs: Array<[string, string, IconName]> = user
     ? [
@@ -346,6 +347,18 @@ function App() {
   const resume = saves.find(
     (s) => !s.parentPlaythroughId && s.status === "active",
   );
+  // Admins get the admin workspace in its own frame, without the player
+  // app's header, footer, tab bar or Copilot.
+  if (adminView && isAdmin)
+    return (
+      <Admin
+        api={api}
+        uid={user!.uid}
+        email={user!.email}
+        path={path}
+        navigate={navigate}
+      />
+    );
   return (
     <>
       <header
@@ -520,10 +533,8 @@ function App() {
               <button onClick={() => setLogin(true)}>Sign in to upload</button>
             </section>
           )
-        ) : path === "/admin" ? (
-          isAdmin ? (
-            <Admin api={api} uid={user!.uid} navigate={navigate} />
-          ) : user && !profile ? (
+        ) : adminView ? (
+          user && !profile ? (
             <div
               className="placeholder summary-placeholder"
               aria-hidden="true"

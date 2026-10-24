@@ -501,3 +501,256 @@
   align-items: center;
   text-decoration: none;
 }
+
+/* The admin workspace frame: its own full window, dark in both themes
+   (.theme-dark), with a sidebar of grouped sections and a top bar. */
+.admin-app {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+.admin-side {
+  flex: 0 0 240px;
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+.admin-brand span {
+  display: grid;
+}
+.admin-brand strong {
+  font: 700 17px/1.1 var(--font-display);
+}
+.admin-brand small {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.admin-side-group {
+  display: grid;
+  gap: 2px;
+}
+.admin-side-label {
+  padding: 0 10px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.admin-side-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-body);
+  font-size: 14px;
+  text-decoration: none;
+}
+.admin-side-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.admin-side-item[aria-current="page"] {
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+  font-weight: 600;
+}
+.admin-back {
+  margin-top: auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+.admin-body {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.admin-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg, var(--bg));
+  backdrop-filter: blur(8px);
+}
+.admin-top h1 {
+  margin: 0;
+  font: 700 22px/1.2 var(--font-display);
+}
+.admin-top-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.admin-env {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.admin-env::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admin-env-production {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.admin-env-preview {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.admin-env-local {
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+}
+.admin-me {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+.admin-main {
+  width: 100%;
+  max-width: 1440px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 24px 28px 64px;
+}
+
+/* A list with its detail in a drawer over the right side, so the list keeps
+   its width; on a phone the drawer covers the screen. */
+.admin-split > .admin-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(480px, 100vw);
+  box-sizing: border-box;
+  overflow-y: auto;
+  border-radius: 0;
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-lg);
+}
+.admin-panel-close {
+  justify-self: end;
+}
+
+/* Notifications float bottom right and clear themselves. */
+.admin-toasts {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  width: min(380px, calc(100vw - 32px));
+}
+.admin-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  font-size: 14px;
+}
+.admin-toast span {
+  flex: 1;
+}
+.admin-toast button {
+  min-height: 0;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+@media (max-width: 900px) {
+  .admin-app {
+    flex-direction: column;
+  }
+  .admin-side {
+    position: static;
+    height: auto;
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+  .admin-side-group {
+    display: contents;
+  }
+  .admin-side-label,
+  .admin-brand span {
+    display: none;
+  }
+  .admin-side-item {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .admin-back {
+    margin-top: 0;
+  }
+  .admin-top {
+    padding: 12px 16px;
+  }
+  .admin-main {
+    padding: 16px 16px 48px;
+  }
+  .admin-split > .admin-panel {
+    width: 100vw;
+    border-left: 0;
+  }
+}

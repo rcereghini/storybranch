@@ -2,6 +2,12 @@
 
 `/admin` is where Storybranch admins manage accounts and stories. It appears in the main navigation only for accounts with the `admin` feature, and every admin route checks that flag on the server (`services/api/admin.ts`); the UI hiding it is a convenience, not the protection.
 
+## Layout
+
+Admin is its own full-window workspace (`apps/web/src/Admin.tsx`): the player app's header, footer, tab bar and Copilot aren't shown there. It is dark in both themes (`.theme-dark`), with a sidebar of sections grouped as People (Users), Content (Stories, Emails), Business (Usage & spend, Analytics) and System (Settings, Activity), and a top bar with the page title, which deployment this is (Production, Preview or Local) and the signed-in admin. Below 900px the sidebar becomes a scrolling strip.
+
+Every view has its own address, so links can be shared and the back button works: `/admin`, `/admin/usage`, `/admin/analytics`, `/admin/users`, `/admin/users/{uid}`, `/admin/stories`, `/admin/stories/{storyId}`, `/admin/emails`, `/admin/settings` and `/admin/activity`; any other `/admin/…` says there's no page there. A user or story opens in a drawer over the right side of its list (the whole screen on a phone) at its own address. Results of actions appear as notifications at the bottom right that clear themselves after six seconds, so nothing on the page moves. Accounts without the admin flag see "Admins only" inside the normal app.
+
 ## Who is an admin
 
 `admin` is one of the account feature flags on `users/{uid}.features` (see Account access in `15-shared-firebase-setup.md`). It implies every other feature. The first admins are set with the server credential:
