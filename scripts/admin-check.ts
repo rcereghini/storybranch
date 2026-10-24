@@ -83,7 +83,48 @@ try {
     .first()
     .waitFor();
 
+  // Usage & spend: one bar per day, the period switch, and a readout that
+  // answers hover in place.
+  await sections.getByRole("button", { name: "Usage & spend" }).click();
+  const bars = tab.locator(".admin-bar");
+  await tab.getByRole("heading", { name: "AI usage and spend" }).waitFor();
+  await bars.first().waitFor();
+  assert.equal(await bars.count(), 30);
+  const readout = tab.locator(".admin-readout");
+  const plot = await tab.locator(".admin-plot").boundingBox();
+  await bars.last().hover();
+  await tab
+    .getByText(/requests, \$\d+\.\d\d estimated|requests, <\$0\.01 estimated/)
+    .first()
+    .waitFor();
+  assert.match((await readout.textContent()) ?? "", /requests/);
+  assert.deepEqual(
+    await tab.locator(".admin-plot").boundingBox(),
+    plot,
+    "Hovering a day moved the chart",
+  );
+  await tab.getByRole("button", { name: "7 days" }).click();
+  await tab.waitForFunction(
+    () => document.querySelectorAll(".admin-bar").length === 7,
+  );
+  assert.equal(
+    await tab
+      .getByRole("button", { name: "7 days" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.equal(
+    await tab
+      .getByRole("button", { name: "30 days" })
+      .getAttribute("aria-pressed"),
+    "false",
+  );
+  // Buttons fade their background; let it settle before the screenshot.
+  await tab.waitForTimeout(300);
+  await tab.screenshot({ path: "test-results/admin-usage.png" });
+
   await tab.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await overflow(), false, "Horizontal overflow on Usage at 390");
   await sections.getByRole("button", { name: "Users" }).click();
   await tab.getByRole("table").waitFor();
   assert.equal(await overflow(), false, "Horizontal overflow on Admin at 390");

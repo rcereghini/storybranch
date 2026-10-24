@@ -41,7 +41,7 @@ Copilot is not available during play (`/play/`, `/story-nodes/` and legacy previ
 
 - An account needs its `copilot` feature (`pnpm features grant <email> copilot`; see Account access in `15-shared-firebase-setup.md`), and the deployment needs `ANTHROPIC_API_KEY`. Emulator accounts have the feature. The profile's `features.copilot` is true only when both hold, and the app shows the Copilot button only then.
 - 100 messages per account per day; at most 8 model turns per message; 2,000 characters per message.
-- Each paid AI call writes one JSON log line with `aiUsage` set to `copilot`, `assist` or `image`: Claude token counts (input, cache writes, cache reads, output) or the image tier, size, reference count and outcome. Prompts, replies and user IDs are never logged. Read spend per feature from Vercel's runtime logs.
+- Each paid AI call writes one JSON log line with `aiUsage` set to `copilot`, `assist` or `image`: Claude token counts (input, cache writes, cache reads, output) or the image tier, size, reference count and outcome. Prompts, replies and user IDs are never logged. The same counts are added to daily totals shown in the admin Usage & spend tab (see AI usage records in `20-admin.md`).
 - Model `claude-opus-5-5` at low effort, which suits chat and keeps replies quick. Server-side refusal fallback (`fallbacks: "default"`) is on, so a declined request is retried on Anthropic's recommended fallback model.
 
 ## Image and video generation

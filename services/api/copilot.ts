@@ -17,7 +17,7 @@ import type { Save } from "../../packages/contracts/index";
 import { db, config } from "./firebase";
 import type { Features } from "../../packages/contracts/profile";
 import * as paths from "./paths";
-import { logClaudeUsage } from "./ai-usage";
+import { recordClaudeUsage } from "./ai-usage";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type Message = Anthropic.Beta.Messages.BetaMessage;
@@ -50,9 +50,7 @@ const claude: CopilotModel = async (request, onText) => {
     ...request,
   });
   stream.on("text", onText);
-  const message = await stream.finalMessage();
-  logClaudeUsage("copilot", message);
-  return message;
+  return stream.finalMessage();
 };
 let model: CopilotModel = claude;
 export const setCopilotModel = (fake: CopilotModel | null) => {
@@ -432,6 +430,7 @@ export async function copilot(
               send({ type: "text", text });
             },
           );
+          await recordClaudeUsage(uid, "copilot", message);
           messages.push({ role: "assistant", content: message.content });
           if (message.stop_reason === "pause_turn") continue;
           const calls = message.content.filter(
