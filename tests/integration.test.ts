@@ -16,7 +16,8 @@ import {
 } from "@firebase/rules-unit-testing";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getBytes, ref, uploadBytes } from "firebase/storage";
-import { bucket, db } from "../services/api/firebase";
+import { auth, bucket, db } from "../services/api/firebase";
+import { setEmailSender, type EmailMessage } from "../services/api/email";
 import { handle } from "../services/api/handler";
 import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
 import { setAssistModel, type AssistModel } from "../services/api/assist";
@@ -1836,6 +1837,163 @@ it("gates publishing, uploads and StoryNode sharing on the account's publish fla
   }
 });
 
+it("sends password resets without revealing accounts, and limits requests", async () => {
+  const sent: EmailMessage[] = [];
+  setEmailSender(async (message) => {
+    sent.push(message);
+  });
+  const reset = async (email: string, ip = randomUUID()) => {
+    const r = await handle(
+      new Request("http://localhost/api/account/password-reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": ip,
+        },
+        body: JSON.stringify({ email }),
+      }),
+    );
+    return { status: r.status, data: await r.json() };
+  };
+  try {
+    expect(await reset("Progressed@Storybranch.test")).toEqual({
+      status: 200,
+      data: { ok: true },
+    });
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe("progressed@storybranch.test");
+    expect(sent[0].subject).toBe("Reset your Storybranch password");
+    expect(sent[0].text).toMatch(
+      /http:\/\/localhost:5173\/account\/action\?mode=resetPassword&oobCode=\S+/,
+    );
+    const logged = await db
+      .collection("emailLog")
+      .where("to", "==", "progressed@storybranch.test")
+      .get();
+    expect(logged.docs.map((d) => d.data())).toContainEqual(
+      expect.objectContaining({
+        template: "password-reset",
+        version: 0,
+        status: "sent",
+        detail: null,
+      }),
+    );
+    // The log never stores the one-time link.
+    expect(JSON.stringify(logged.docs.map((d) => d.data()))).not.toContain(
+      "oobCode",
+    );
+
+    // An unknown address gets the same reply and no email.
+    expect(await reset(`nobody-${randomUUID()}@storybranch.test`)).toEqual({
+      status: 200,
+      data: { ok: true },
+    });
+    expect(sent).toHaveLength(1);
+    expect((await reset("not an email")).status).toBe(400);
+
+    // Three per address per hour, and ten per IP.
+    const flooded = `flood-${randomUUID()}@storybranch.test`;
+    for (let i = 0; i < 3; i++) expect((await reset(flooded)).status).toBe(200);
+    expect((await reset(flooded)).data.error.message).toMatch(/Too many/);
+    const ip = randomUUID();
+    for (let i = 0; i < 10; i++)
+      expect((await reset(`ip-${i}-${randomUUID()}@x.test`, ip)).status).toBe(
+        200,
+      );
+    expect((await reset(`ip-last-${randomUUID()}@x.test`, ip)).status).toBe(
+      400,
+    );
+
+    // Locally, with no sender installed, emails are logged but not sent.
+    setEmailSender(null);
+    await reset("progressed@storybranch.test");
+    expect(
+      (
+        await db
+          .collection("emailLog")
+          .where("to", "==", "progressed@storybranch.test")
+          .where("status", "==", "skipped")
+          .get()
+      ).size,
+    ).toBeGreaterThan(0);
+  } finally {
+    setEmailSender(null);
+  }
+});
+it("confirms new password accounts and welcomes new Google accounts once", async () => {
+  const sent: EmailMessage[] = [];
+  setEmailSender(async (message) => {
+    sent.push(message);
+  });
+  const firstRequest = async (email: string, password: string) => {
+    const r = await fetch(
+      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=local-demo-key",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, returnSecureToken: true }),
+      },
+    );
+    const token = (await r.json()).idToken;
+    return handle(
+      new Request("http://localhost/api/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    );
+  };
+  try {
+    const email = `new-${randomUUID()}@storybranch.test`;
+    await auth.createUser({
+      email,
+      password: "HarborDemo123!",
+      displayName: "Robin",
+    });
+    expect((await firstRequest(email, "HarborDemo123!")).status).toBe(200);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      to: email,
+      subject: "Confirm your email for Storybranch",
+    });
+    expect(sent[0].html).toContain("Welcome to Storybranch, Robin");
+    expect(sent[0].text).toMatch(
+      /\/account\/action\?mode=verifyEmail&oobCode=/,
+    );
+    // Later requests don't send it again.
+    await firstRequest(email, "HarborDemo123!");
+    expect(sent).toHaveLength(1);
+
+    // An account without a password provider (as with Google) is welcomed.
+    const google = await auth.createUser({
+      email: `google-${randomUUID()}@storybranch.test`,
+      emailVerified: true,
+    });
+    const custom = await auth.createCustomToken(google.uid);
+    const exchanged = await fetch(
+      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=local-demo-key",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: custom, returnSecureToken: true }),
+      },
+    );
+    const token = (await exchanged.json()).idToken;
+    await handle(
+      new Request("http://localhost/api/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    );
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toMatchObject({
+      to: google.email,
+      subject: "Welcome to Storybranch",
+    });
+    expect(sent[1].text).toContain(
+      "Find a story: http://localhost:5173/discover",
+    );
+  } finally {
+    setEmailSender(null);
+  }
+});
 it("records AI usage per day and per user and reports it only to admins", async () => {
   const uid = `usage-${randomUUID()}`;
   const report = async () =>

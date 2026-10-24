@@ -17,6 +17,7 @@ import {
   transition,
 } from "../../packages/domain/index";
 import { ensurePlayerProfile } from "./player-profile";
+import { passwordReset, sendAccountEmail } from "./email";
 import {
   accountFeatures,
   memberFeatures,
@@ -157,6 +158,8 @@ async function handleCanonical(request: Request): Promise<Response> {
       segments.length === 4
     )
       return json(await sharedStoryNode(segments[2], segments[3]));
+    if (request.method === "POST" && path === "/api/account/password-reset")
+      return json(await passwordReset(request));
     const token = request.headers
       .get("authorization")
       ?.match(/^Bearer (.+)$/)?.[1];
@@ -178,11 +181,14 @@ async function handleCanonical(request: Request): Promise<Response> {
       );
     }
     const profileRef = db.doc(paths.user(uid));
-    await ensurePlayerProfile(
-      db,
-      uid,
-      config.mode === "emulator" ? memberFeatures : undefined,
-    );
+    if (
+      await ensurePlayerProfile(
+        db,
+        uid,
+        config.mode === "emulator" ? memberFeatures : undefined,
+      )
+    )
+      await sendAccountEmail(uid);
     const profile = await profileRef.get();
     if (!profile.exists || profile.data()!.status !== "active")
       throw new GameError(

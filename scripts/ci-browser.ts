@@ -22,6 +22,7 @@ try {
   await import("./browser-check");
   await import("./copilot-check");
   await import("./admin-check");
+  await import("./email-check");
 } finally {
   server.kill();
 }

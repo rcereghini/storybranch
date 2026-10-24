@@ -6,6 +6,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { auth, emulatorMode } from "./firebase";
+import { ApiError, createApi } from "../../../packages/api-client/index";
 
 function authMessage(error: unknown): string {
   const code =
@@ -58,6 +59,89 @@ export function AuthForm({
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Forgot-password view: same dialog, one email field.
+  const [reset, setReset] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  async function requestReset() {
+    if (busy || offline) return;
+    setError("");
+    setBusy(true);
+    try {
+      await createApi(fetch, async () => null)("/account/password-reset", {
+        email: email.trim(),
+      });
+      setResetSent(true);
+    } catch (error) {
+      setError(
+        error instanceof ApiError
+          ? error.message
+          : "Could not send the email. Please try again shortly.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (reset)
+    return (
+      <>
+        <p className="eyebrow">FORGOT YOUR PASSWORD?</p>
+        <h2 id="signin-title">Reset your password.</h2>
+        <p>
+          Enter the email you signed up with and we'll send you a link to choose
+          a new password.
+        </p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void requestReset();
+          }}
+          aria-busy={busy}
+        >
+          <label>
+            Email
+            <input
+              autoFocus
+              type="email"
+              autoComplete="username"
+              value={email}
+              disabled={busy}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setResetSent(false);
+              }}
+              required
+            />
+          </label>
+          <button className="primary" disabled={busy || offline}>
+            {busy ? "Sending…" : "Send reset link ↗"}
+          </button>
+        </form>
+        {resetSent && (
+          <p role="status">
+            If there's a Storybranch account for that email, a reset link is on
+            its way. Check your inbox and spam folder; the link expires in 1
+            hour.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="error-text">
+            {error}
+          </p>
+        )}
+        <p>
+          <button
+            disabled={busy}
+            onClick={() => {
+              setReset(false);
+              setResetSent(false);
+              setError("");
+            }}
+          >
+            Back to sign in
+          </button>
+        </p>
+      </>
+    );
   async function authenticate(google = false) {
     if (busy || offline) return;
     setError("");
@@ -153,6 +237,20 @@ export function AuthForm({
           {busy ? "Connecting…" : signup ? "Create account ↗" : "Sign in ↗"}
         </button>
       </form>
+      {!signup && (
+        <p>
+          <button
+            disabled={busy}
+            onClick={() => {
+              setReset(true);
+              setError("");
+              setPassword("");
+            }}
+          >
+            Forgot password?
+          </button>
+        </p>
+      )}
       {offline && (
         <p role="status">
           Connect to the internet to sign in or create an account.

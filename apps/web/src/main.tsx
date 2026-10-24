@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
 import { analyticsUrl } from "./analytics";
+import { AccountAction } from "./AccountAction";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth, emulatorMode } from "./firebase";
 import { AuthForm } from "./AuthForm";
@@ -488,6 +489,8 @@ function App() {
         </div>
         {path.startsWith("/story-nodes/") ? (
           <SharedStoryNode key={path} path={path} />
+        ) : path === "/account/action" ? (
+          <AccountAction navigate={navigate} onSignIn={() => setLogin(true)} />
         ) : path === "/assets" || path.startsWith("/assets/") ? (
           user ? (
             <AssetLibrary

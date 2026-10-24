@@ -895,3 +895,28 @@ input[type="file"]::file-selector-button {
   font: 16px/1.5 var(--font-ui);
   color: var(--text);
 }
+
+/* Where email links land: the sign-in card, in the page. */
+.account-action {
+  display: grid;
+  place-items: start center;
+  padding: 48px 16px;
+}
+.account-action h1 {
+  margin: 4px 0 8px;
+  font: 700 30px/1.2 var(--font-display);
+}
+.account-action .modal > p,
+.account-action .modal small {
+  color: var(--muted);
+  font-size: 14px;
+}
+.account-action-placeholder {
+  min-height: 240px;
+}
+.account-action-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
