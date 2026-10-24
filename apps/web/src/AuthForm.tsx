@@ -27,6 +27,8 @@ function authMessage(error: unknown): string {
       return "Choose a stronger password with at least 8 characters, including uppercase, lowercase, a number and a symbol.";
     case "auth/account-exists-with-different-credential":
       return "Sign in using the original method for this email address.";
+    case "auth/user-disabled":
+      return "This account has been disabled. If you think this is a mistake, reply to any Storybranch email to reach us.";
     case "auth/network-request-failed":
       return "Could not connect. Check your connection and try again.";
     case "auth/too-many-requests":

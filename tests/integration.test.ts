@@ -2603,16 +2603,32 @@ it("lets only admins manage accounts and stories, with guards, retries and an au
       (await call("/admin/users/player", { idempotencyKey: key() })).status,
     ).toBe(400);
 
-    // A disabled account is refused on its next request; enabling restores it.
+    // A disabled account's session is revoked at once and it can't sign in;
+    // enabling lets it sign in again.
     await call("/admin/users/progressed", {
       idempotencyKey: key(),
       status: "disabled",
     });
-    expect((await call("/profile", undefined, "progressed")).status).toBe(403);
+    expect((await call("/profile", undefined, "progressed")).status).toBe(401);
+    const signIn = () =>
+      fetch(
+        "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=local-demo-key",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "progressed@storybranch.test",
+            password: "HarborDemo123!",
+            returnSecureToken: true,
+          }),
+        },
+      ).then((r) => r.json());
+    expect((await signIn()).error?.message).toMatch(/USER_DISABLED/);
     await call("/admin/users/progressed", {
       idempotencyKey: key(),
       status: "active",
     });
+    tokens.progressed = (await signIn()).idToken;
     expect((await call("/profile", undefined, "progressed")).status).toBe(200);
 
     // Hiding a story: gone from Discover and closed to new players, while an
