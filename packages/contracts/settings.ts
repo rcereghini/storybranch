@@ -98,3 +98,31 @@ export function settingsChanges(before: AppSettings, after: AppSettings) {
       after: now.get(path) ?? null,
     }));
 }
+
+// A person's own daily limits, set by an admin on their profile; null (or
+// missing) means the default in Settings.
+export const accountLimitsSchema = z
+  .object({
+    aiRequestsPerDay: z.number().int().min(0).max(10000).nullable(),
+    imagesPerDay: z.number().int().min(0).max(10000).nullable(),
+  })
+  .strict();
+export type AccountLimits = z.infer<typeof accountLimitsSchema>;
+export const noAccountLimits: AccountLimits = {
+  aiRequestsPerDay: null,
+  imagesPerDay: null,
+};
+export const storedAccountLimits = (data: { limits?: unknown } | undefined) => {
+  const parsed = accountLimitsSchema.safeParse(data?.limits);
+  return parsed.success ? parsed.data : noAccountLimits;
+};
+export const effectiveLimits = (
+  data: { limits?: unknown } | undefined,
+  settings: AppSettings,
+): AppSettings["limits"] => {
+  const own = storedAccountLimits(data);
+  return {
+    aiRequestsPerDay: own.aiRequestsPerDay ?? settings.limits.aiRequestsPerDay,
+    imagesPerDay: own.imagesPerDay ?? settings.limits.imagesPerDay,
+  };
+};

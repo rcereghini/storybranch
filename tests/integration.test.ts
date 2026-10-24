@@ -21,6 +21,11 @@ import { setEmailSender, type EmailMessage } from "../services/api/email";
 import { setEmailModel } from "../services/api/email-ai";
 import { clearSettingsCache } from "../services/api/settings";
 import type { AdminSettings } from "../packages/contracts/settings";
+import type {
+  AdminUserDetail,
+  AdminUsersPage,
+} from "../packages/contracts/admin";
+import { aiQuota } from "../services/api/paths";
 import { emailTemplates, type AdminEmails } from "../packages/contracts/email";
 import { handle } from "../services/api/handler";
 import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
@@ -1841,6 +1846,123 @@ it("gates publishing, uploads and StoryNode sharing on the account's publish fla
   }
 });
 
+it("searches users, shows one account, and applies its own limits and disabling", async () => {
+  const anthropic = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  const page = async (query: string) =>
+    (await call(`/admin/users?${query}`)).data as AdminUsersPage;
+  const detail = async (uid: string) =>
+    (await call(`/admin/users/${uid}`)).data as AdminUserDetail;
+  const update = (body: object) =>
+    call("/admin/users/progressed", { idempotencyKey: randomUUID(), ...body });
+  try {
+    expect(
+      (await call("/admin/users/player", undefined, "progressed")).status,
+    ).toBe(403);
+    // Search, filters and paging happen on the server.
+    const found = await page("q=PROGRESSED%40storybranch");
+    expect(found.items.map((u) => u.uid)).toEqual(["progressed"]);
+    expect(found).toMatchObject({ total: 1, nextCursor: null });
+    expect((await page("feature=admin")).items.map((u) => u.uid)).toContain(
+      "player",
+    );
+    expect((await page("feature=admin")).items.map((u) => u.uid)).not.toContain(
+      "progressed",
+    );
+    const all = await page("");
+    expect(all.items.length).toBeLessThanOrEqual(50);
+    expect(all.total).toBe(all.scanned);
+    expect((await call("/admin/users?status=unknown")).status).toBe(400);
+    expect((await call("/admin/users/nobody-here")).status).toBe(404);
+
+    const before = await detail("progressed");
+    expect(before.user).toMatchObject({
+      uid: "progressed",
+      email: "progressed@storybranch.test",
+      providers: ["password"],
+      signInBlocked: false,
+    });
+    expect(before.limits).toMatchObject({
+      own: { aiRequestsPerDay: null, imagesPerDay: null },
+      effective: { aiRequestsPerDay: 100, imagesPerDay: 100 },
+      defaults: { aiRequestsPerDay: 100, imagesPerDay: 100 },
+    });
+
+    // An own limit of 0 stops their AI requests; others keep the default.
+    expect(
+      (await update({ limits: { aiRequestsPerDay: -1, imagesPerDay: null } }))
+        .status,
+    ).toBe(400);
+    const limited = await update({
+      limits: { aiRequestsPerDay: 0, imagesPerDay: null },
+    });
+    expect(limited.data.limits).toEqual({
+      aiRequestsPerDay: 0,
+      imagesPerDay: null,
+    });
+    const chat = await call(
+      `/copilot/threads/t-${randomUUID()}`,
+      { idempotencyKey: randomUUID(), text: "Hi", context: { path: "/" } },
+      "progressed",
+    );
+    expect(chat.data.error.message).toBe(
+      "Daily Copilot limit reached (0 messages). Try again tomorrow.",
+    );
+    expect((await detail("progressed")).limits.effective.aiRequestsPerDay).toBe(
+      0,
+    );
+
+    // Resetting today clears their count.
+    await db.doc(aiQuota("progressed")).set({ count: 7 });
+    expect((await detail("progressed")).limits.usedToday.ai).toBe(7);
+    await update({ resetToday: ["ai"] });
+    expect((await detail("progressed")).limits.usedToday.ai).toBe(0);
+    expect((await update({})).status).toBe(400);
+
+    // Disabling signs them out and blocks sign-in; enabling restores it.
+    const signedInBefore = (await auth.getUser("progressed"))
+      .tokensValidAfterTime;
+    await new Promise((r) => setTimeout(r, 1100));
+    await update({ status: "disabled" });
+    const blocked = await auth.getUser("progressed");
+    expect(blocked.disabled).toBe(true);
+    expect(blocked.tokensValidAfterTime).not.toBe(signedInBefore);
+    expect((await detail("progressed")).user.signInBlocked).toBe(true);
+    expect((await page("status=disabled")).items.map((u) => u.uid)).toEqual([
+      "progressed",
+    ]);
+    await update({ status: "active" });
+    expect((await auth.getUser("progressed")).disabled).toBe(false);
+
+    // The account's own history lists these changes.
+    const history = (await detail("progressed")).audit.map((e) => e.change);
+    expect(history).toContainEqual(
+      expect.objectContaining({ resetToday: ["ai"] }),
+    );
+    expect(history).toContainEqual(
+      expect.objectContaining({ status: "disabled" }),
+    );
+  } finally {
+    await update({ limits: { aiRequestsPerDay: null, imagesPerDay: null } });
+    await db.doc(aiQuota("progressed")).delete();
+    if (anthropic === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = anthropic;
+    // Disabling revoked their sessions, so later tests need a fresh sign-in.
+    const r = await fetch(
+      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=local-demo-key",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "progressed@storybranch.test",
+          password: "HarborDemo123!",
+          returnSecureToken: true,
+        }),
+      },
+    );
+    tokens.progressed = (await r.json()).idToken;
+  }
+});
 it("applies admin settings to AI switches, daily limits and price estimates", async () => {
   const keys = {
     openai: process.env.OPENAI_API_KEY,
@@ -2425,7 +2547,8 @@ it("lets only admins manage accounts and stories, with guards, retries and an au
     expect(overview.status).toBe(200);
     expect(overview.data.users).toBeGreaterThanOrEqual(2);
     expect(overview.data.publishedStories).toBeGreaterThanOrEqual(1);
-    const users = (await call("/admin/users")).data.items as Array<{
+    const users = (await call("/admin/users?q=progressed%40")).data
+      .items as Array<{
       uid: string;
       email: string;
     }>;
@@ -2480,16 +2603,32 @@ it("lets only admins manage accounts and stories, with guards, retries and an au
       (await call("/admin/users/player", { idempotencyKey: key() })).status,
     ).toBe(400);
 
-    // A disabled account is refused on its next request; enabling restores it.
+    // A disabled account's session is revoked at once and it can't sign in;
+    // enabling lets it sign in again.
     await call("/admin/users/progressed", {
       idempotencyKey: key(),
       status: "disabled",
     });
-    expect((await call("/profile", undefined, "progressed")).status).toBe(403);
+    expect((await call("/profile", undefined, "progressed")).status).toBe(401);
+    const signIn = () =>
+      fetch(
+        "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=local-demo-key",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "progressed@storybranch.test",
+            password: "HarborDemo123!",
+            returnSecureToken: true,
+          }),
+        },
+      ).then((r) => r.json());
+    expect((await signIn()).error?.message).toMatch(/USER_DISABLED/);
     await call("/admin/users/progressed", {
       idempotencyKey: key(),
       status: "active",
     });
+    tokens.progressed = (await signIn()).idToken;
     expect((await call("/profile", undefined, "progressed")).status).toBe(200);
 
     // Hiding a story: gone from Discover and closed to new players, while an

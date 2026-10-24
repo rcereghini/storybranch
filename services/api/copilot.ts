@@ -317,6 +317,7 @@ export async function copilot(
   uid: string,
   segments: string[],
   features: Features,
+  limits: AppSettings["limits"],
 ): Promise<Response> {
   const settings = await appSettings();
   const reason = access(features, settings);
@@ -349,8 +350,7 @@ export async function copilot(
   const command = copilotCommandSchema.parse(body);
   const fingerprint = digest(JSON.stringify({ threadId, command }));
   const receipt = db.doc(paths.receipt(uid, "copilot", command.idempotencyKey));
-  const day = Math.floor(Date.now() / 86400000);
-  const quota = db.doc(`copilotQuotas/${digest(uid)}-${day}`);
+  const quota = db.doc(paths.aiQuota(uid));
 
   // Reserve the message: one receipt per key, the daily quota and the turn cap.
   const started = await db.runTransaction(async (tx) => {
@@ -379,10 +379,10 @@ export async function copilot(
         "VALIDATION_FAILED",
         "This conversation is full. Start a new one.",
       );
-    if ((used.data()?.count ?? 0) >= settings.limits.aiRequestsPerDay)
+    if ((used.data()?.count ?? 0) >= limits.aiRequestsPerDay)
       throw new GameError(
         "VALIDATION_FAILED",
-        `Daily Copilot limit reached (${settings.limits.aiRequestsPerDay} messages). Try again tomorrow.`,
+        `Daily Copilot limit reached (${limits.aiRequestsPerDay} messages). Try again tomorrow.`,
       );
     tx.set(receipt, {
       actor: uid,

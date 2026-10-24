@@ -36,6 +36,9 @@ try {
   // Users: turn a member's Copilot off and back on.
   const sections = tab.getByRole("navigation", { name: "Admin sections" });
   await sections.getByRole("button", { name: "Users" }).click();
+  // Search runs on the server; both seeded accounts match.
+  await tab.getByLabel("Search users").fill("storybranch.test");
+  await tab.getByText(/^\d+ accounts?$/).waitFor();
   const row = tab.getByRole("row", { name: /progressed@storybranch\.test/ });
   const copilot = row.getByRole("checkbox", { name: "Copilot" });
   await copilot.waitFor();
@@ -63,6 +66,32 @@ try {
     true,
   );
   assert.equal(await self.getByRole("button", { name: "Disable" }).count(), 0);
+
+  // A member's detail page: give them their own AI limit, then remove it.
+  await tab.getByLabel("Status").selectOption("disabled");
+  await tab.getByText("No accounts match.").waitFor();
+  await tab.getByLabel("Status").selectOption("all");
+  await row.getByRole("button", { name: "Progressed", exact: false }).click();
+  await tab.getByRole("heading", { name: "Daily limits" }).waitFor();
+  await tab.getByText("Email and password").waitFor();
+  const aiLimit = tab.getByLabel("AI requests per day");
+  await aiLimit.fill("5");
+  await tab.getByRole("button", { name: "Save limits" }).click();
+  await tab.getByText("Limits saved.").waitFor();
+  await tab.getByText(/Used today: \d+ of 5 \(own limit\)/).waitFor();
+  await tab
+    .getByText(/set daily limits to 5 AI requests/)
+    .first()
+    .waitFor();
+  await tab.screenshot({ path: "test-results/admin-user.png", fullPage: true });
+  await aiLimit.fill("");
+  await tab.getByRole("button", { name: "Save limits" }).click();
+  await tab.getByText(/Used today: \d+ of 100 \(default\)/).waitFor();
+  await tab.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await overflow(), false, "Horizontal overflow on a user at 390");
+  await tab.setViewportSize({ width: 1024, height: 900 });
+  await tab.getByRole("button", { name: "← All users" }).click();
+  await row.waitFor();
 
   // Stories: hide and show a story.
   await sections.getByRole("button", { name: "Stories" }).click();
