@@ -100,8 +100,29 @@ try {
   await story.getByText("Hidden", { exact: true }).waitFor();
   await story.getByRole("button", { name: "Show in Discover" }).click();
   await story.getByText("Listed", { exact: true }).waitFor();
+  // A story's page: play, editions and its own admin history.
+  await story.getByRole("button", { name: "The Glass Harbor" }).click();
+  await tab.getByRole("heading", { name: "Editions" }).waitFor();
+  await tab.getByText(/· current/).waitFor();
+  await tab
+    .getByText("showed story glass-harbor in Discover", { exact: false })
+    .first()
+    .waitFor();
+  await tab.screenshot({
+    path: "test-results/admin-story.png",
+    fullPage: true,
+  });
+  await tab.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await overflow(),
+    false,
+    "Horizontal overflow on a story at 390",
+  );
+  await tab.setViewportSize({ width: 1024, height: 900 });
+  await tab.getByRole("button", { name: "← All stories" }).click();
+  await story.waitFor();
 
-  // Activity lists those changes, newest first.
+  // Activity lists those changes, newest first, and filters by type.
   await sections.getByRole("button", { name: "Activity" }).click();
   await tab
     .getByText("showed story glass-harbor in Discover", { exact: false })
@@ -111,6 +132,16 @@ try {
     .getByText("turned on Copilot for progressed", { exact: false })
     .first()
     .waitFor();
+  await tab.getByLabel("Type").selectOption("story");
+  await tab.waitForFunction(
+    () =>
+      !document.body.textContent?.includes("turned on Copilot for progressed"),
+  );
+  await tab
+    .getByText("showed story glass-harbor in Discover", { exact: false })
+    .first()
+    .waitFor();
+  await tab.getByLabel("Type").selectOption("");
 
   // Usage & spend: one bar per day, the period switch, and a readout that
   // answers hover in place.

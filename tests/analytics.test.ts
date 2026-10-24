@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyticsUrl } from "../apps/web/src/analytics";
-import { siteAnalytics } from "../packages/domain/analytics";
+import { siteAnalytics, storyStats } from "../packages/domain/analytics";
 
 describe("Web Analytics URLs", () => {
   it("hides private IDs and drops query strings and hashes", () => {
@@ -111,5 +111,57 @@ describe("Site analytics", () => {
         lastPlayedAt: null,
       },
     ]);
+  });
+});
+
+describe("Story stats", () => {
+  it("counts a story's players once, per edition too", () => {
+    const now = Date.UTC(2026, 9, 24);
+    const day = 86400000;
+    const stats = storyStats(
+      [
+        {
+          playerUid: "ana",
+          storyId: "s",
+          versionId: "edition-1",
+          status: "completed",
+          updatedAt: now - 40 * day,
+        },
+        {
+          playerUid: "ana",
+          storyId: "s",
+          versionId: "edition-2",
+          status: "active",
+          updatedAt: now - day,
+        },
+        {
+          playerUid: "ben",
+          storyId: "s",
+          versionId: "edition-2",
+          status: "active",
+          updatedAt: now - 2 * day,
+        },
+        {
+          playerUid: "cy",
+          storyId: "other",
+          versionId: "edition-1",
+          status: "completed",
+          updatedAt: now,
+        },
+      ],
+      "s",
+      now,
+    );
+    expect(stats).toEqual({
+      players: 2,
+      finishers: 1,
+      completionRate: 0.5,
+      recentPlayers: 2,
+      lastPlayedAt: now - day,
+      byEdition: {
+        "edition-1": { players: 1, finishers: 1 },
+        "edition-2": { players: 2, finishers: 0 },
+      },
+    });
   });
 });

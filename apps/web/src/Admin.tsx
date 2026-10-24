@@ -3,7 +3,6 @@ import type { createApi } from "../../../packages/api-client/index";
 import type {
   AdminAuditEntry,
   AdminOverview,
-  AdminStory,
 } from "../../../packages/contracts/admin";
 import type { FeatureId, Features } from "../../../packages/contracts/profile";
 import type { AccountLimits } from "../../../packages/contracts/settings";
@@ -12,6 +11,8 @@ import { AdminUsage, usd } from "./AdminUsage";
 import { AdminAnalytics } from "./AdminAnalytics";
 import { AdminEmails } from "./AdminEmails";
 import { AdminSettings, settingLabel, settingValue } from "./AdminSettings";
+import { AdminStories } from "./AdminStories";
+import { AdminActivity } from "./AdminActivity";
 import { emailTemplates, type EmailTemplateId } from "../../../packages/contracts/email";
 import "./admin.css";
 
@@ -97,51 +98,14 @@ export function Admin({
 }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [overview, setOverview] = useState<AdminOverview | null>(null);
-  const [stories, setStories] = useState<AdminStory[] | null>(null);
-  const [audit, setAudit] = useState<AdminAuditEntry[] | null>(null);
   const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
 
-  const load = async (which: Tab) => {
-    try {
-      if (which === "overview")
-        setOverview(await api<AdminOverview>("/admin/overview"));
-      if (which === "stories")
-        setStories((await api<{ items: AdminStory[] }>("/admin/stories")).items);
-      if (which === "activity")
-        setAudit((await api<{ items: AdminAuditEntry[] }>("/admin/audit")).items);
-    } catch (error) {
-      setNotice((error as Error).message);
-    }
-  };
   useEffect(() => {
-    void load(tab);
+    if (tab === "overview")
+      api<AdminOverview>("/admin/overview")
+        .then(setOverview)
+        .catch((error) => setNotice((error as Error).message));
   }, [tab]);
-
-  const change = async (key: string, run: () => Promise<void>) => {
-    setBusy(key);
-    setNotice("");
-    try {
-      await run();
-      setAudit(null);
-    } catch (error) {
-      setNotice((error as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
-  const setHidden = (story: AdminStory, hidden: boolean) =>
-    change(`story-${story.id}`, async () => {
-      await api(`/admin/stories/${story.id}`, {
-        idempotencyKey: crypto.randomUUID(),
-        hidden,
-      });
-      setStories((current) =>
-        current?.map((s) => (s.id === story.id ? { ...s, hidden } : s)) ?? null,
-      );
-      setOverview(null);
-    });
-
 
   return (
     <div className="hub admin">
@@ -206,68 +170,19 @@ export function Admin({
           api={api}
           uid={uid}
           onNotice={setNotice}
-          onChanged={() => {
-            setOverview(null);
-            setAudit(null);
-          }}
+          onChanged={() => setOverview(null)}
           describe={describe}
         />
       )}
 
       {tab === "stories" && (
-        <section className="panel">
-          <h2 className="panel-title">Published stories</h2>
-          {stories ? (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Story</th>
-                    <th>Creator</th>
-                    <th>Edition</th>
-                    <th>Discover</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {stories.map((story) => (
-                    <tr key={story.id}>
-                      <td>
-                        <button className="admin-link" onClick={() => navigate(`/s/${story.id}`)}>
-                          {story.title}
-                        </button>
-                        <code className="admin-sub">{story.id}</code>
-                      </td>
-                      <td>{story.creatorEmail ?? (story.creatorUid ? story.creatorUid : "Storybranch")}</td>
-                      <td>
-                        <code>{story.publishedVersionId ?? "—"}</code>
-                      </td>
-                      <td>
-                        <span className={`admin-badge ${story.hidden ? "admin-disabled" : "admin-active"}`}>
-                          {story.hidden ? "Hidden" : "Listed"}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="admin-action"
-                          disabled={busy === `story-${story.id}`}
-                          onClick={() => void setHidden(story, !story.hidden)}
-                        >
-                          {story.hidden ? "Show in Discover" : "Hide from Discover"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="admin-empty">
-                Hiding removes a story from Discover and stops new playthroughs; players who already started keep their saves.
-              </p>
-            </div>
-          ) : (
-            <div className="admin-placeholder" aria-hidden="true" />
-          )}
-        </section>
+        <AdminStories
+          api={api}
+          navigate={navigate}
+          onNotice={setNotice}
+          onChanged={() => setOverview(null)}
+          describe={describe}
+        />
       )}
 
       {tab === "emails" && <AdminEmails api={api} onNotice={setNotice} />}
@@ -275,27 +190,7 @@ export function Admin({
       {tab === "settings" && <AdminSettings api={api} onNotice={setNotice} />}
 
       {tab === "activity" && (
-        <section className="panel">
-          <h2 className="panel-title">Recent admin activity</h2>
-          {audit ? (
-            audit.length ? (
-              <ul className="admin-audit">
-                {audit.map((entry) => (
-                  <li key={entry.id}>
-                    <span>
-                      <strong>{entry.actorEmail ?? entry.actorUid}</strong> {describe(entry)}
-                    </span>
-                    <time>{new Date(entry.at).toLocaleString()}</time>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="admin-empty">No admin changes yet.</p>
-            )
-          ) : (
-            <div className="admin-placeholder" aria-hidden="true" />
-          )}
-        </section>
+        <AdminActivity api={api} onNotice={setNotice} describe={describe} />
       )}
     </div>
   );
