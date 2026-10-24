@@ -152,6 +152,40 @@ try {
   await tab.waitForTimeout(300);
   await tab.screenshot({ path: "test-results/admin-usage.png" });
 
+  // Analytics: totals, sign-ups per day, the story table and Vercel's link.
+  await sections.getByRole("button", { name: "Analytics" }).click();
+  await tab.getByRole("heading", { name: "Players and stories" }).waitFor();
+  await tab.getByText("Active this week").waitFor();
+  await tab.waitForFunction(
+    () => document.querySelectorAll(".admin-bar").length === 30,
+  );
+  await tab
+    .getByRole("row", { name: /The Glass Harbor/ })
+    .first()
+    .waitFor();
+  assert.equal(
+    await tab
+      .getByRole("link", { name: "Open Vercel Analytics ↗" })
+      .getAttribute("href"),
+    "https://vercel.com/opin-projects/storybranch/analytics",
+  );
+  await tab.getByRole("button", { name: "90 days" }).click();
+  await tab.waitForFunction(
+    () => document.querySelectorAll(".admin-bar").length === 90,
+  );
+  await tab.waitForTimeout(300);
+  await tab.screenshot({
+    path: "test-results/admin-analytics.png",
+    fullPage: true,
+  });
+  await tab.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await overflow(),
+    false,
+    "Horizontal overflow on Analytics at 390",
+  );
+  await tab.setViewportSize({ width: 1024, height: 900 });
+
   // Emails: edit with a live preview, save a draft, publish, see history.
   await sections.getByRole("button", { name: "Emails" }).click();
   await tab.getByRole("tab", { name: /Password reset/ }).click();

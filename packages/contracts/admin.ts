@@ -58,6 +58,8 @@ export type AdminUser = {
   features: Features;
   createdAt: string | null;
   lastSignIn: string | null;
+  // When a signed-in session last refreshed: when they last used the app.
+  lastActive: string | null;
 };
 export const adminUserStatuses = [
   "all",
