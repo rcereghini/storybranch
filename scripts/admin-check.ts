@@ -127,7 +127,7 @@ try {
   await sections.getByRole("button", { name: "Emails" }).click();
   await tab.getByRole("tab", { name: /Password reset/ }).click();
   const editor = tab.getByRole("region", { name: "Edit Password reset" });
-  const subject = editor.getByLabel("Subject");
+  const subject = editor.getByLabel("Subject", { exact: true });
   await subject.fill("Pick a new Storybranch password");
   const frame = tab.getByTitle("Password reset preview");
   await tab.waitForFunction(() =>
@@ -137,13 +137,15 @@ try {
       ?.includes("Pick a new Storybranch password"),
   );
   // A placeholder we don't support is caught before saving.
-  await editor.getByLabel("Heading").fill("Hi {{email}}");
+  await editor.getByLabel("Heading", { exact: true }).fill("Hi {{email}}");
   await editor.getByText(/Heading: Only these placeholders/).waitFor();
   assert.equal(
     await editor.getByRole("button", { name: "Save draft" }).isDisabled(),
     true,
   );
-  await editor.getByLabel("Heading").fill("Reset your password, {{name}}");
+  await editor
+    .getByLabel("Heading", { exact: true })
+    .fill("Reset your password, {{name}}");
   await editor.getByRole("button", { name: "Save draft" }).click();
   await tab.getByText("Draft saved.", { exact: false }).waitFor();
   await tab
