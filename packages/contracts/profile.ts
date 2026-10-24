@@ -142,8 +142,10 @@ export type PlayerProfile = {
   stats: Stats;
   achievements: string[];
   // What this account can use right now: its flags, limited to services
-  // this deployment has configured.
+  // this deployment has configured and AI an admin hasn't switched off.
   features: Features;
+  // Studio writing help: the copilot flag, with its own admin switch.
+  writingHelp: boolean;
 };
 export const profileDefaults = {
   avatarId: defaultAvatarId,

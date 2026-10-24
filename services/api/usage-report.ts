@@ -1,6 +1,5 @@
 import { FieldPath } from "firebase-admin/firestore";
 import {
-  defaultAiPrices,
   type AiUsage,
   type AiUsageDay,
   type AiUsageReport,
@@ -13,6 +12,7 @@ import {
   usageTotals,
 } from "../../packages/domain/usage";
 import { auth, db } from "./firebase";
+import { appSettings } from "./settings";
 import * as paths from "./paths";
 
 // Enough per-user records for a quarter of alpha traffic; a busier app
@@ -35,7 +35,7 @@ export async function aiUsageDays(count: number): Promise<AiUsageDay[]> {
 }
 
 export async function usageReport(count: number): Promise<AiUsageReport> {
-  const prices = defaultAiPrices;
+  const { prices } = await appSettings();
   const days = await aiUsageDays(count);
   const from = days[0].day;
   const userDocs = await db

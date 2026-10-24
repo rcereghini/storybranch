@@ -167,6 +167,48 @@ try {
     fullPage: true,
   });
 
+  // Settings: a change is summarized before saving, saved, and audited.
+  await sections.getByRole("button", { name: "Settings" }).click();
+  await tab.getByText("Using the built-in defaults").waitFor();
+  const imageSwitch = tab.getByRole("checkbox", { name: /Image generation/ });
+  assert.equal(await imageSwitch.isChecked(), true);
+  await imageSwitch.uncheck();
+  await tab.getByText("Saving changes: Image generation on → off.").waitFor();
+  await tab.getByLabel("Images per person per day").fill("-3");
+  await tab.getByText(/Images per person per day: /).waitFor();
+  assert.equal(
+    await tab.getByRole("button", { name: "Save settings" }).isDisabled(),
+    true,
+  );
+  await tab.getByLabel("Images per person per day").fill("100");
+  await tab.getByRole("button", { name: "Save settings" }).click();
+  await tab.getByText("Settings saved.", { exact: false }).waitFor();
+  await tab.getByText(/Last changed .* by player@storybranch\.test/).waitFor();
+  await tab.screenshot({
+    path: "test-results/admin-settings.png",
+    fullPage: true,
+  });
+  await sections.getByRole("button", { name: "Activity" }).click();
+  await tab
+    .getByText("changed settings: Image generation on → off", {
+      exact: false,
+    })
+    .first()
+    .waitFor();
+  // Back to the defaults, so later checks see the usual app.
+  await sections.getByRole("button", { name: "Settings" }).click();
+  await tab.getByRole("button", { name: "Restore defaults" }).click();
+  await tab.getByRole("button", { name: "Save settings" }).click();
+  await tab.getByText("Settings saved.", { exact: false }).waitFor();
+  await tab.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await overflow(),
+    false,
+    "Horizontal overflow on Settings at 390",
+  );
+  await sections.getByRole("button", { name: "Emails" }).click();
+  await tab.getByRole("tab", { name: /Password reset/ }).waitFor();
+
   await tab.setViewportSize({ width: 390, height: 844 });
   // On failure, name the elements that stick out past the screen.
   const wide = await tab.evaluate(() =>

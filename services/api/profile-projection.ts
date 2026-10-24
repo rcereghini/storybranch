@@ -13,7 +13,8 @@ import {
   accountFeatures,
   type PlayerProfile,
 } from "../../packages/contracts/profile";
-import { usableFeatures } from "./access";
+import { usableFeatures, writingHelpUsable } from "./access";
+import type { AppSettings } from "../../packages/contracts/settings";
 import type { ZodType } from "zod";
 
 const or = <T>(schema: ZodType<T>, value: unknown, fallback: T): T => {
@@ -26,6 +27,7 @@ const or = <T>(schema: ZodType<T>, value: unknown, fallback: T): T => {
 export function projectProfile(
   uid: string,
   data: Record<string, unknown>,
+  settings: AppSettings,
   tokenName?: string,
 ): PlayerProfile {
   return {
@@ -41,6 +43,7 @@ export function projectProfile(
     favoriteGenres: or(favoriteGenres, data.favoriteGenres, []),
     stats: data.stats as Stats,
     achievements: Array.isArray(data.achievements) ? data.achievements : [],
-    features: usableFeatures(accountFeatures(data)),
+    features: usableFeatures(accountFeatures(data), settings),
+    writingHelp: writingHelpUsable(accountFeatures(data), settings),
   };
 }

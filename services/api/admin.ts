@@ -13,10 +13,7 @@ import {
   storedFeatures,
   type Features,
 } from "../../packages/contracts/profile";
-import {
-  defaultAiPrices,
-  usageReportDays,
-} from "../../packages/contracts/usage";
+import { usageReportDays } from "../../packages/contracts/usage";
 import {
   addTotals,
   emptyTotals,
@@ -26,6 +23,16 @@ import { auth, db } from "./firebase";
 import * as paths from "./paths";
 import { aiUsageDays, usageReport } from "./usage-report";
 import { AUDIT, run } from "./admin-audit";
+import {
+  appSettings,
+  clearSettingsCache,
+  readSettings,
+  settingsRef,
+} from "./settings";
+import {
+  adminSettingsCommandSchema,
+  settingsChanges,
+} from "../../packages/contracts/settings";
 import { emailCommand, emailLog, listEmails } from "./admin-emails";
 
 // Admin routes: everything here is reached only by accounts whose features
@@ -53,7 +60,6 @@ async function body(request: Request, max = 4096) {
   }
 }
 
-
 export async function admin(
   request: Request,
   uid: string,
@@ -65,7 +71,7 @@ export async function admin(
   if (rest.length) throw new GameError("NOT_FOUND", "Route not found.");
 
   if (request.method === "GET" && area === "overview" && !target) {
-    const [users, profiles, catalogue, drafts, playthroughs, usage] =
+    const [users, profiles, catalogue, drafts, playthroughs, usage, settings] =
       await Promise.all([
         allAuthUsers(),
         db.collection("users").get(),
@@ -73,9 +79,10 @@ export async function admin(
         db.collectionGroup("drafts").count().get(),
         db.collectionGroup("playthroughs").count().get(),
         aiUsageDays(30),
+        appSettings(),
       ]);
     const ai = usage.reduce(
-      (sum, day) => addTotals(sum, usageTotals(day, defaultAiPrices)),
+      (sum, day) => addTotals(sum, usageTotals(day, settings.prices)),
       emptyTotals(),
     );
     const overview: AdminOverview = {
@@ -188,6 +195,9 @@ export async function admin(
 
   if (request.method === "GET" && area === "emails" && !target)
     return listEmails();
+  // Fresh, not cached: the editor must start from what is stored.
+  if (request.method === "GET" && area === "settings" && !target)
+    return readSettings((await settingsRef().get()).data());
   if (request.method === "GET" && area === "email-log" && !target)
     return emailLog();
 
@@ -197,6 +207,42 @@ export async function admin(
 
   if (area === "emails")
     return emailCommand(uid, actorEmail, target, await body(request, 16384));
+
+  if (area === "settings" && target === "app") {
+    const command = adminSettingsCommandSchema.parse(
+      await body(request, 16384),
+    );
+    const result = await run(
+      uid,
+      actorEmail,
+      command.idempotencyKey,
+      command,
+      async (tx) => {
+        const current = readSettings((await tx.get(settingsRef())).data());
+        if (current.revision !== command.expectedRevision)
+          throw new GameError(
+            "STALE_REVISION",
+            "Settings changed in another tab. Reload them before saving.",
+          );
+        const changes = settingsChanges(current.settings, command.settings);
+        if (!changes.length)
+          throw new GameError("VALIDATION_FAILED", "Nothing has changed.");
+        const revision = current.revision + 1;
+        tx.set(settingsRef(), {
+          settings: command.settings,
+          revision,
+          updatedAt: Date.now(),
+          updatedBy: actorEmail,
+        });
+        return {
+          audit: { action: "settings", target: "app", change: { changes } },
+          result: { revision },
+        };
+      },
+    );
+    clearSettingsCache();
+    return result;
+  }
 
   if (area === "users") {
     const command = adminUserCommandSchema.parse(await body(request));

@@ -57,7 +57,7 @@ export type AdminAuditEntry = {
   at: number;
   actorUid: string;
   actorEmail: string | null;
-  action: "user" | "story" | "email";
+  action: "user" | "story" | "email" | "settings";
   target: string;
   change: Record<string, unknown>;
 };

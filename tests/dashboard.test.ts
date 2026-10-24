@@ -9,6 +9,7 @@ import {
   type StoryOutline,
 } from "../packages/domain/dashboard";
 import { projectProfile } from "../services/api/profile-projection";
+import { defaultAppSettings } from "../packages/contracts/settings";
 
 const save = (overrides: Partial<Save>): Save => ({
   id: "save",
@@ -211,11 +212,11 @@ it("validates profile customizations and defaults older profiles", () => {
       false,
     );
   expect(
-    projectProfile("uid", {
-      stats: baseStats,
-      accent: "neon",
-      bannerId: "storm",
-    }),
+    projectProfile(
+      "uid",
+      { stats: baseStats, accent: "neon", bannerId: "storm" },
+      defaultAppSettings,
+    ),
   ).toMatchObject({
     accent: "teal",
     bannerId: "storm",
@@ -240,14 +241,22 @@ it("validates profile edits and defaults older profiles", () => {
     expect(profileUpdateSchema.safeParse(bad).success).toBe(false);
 
   const stored = { stats: baseStats, status: "active" };
-  expect(projectProfile("uid", stored, "Ada Lovelace")).toMatchObject({
+  expect(
+    projectProfile("uid", stored, defaultAppSettings, "Ada Lovelace"),
+  ).toMatchObject({
     displayName: "Ada Lovelace",
     avatarId: "lantern",
     achievements: [],
   });
-  expect(projectProfile("uid", stored).displayName).toBe("Player");
+  expect(projectProfile("uid", stored, defaultAppSettings).displayName).toBe(
+    "Player",
+  );
   expect(
-    projectProfile("uid", { ...stored, displayName: "Wren", avatarId: "tide" }),
+    projectProfile(
+      "uid",
+      { ...stored, displayName: "Wren", avatarId: "tide" },
+      defaultAppSettings,
+    ),
   ).toMatchObject({ displayName: "Wren", avatarId: "tide" });
 });
 
