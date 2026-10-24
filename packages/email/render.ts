@@ -68,7 +68,7 @@ export function renderEmail({
 <tr><td align="center" style="padding:32px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
 <tr><td style="padding:0 8px 24px;">
-<a href="${escape(site)}" style="text-decoration:none;"><img src="${escape(site)}/email/logo.png" width="208" height="42" alt="Storybranch" style="display:block;border:0;"></a>
+<a href="${escape(site)}" style="text-decoration:none;"><img src="${escape(site)}/email/logo.png" width="208" height="42" alt="storybranch" style="display:block;border:0;font:700 24px/42px ${brand.font};color:${brand.text};text-decoration:none;"></a>
 </td></tr>
 <tr><td style="background:${brand.card};border:1px solid ${brand.border};border-radius:16px;padding:40px 32px;">
 <h1 style="margin:0 0 24px;font:700 26px/1.25 ${brand.font};color:${brand.text};">${h(content.heading)}</h1>
