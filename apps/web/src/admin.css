@@ -1,6 +1,6 @@
-/* Admin dashboard. Tables scroll inside their panel, never the page. */
+/* Admin dashboard. Tables scroll inside their panel, never the view. */
 .admin {
-  /* A wide table must not widen the page's grid column. */
+  /* A wide table must not widen the view's grid column. */
   grid-template-columns: minmax(0, 1fr);
 }
 .admin-title {

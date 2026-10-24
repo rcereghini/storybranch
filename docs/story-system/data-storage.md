@@ -7,10 +7,10 @@ Status: target persistence design with an explicit current-path map. Decisions S
 | Record | Current location / status | Target ownership and lifecycle |
 | --- | --- | --- |
 | Private account/profile | `users/{uid}` | Account service; allowlisted profile edits; no story-author writes |
-| Private draft | `users/{uid}/drafts/{storyId}` | Creator through revision-checked commands; incomplete graph allowed, including future empty drafts |
-| Published edition | `stories/{storyId}/versions/{versionId}` and `pages/{pageId}` | Server materializes immutable, validated graph and asset/type/rules references |
+| Private draft | `users/{uid}/drafts/{storyId}` | Creator through revision-checked commands; target blank draft contains one StoryTrunk and no playable placements; incomplete graph allowed |
+| Published edition | `stories/{storyId}/versions/{versionId}` and `storyNodes/{storyNodeId}` | Server materializes immutable, validated graph and asset/type/rules references |
 | Catalogue projection | `catalogue/{storyId}` | Safe public metadata; no private drafts, saves, answers or entitlement records |
-| Reusable content | `pageLibrary/{pageId}/revisions/{revision}` | Immutable content revisions; sharing explicit; placement bindings remain in stories |
+| Reusable content | `storyNodeLibrary/{storyNodeId}/revisions/{revision}` | Immutable content revisions; sharing explicit; placement bindings remain in stories |
 | Run/save | `users/{uid}/playthroughs/{runId}` | Server-owned PlayerContext with bounded current state; owner reads through permitted APIs |
 | Run events | `users/{uid}/playthroughs/{runId}/events/{eventId}` | Append-only audit/progress facts; paginated, not a forever-growing array in a save |
 | Command receipt | `users/{uid}/receipts/{hash}` | Request fingerprint, actor/scope/result/expiry; existing helper sets a 30-day expiry timestamp |
@@ -22,10 +22,17 @@ Status: target persistence design with an explicit current-path map. Decisions S
 
 Physical future collection names are intentionally not finalized. Indexes, access rules, size limits and query patterns must be designed with the feature. The old illustrative `draftNodes`/`nodes` paths in [docs/05](../05-data-and-api-contracts.md) are not today's schema and should not be reintroduced just because the conceptual name is StoryNode.
 
+The table uses canonical names for new records. Read [naming compatibility](naming-compatibility.md) for existing editions, saves, drafts, reusable revisions and API clients. Legacy immutable records remain in place; normal future mutations write canonical fields.
+
+Use [the terminology mapping](terminology.md#mapping-to-the-current-implementation): `StoryNode`/`storyNodeId` currently represent StoryNode placements, `kind: "ending"` represents StoryLeaf behavior, and outcome routes represent StoryBranches. StoryTrunk has no dedicated current record. Existing `branches/{branchId}` community links identify separately authored side Stories; they are not storage records for every in-story StoryBranch. This distinction preserves the separate-context boundary.
+
+Target publication stores the unique StoryTrunk's metadata/context definitions and a validated effective playable graph. Keep unfinished StoryBranches and their diagnostic reasons in the private draft/review record; exclude disabled routes, their options and resulting unreachable placements from player projections. Apply the [upstream validation rules](story-nodes.md#storyleaves-and-termination) before materializing an edition. Server commands accept only enabled routes and validate current conditions. Repairing a branch publishes a new edition; it never mutates an issued graph or redirects an existing pinned save. Current all-or-nothing graph rejection remains unchanged until that target pipeline is implemented.
+
 ```mermaid
 flowchart TD
   Draft[Creator draft and private assets] --> Validation[Graph, input, output and asset validation]
-  Validation --> Edition[Ready immutable edition and manifest]
+  Validation --> Diagnostics[Private creator diagnostics and disabled paths]
+  Validation -->|Safe effective graph| Edition[Ready immutable edition and manifest]
   Edition --> Catalogue[Public catalogue projection]
   Edition --> Run[Owned pinned run]
   Account[Private user records] --> Projection[Allowlisted start projection]
@@ -51,7 +58,7 @@ The browser sends actor intent, idempotency key and expected run revision; actor
 
 ```mermaid
 sequenceDiagram
-  participant UI as Page renderer
+  participant UI as StoryNode renderer
   participant API as Command API
   participant DB as State and receipts
   participant Rules as Portable rules
@@ -73,15 +80,15 @@ Command receipts are finite-lived. Their TTL is not sufficient for permanent rew
 
 ## Publication and versioning
 
-Draft and published schemas are separate validation stages. A blank/incomplete draft is valid authoring state but invalid publication. Publication validates all node types, required input mappings, routes, termination policies, conditions/effects, import/export permissions, content revisions and asset ownership/readiness before exposing the edition pointer.
+Draft and published schemas are separate validation stages. A blank/incomplete draft is valid authoring state. The target pipeline can publish its safe effective graph only when a valid start survives; unfinished paths never enter the playable edition. Publication validates included node types, required input mappings, routes, termination policies, conditions/effects, import/export permissions, content revisions and asset ownership/readiness before exposing the edition pointer. Suppression of unfinished paths cannot bypass permissions, schema bounds or asset checks on included content.
 
-Small editions can commit atomically. Larger staged publication must keep all parts hidden until a complete manifest is ready. Neither partially staged content nor a concurrent draft edit can leak into the published snapshot. Publishing the same source revision is idempotent. Existing code bounds draft graphs to 80 pages; target scalability must be measured and versioned, not achieved by removing bounds.
+Small editions can commit atomically. Larger staged publication must keep all parts hidden until a complete manifest is ready. Neither partially staged content nor a concurrent draft edit can leak into the published snapshot. Publishing the same source revision is idempotent. Existing code bounds draft graphs to 80 StoryNodes; target scalability must be measured and versioned, not achieved by removing bounds.
 
 Save identity pins story edition, schema/rules versions and type semantics. Content changes publish a new edition. A migration must explicitly define source/target versions, run compatibility, pending interaction handling, data preservation, rollback and verification. Never edit immutable historical editions, repoint all saves or delete user data as a shortcut. Unsupported old formats need an explicit recovery path, not an implicit renderer fallback.
 
 ## Privacy, retention and operational boundaries
 
-Use separate public projections for catalogue, shared pages and creator display. Authorization must apply to the whole underlying private record, not imagined per-field secrecy on a publicly readable document. Server SDK access still needs explicit authorization. Cross-story facts are served through import policy, not arbitrary save queries.
+Use separate public projections for catalogue, shared StoryNodes and creator display. Authorization must apply to the whole underlying private record, not imagined per-field secrecy on a publicly readable document. Server SDK access still needs explicit authorization. Cross-story facts are served through import policy, not arbitrary save queries.
 
 Keep current state bounded and histories paginated. Retain media referenced by issued editions, saves or public shared revisions; account/asset deletion must use a documented retention and access policy. Forms require response-specific retention/deletion decisions before launch. Narrative event integrity does not remove privacy obligations; sensitive data should not be copied into every event.
 

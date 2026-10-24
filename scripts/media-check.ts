@@ -3,9 +3,9 @@ import { launchBrowser } from "./browser";
 import { harborMedia, sceneMedia } from "../fixtures/media";
 const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.goto("http://127.0.0.1:5173");
-  await page.evaluate("globalThis.__name = (fn) => fn");
+  const tab = await browser.newPage();
+  await tab.goto("http://127.0.0.1:5173");
+  await tab.evaluate("globalThis.__name = (fn) => fn");
   for (const asset of [
     harborMedia.landscape,
     harborMedia.portrait!,
@@ -15,7 +15,7 @@ try {
       media.portrait!,
     ]),
   ]) {
-    const result = await page.evaluate(async (src) => {
+    const result = await tab.evaluate(async (src) => {
       const context = new AudioContext();
       const response = await fetch(src);
       if (!response.ok) throw new Error(`Missing media ${src}`);

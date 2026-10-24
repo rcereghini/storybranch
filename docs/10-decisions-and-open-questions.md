@@ -2,13 +2,13 @@
 
 October 23, 2026: [Story system decisions](story-system/decisions.md) own the detailed StoryNode, context, key/import and documentation-review design. Read [the current-state review](story-system/current-state-review.md) for implemented status; dated alpha assumptions below are historical and may have been superseded. Product/commercial decisions remain in this register.
 
-Creator alpha implementation assumptions (October 14, 2026): private drafts are available to active accounts; hosted publication requires the account's `publish` feature flag (a server-side UID allowlist until October 18, 2026); publication is public and atomic for a bounded graph of up to 80 pages. The first editor uses shipped sample clips and a disposable client preview. Uploads, moderation and community branch authoring are not enabled by this slice. These are prototype defaults, not settled public-launch policy. See [Creator Studio](17-creator-studio.md).
+Creator alpha implementation assumptions (October 14, 2026): private drafts are available to active accounts; hosted publication requires the account's `publish` feature flag (a server-side UID allowlist until October 18, 2026); publication is public and atomic for a bounded graph of up to 80 StoryNodes. The first editor uses shipped sample clips and a disposable client preview. Uploads, moderation and community branch authoring are not enabled by this slice. These are prototype defaults, not settled public-launch policy. See [Creator Studio](17-creator-studio.md).
 
 This register distinguishes the user's requirements from proposed defaults. A proposed default can guide a reversible prototype. It must not become an undisclosed paid-service or content-permission promise.
 
 ## Confirmed decisions
 
-October 13: Stories own context and typed pages; every renderer uses a shared Page parent with explicit inputs/outputs. Remove obsolete prototype compatibility rather than carrying implicit video-only pages. See [Story and Page model](16-story-pages.md). RPG combat remains deferred. Dice and linear Continue behavior are prototype defaults documented there.
+October 13: Stories own context and typed StoryNodes; every renderer uses a shared StoryNode parent with explicit inputs/outputs. Remove obsolete prototype compatibility rather than carrying implicit video-only StoryNodes. See [Story and StoryNode model](16-story-nodes.md). RPG combat remains deferred. Dice and linear Continue behavior are prototype defaults documented there.
 
 | ID | Decision | Source |
 | --- | --- | --- |
@@ -25,11 +25,14 @@ October 13: Stories own context and typed pages; every renderer uses a shared Pa
 | C11 | Players can initiate trades involving the exclusive branch right | Initial request; interpreted as featured placement following C10 |
 | C12 | Prefer landscape presentation on larger screens; support portrait at small breakpoints, with social clip sharing as a product goal | October 12, 2026 user direction |
 | C13 | Video is the primary player content; choosing a route starts the next clip and the interface fades during playback | October 12, 2026 user direction |
-| C14 | Stories are extensible graphs of typed StoryNodes, presented through the shared Story/Page lifecycle, with branches leading to deliberate endpoints | October 23, 2026 user direction; target details in S01/S03/S08 |
+| C14 | Stories are extensible graphs of typed StoryNodes, presented through the shared Story/StoryNode lifecycle, with branches leading to deliberate endpoints | October 23, 2026 user direction; target details in S01/S03/S08 |
 | C15 | A creator can start with a blank story; future types include graphic novels, forms, battles and advertisements | October 23, 2026 user direction; documentation does not implement these types |
 | C16 | Establish separate Story, Player-run and User-account context ownership, including deliberate cross-story key use for sequels | October 23, 2026 user direction; concrete import/authority defaults in S04/S06/S09 |
 | C17 | Document architecture and flows now; do not refactor runtime code in this task | October 23, 2026 user scope |
 | C18 | Relevant documentation must be considered by developers/agents; document review belongs in the contribution process | October 23, 2026 user direction; S12 distinguishes present instructions/templates from future automated gates |
+| C19 | Use Story, StoryTrunk, StoryNode, StoryBranch and StoryLeaf consistently. Each Story has one title/configuration StoryTrunk outside the playthrough; StoryNodes are playable content, StoryBranches carry connections/data/conditions, and StoryLeaves configure endings/rewards. An unfinished branch must notify the creator, be disabled and have its option hidden from players. | User's terminology clarification; [canonical glossary](story-system/terminology.md) and S01–S03 own the detailed target contract |
+
+C20 — Subsequent user direction expands C17's original documentation-only scope to consistent code/UI/file/storage/API naming, with compatibility for existing data explicitly authorized. Gameplay rules remain unchanged; see [S13 and the naming boundary](story-system/naming-compatibility.md).
 
 ## Proposed defaults
 

@@ -7,7 +7,7 @@ Status: target design, with current `Save` as its foundation. Decisions S04–S0
 | Field group | Target contract | Current mapping |
 | --- | --- | --- |
 | Identity | Run ID, owner UID, story/edition/rules versions | `Save.id`, `playerUid`, `storyId`, `versionId`, `rulesetVersion` |
-| Position | Current node and visit ID; run revision/status | `pageId`, `revision`, `status`; visit ID deferred |
+| Position | Current node and visit ID; run revision/status | `storyNodeId`, `revision`, `status`; visit ID deferred |
 | Entry snapshot | Starting stats and explicitly imported facts with provenance | `statsSnapshot`; generalized imports deferred |
 | Local progress | Stats, health, keys, inventory, scores, milestones, bounded variables | Existing local state; generic variables deferred |
 | Interaction | Pending dice, form response draft, battle turn/state, bound node input | `lastRoll`; other type state deferred |
@@ -31,7 +31,9 @@ A node visit receives resolved, schema-validated input and stores its binding pr
 
 Dice Roll and Next are separate commands. Pending state includes the visit that produced it; returning to the same node is a new visit and cannot reuse a previous pending action accidentally. Persist enough state to reproduce interpretation on reload. Latest-result convenience fields are projections, not the sole durable evidence for every prior interaction.
 
-## Concurrency, replay and child branches
+## Concurrency, replay and child Stories
+
+Following a StoryBranch between playable placements keeps the same PlayerContext. The StoryTrunk is the title/configuration root outside the playthrough: run visits begin at the playable destination of its start connection, not at the trunk. Current `entryStoryNodeId` still identifies that first playable placement. Only an explicit launch of a separately authored child Story creates a child run. See [terminology](terminology.md#different-meanings-of-branch).
 
 Each mutating intent includes an expected revision and idempotency key. Two devices cannot commit different choices from the same revision. A stale response refreshes the run; it does not merge local client guesses. Reload during a submitted command checks authoritative state or retries the same key.
 

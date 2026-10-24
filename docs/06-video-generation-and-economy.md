@@ -14,7 +14,7 @@ Start with a fake adapter that simulates success, rejection, timeout, duplicate 
 
 ## User generation flow
 
-The creator selects a scene, supplies a prompt or reference assets, chooses a supported model/configuration, and receives an expiring credit quote. Generate explicitly authorizes up to that quoted credit amount. Reserve the credits and create the job atomically, then submit asynchronously. The creator can leave the page and return to the same job.
+The creator selects a scene, supplies a prompt or reference assets, chooses a supported model/configuration, and receives an expiring credit quote. Generate explicitly authorizes up to that quoted credit amount. Reserve the credits and create the job atomically, then submit asynchronously. The creator can leave the generation view and return to the same job.
 
 A completed output goes into the creator's asset library. The creator reviews it and chooses Attach to scene. Check the node revision before attachment; if it changed during generation, offer the output as a new selection rather than overwriting content. Generating another variation requires a new quote and deliberate action.
 

@@ -9,7 +9,7 @@
   right: 16px;
   z-index: 4;
 }
-.page-photo {
+.story-node-photo {
   display: block;
   max-height: 40dvh;
   max-width: 100%;
@@ -46,7 +46,7 @@ main.immersive-player {
   max-width: none;
   padding: 12px 24px;
 }
-.immersive-player .reading-page {
+.immersive-player .reading-story-node {
   min-height: calc(100dvh - 180px);
   margin: 0 auto;
   display: flex;
@@ -56,10 +56,10 @@ main.immersive-player {
 .immersive-player :is(.character-panel, .transcript, .community, .share-story) {
   margin-inline: 24px;
 }
-.reading-page {
-  animation: page-arrive 220ms ease-out;
+.reading-story-node {
+  animation: story-node-arrive 220ms ease-out;
 }
-@keyframes page-arrive {
+@keyframes story-node-arrive {
   from {
     opacity: 0;
   }
@@ -81,7 +81,7 @@ main.immersive-player {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .reading-page {
+  .reading-story-node {
     animation: none;
   }
 }
@@ -153,7 +153,11 @@ main.immersive-player {
   gap: 36px;
   align-items: end;
   padding: 110px 36px 28px;
-  background: linear-gradient(transparent, rgb(14 14 19 / 91%) 24%, rgb(14 14 19 / 99%));
+  background: linear-gradient(
+    transparent,
+    rgb(14 14 19 / 91%) 24%,
+    rgb(14 14 19 / 99%)
+  );
 }
 .scene-overlay {
   opacity: 1;
@@ -416,7 +420,11 @@ main.immersive-player {
     grid-template-columns: 1fr;
     gap: 18px;
     padding: 120px 20px 20px;
-    background: linear-gradient(transparent, rgb(14 14 19 / 92%) 22%, rgb(14 14 19 / 99%));
+    background: linear-gradient(
+      transparent,
+      rgb(14 14 19 / 92%) 22%,
+      rgb(14 14 19 / 99%)
+    );
   }
   .scene-copy h1 {
     font-size: 32px;

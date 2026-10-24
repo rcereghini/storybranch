@@ -3,10 +3,10 @@ import { launchBrowser } from "./browser";
 // New rendition IDs; published story graphs and original assets remain intact.
 const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.goto("http://127.0.0.1:5173");
-  await page.evaluate("globalThis.__name = (fn) => fn");
-  await page.evaluate(() => {
+  const tab = await browser.newPage();
+  await tab.goto("http://127.0.0.1:5173");
+  await tab.evaluate("globalThis.__name = (fn) => fn");
+  await tab.evaluate(() => {
     const button = document.createElement("button");
     button.textContent = "Enable fixture audio";
     button.onclick = () => {
@@ -17,14 +17,14 @@ try {
     };
     document.body.replaceChildren(button);
   });
-  await page.getByRole("button", { name: "Enable fixture audio" }).click();
+  await tab.getByRole("button", { name: "Enable fixture audio" }).click();
   for (const variant of ["landscape", "portrait", "social"]) {
     const portrait = variant !== "landscape";
     const svg = await readFile(
       `apps/web/public/media/${portrait ? "harbor-portrait-v1.svg" : "harbor.svg"}`,
       "utf8",
     );
-    const bytes = await page.evaluate(
+    const bytes = await tab.evaluate(
       async ({ svg, portrait, social }) => {
         const audio = (window as unknown as { fixtureAudio: AudioContext })
           .fixtureAudio;

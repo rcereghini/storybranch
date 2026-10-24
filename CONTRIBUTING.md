@@ -2,7 +2,9 @@
 
 Read [AGENTS.md](AGENTS.md) before planning a change. Follow [the documentation workflow](docs/development-workflow.md) to find the documents for each affected area. This applies to human developers, coding agents and reviewers.
 
-For Story work, begin with [the Story system](docs/story-system/README.md) and [the current Story/Page contract](docs/16-story-pages.md). Source code establishes what runs today; the target documents establish where new implementation should go. Describe a mismatch explicitly instead of preserving it as a new design requirement or silently claiming it is already fixed.
+For Story work, begin with [the Story system](docs/story-system/README.md) and [the current Story/StoryNode contract](docs/16-story-nodes.md). Source code establishes what runs today; the target documents establish where new implementation should go. Describe a mismatch explicitly instead of preserving it as a new design requirement or silently claiming it is already fixed.
+
+Use [the canonical Story terminology](docs/story-system/terminology.md) in documentation, plans and reviews. Story, StoryTrunk, StoryNode, StoryBranch and StoryLeaf describe the narrative model. Existing code identifiers remain exact; they do not define additional domain entities.
 
 ## Before implementation
 
@@ -29,6 +31,6 @@ The [PR template](.github/pull_request_template.md) makes this review visible. I
 
 ## Review and validation
 
-Reviewers check the actual behavior against the cited contracts and ask for missing evidence. Read [README checks](README.md#checks) for runnable commands and prerequisites. Story changes generally need portable contract/domain checks, authoritative retry/persistence checks and a browser flow through `Story`/`Page`; choose checks that cover the change. Record unavailable emulators, devices, providers or credentials as verification limits.
+Reviewers check the actual behavior against the cited contracts and ask for missing evidence. Read [README checks](README.md#checks) for runnable commands and prerequisites. Story changes generally need portable contract/domain checks, authoritative retry/persistence checks and a browser flow through `Story`/`StoryNode`; choose checks that cover the change. Record unavailable emulators, devices, providers or credentials as verification limits.
 
 No commit, push, publish, migration or deployment is implied by preparing a change. Follow the user's requested delivery scope.

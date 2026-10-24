@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { pageSchema } from "../packages/contracts/index";
+import { storyNodeSchema } from "../packages/contracts/index";
 import {
   assetIdOf,
   assetRef,
@@ -55,27 +55,31 @@ it("builds download URLs the media contract accepts, live and local", () => {
     ).toBe(false);
 });
 
-it("lets pages reference uploaded clips by asset ID only", () => {
-  const page = {
+it("lets StoryNodes reference uploaded clips by asset ID only", () => {
+  const storyNode = {
     id: "opening",
     title: "Opening",
     transcript: "",
     kind: "scene",
-    pageType: "video",
+    storyNodeType: "video",
     entryEffects: [],
     choices: [],
   };
   const ref = assetRef("0f8fad5b-d9cb-469f-a165-70867728950e");
-  expect(pageSchema.safeParse({ ...page, video: ref }).success).toBe(true);
-  expect(pageSchema.safeParse({ ...page, video: "/media/a.mp4" }).success).toBe(
+  expect(storyNodeSchema.safeParse({ ...storyNode, video: ref }).success).toBe(
     true,
   );
+  expect(
+    storyNodeSchema.safeParse({ ...storyNode, video: "/media/a.mp4" }).success,
+  ).toBe(true);
   for (const video of [
     "asset:../x",
     "asset:short",
     "https://example.com/clip.mp4",
   ])
-    expect(pageSchema.safeParse({ ...page, video }).success).toBe(false);
+    expect(storyNodeSchema.safeParse({ ...storyNode, video }).success).toBe(
+      false,
+    );
   expect(assetIdOf(ref)).toBe("0f8fad5b-d9cb-469f-a165-70867728950e");
   expect(assetIdOf("/media/a.mp4")).toBe(null);
 });

@@ -2,7 +2,7 @@
 
 Storybranch is a working name for a video based interactive storytelling platform. Players discover and play adventures, creators build video story graphs, and the community adds side quests without replacing the original adventure.
 
-For Story-related work, start with the [Story system documentation](docs/story-system/README.md): StoryNodes, StoryPage types, Story/Player/User contexts, keys, storage, AI boundaries and flow charts. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [documentation workflow](docs/development-workflow.md) before planning or editing. The [October 23 review](docs/story-system/current-state-review.md) records the latest pull and verification limits. Target design is explicitly distinguished from current implementation.
+For Story-related work, start with the [Story system documentation](docs/story-system/README.md) and [canonical terminology](docs/story-system/terminology.md): Story, StoryTrunk, connected StoryNodes, their StoryBranches, and StoryLeaves. The documentation covers node types, Story/Player/User contexts, keys, storage, AI boundaries and flow charts. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [documentation workflow](docs/development-workflow.md) before planning or editing. The [October 23 review](docs/story-system/current-state-review.md) records the latest pull and verification limits. Target design is explicitly distinguished from current implementation.
 
 This repository contains a working M0 foundation and M1 local playable prototype, plus the product specifications. React/TypeScript now defaults to Firebase Authentication and Firestore project `storybranch-f77a3` locally and in production. Production runs on Vercel at https://www.storybranch.com. Server credentials are required for that mode; explicit emulator mode remains credential-free. See [shared Firebase setup](docs/15-shared-firebase-setup.md). Implementation and verification notes: [M0/M1 delivery record](docs/12-local-prototype.md).
 
@@ -12,9 +12,9 @@ The player now uses a landscape overlay on larger screens and an authored portra
 
 Signed-in players land on their **Dashboard**: profile with display name and avatar, shared stats, progress across stories, endings found and where they left off. The catalogue lives under **Discover** (`/discover`). See [Player dashboard and profile](docs/18-player-dashboard.md).
 
-**Create** opens the new Creator Studio: private drafts, all seven page types, personality-quiz and comic templates, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Video pages can use sample clips or uploaded MP4/WebM clips stored in Firebase Storage. Hosted publishing needs the account's `publish` feature (`pnpm features grant <email> publish`, see [Account access](docs/15-shared-firebase-setup.md#account-access)); emulator accounts can publish immediately.
+**Create** opens the new Creator Studio: private drafts, all seven StoryNode types, personality-quiz and comic templates, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Video StoryNodes can use sample clips or uploaded MP4/WebM clips stored in Firebase Storage. Hosted publishing needs the account's `publish` feature (`pnpm features grant <email> publish`, see [Account access](docs/15-shared-firebase-setup.md#account-access)); emulator accounts can publish immediately.
 
-The player now supports seven explicit page types, including Comic, and sample stories such as **The Clockwork Door**, **The Storm Signal** and the personality quiz **What Kind of Explorer Are You?**. See [Story and Page model](docs/16-story-pages.md). Reseed to publish the sample `pages-v1` editions. Pre-page prototype saves require a new journey; accounts are unchanged.
+The player now supports seven explicit StoryNode types, including Comic, and sample stories such as **The Clockwork Door**, **The Storm Signal** and the personality quiz **What Kind of Explorer Are You?**. See [Story and StoryNode model](docs/16-story-nodes.md). Reseed to publish the sample `story-nodes-v1` editions. Pre-StoryNode prototype saves require a new journey; accounts are unchanged.
 
 Follow [shared Firebase setup](docs/15-shared-firebase-setup.md) to install server credentials in ignored `.secrets/` and `.env.local`, then run `pnpm seed:firebase` and `pnpm dev`. Use a real Firebase Email/Password account; local and hosted saves share the same namespaced data.
 
@@ -88,6 +88,7 @@ Read [CONTRIBUTING](CONTRIBUTING.md) and follow the [documentation reading map](
 
 | Document | Purpose |
 | --- | --- |
+| [Story terminology](docs/story-system/terminology.md) | Canonical graph vocabulary, connectivity, and mappings to existing code names |
 | [Story system](docs/story-system/README.md) | Canonical target architecture, StoryNode types, contexts, keys, storage, AI and example flows |
 | [Contribution and documentation workflow](CONTRIBUTING.md) | Required reading, scoped guides and review before committing |
 | [Current-state review](docs/story-system/current-state-review.md) | Latest pull, inspected architecture, target gaps and actual verification limits |
@@ -106,7 +107,7 @@ Read [CONTRIBUTING](CONTRIBUTING.md) and follow the [documentation reading map](
 | [Responsive video and sharing](docs/13-responsive-video-and-sharing.md) | Landscape/portrait player, teaser video and share links |
 | [Phone playback preview](docs/14-phone-playback-preview.md) | Private HTTPS tunnel for testing on a real phone |
 | [Shared Firebase setup](docs/15-shared-firebase-setup.md) | Live Firebase project, credentials and Vercel hosting |
-| [Story and Page model](docs/16-story-pages.md) | Current page-type contract; read before changing stories, pages or routing |
+| [Story and StoryNode model](docs/16-story-nodes.md) | Current StoryNode-type contract; read before changing stories, StoryNodes or routing |
 | [Creator Studio](docs/17-creator-studio.md) | Drafts, preview, publishing and publishing access |
 | [Player dashboard](docs/18-player-dashboard.md) | Dashboard home, profile customization and progress summary |
 | [Copilot](docs/19-copilot.md) | In-app chat assistant: phases, contract, limits and the video model test |

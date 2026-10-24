@@ -1,3 +1,4 @@
+import { readStoryData } from "../../packages/contracts/legacy-story-format";
 import { FieldPath, type DocumentData } from "firebase-admin/firestore";
 import { db } from "./firebase";
 import { GameError, type Save } from "../../packages/contracts/index";
@@ -66,10 +67,10 @@ export async function profileRoutes(
       .get(),
     db.collection("catalogue").orderBy(FieldPath.documentId()).limit(50).get(),
   ]);
-  // Pre-page prototype saves have no pageId and cannot be resumed.
+  // Retired prototype saves have no storyNodeId and cannot be resumed.
   const saves = savesSnapshot.docs
-    .map((d) => d.data() as Save)
-    .filter((s) => s.pageId);
+    .map((d) => readStoryData<Save>(d.data()))
+    .filter((s) => s.storyNodeId);
   const catalogue: CatalogueOutline[] = catalogueSnapshot.docs
     .map((d) => d.data())
     .filter((c) => c.versionId ?? c.publishedVersionId)
@@ -98,10 +99,10 @@ export async function profileRoutes(
         );
         outlines.set(key, {
           title: story.title,
-          pages: Object.fromEntries(
-            Object.entries(story.pages).map(([pageId, page]) => [
-              pageId,
-              { title: page.title, kind: page.kind },
+          storyNodes: Object.fromEntries(
+            Object.entries(story.storyNodes).map(([storyNodeId, storyNode]) => [
+              storyNodeId,
+              { title: storyNode.title, kind: storyNode.kind },
             ]),
           ),
         });

@@ -1,21 +1,26 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Story } from "../../../packages/contracts/index";
-import type { PagePositions } from "../../../packages/contracts/authoring";
+import type { StoryNodePositions } from "../../../packages/contracts/authoring";
 import {
-  arrangePages,
+  arrangeStoryNodes,
   connections,
   graphCardHeight,
-  type PageConnection,
+  type StoryNodeConnection,
 } from "../../../packages/domain/story-graph";
 import { Button } from "./ui";
-import { pageTypeNames } from "./StoryOutline";
+import { storyNodeTypeNames } from "./StoryOutline";
 import "./story-graph.css";
 
 const CARD = 270;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 1.6;
 type View = { x: number; y: number; z: number };
-type NewPage = "text" | "text-options" | "video" | "video-options" | "ending";
+type NewStoryNode =
+  | "text"
+  | "text-options"
+  | "video"
+  | "video-options"
+  | "ending";
 const clamp = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
 // The story map: a canvas you pan by dragging the background (or scrolling a
@@ -35,24 +40,28 @@ export function StoryGraph({
   onBranch,
 }: {
   story: Story;
-  positions?: PagePositions;
+  positions?: StoryNodePositions;
   selected: string;
   disabled: boolean;
-  // Changing this number centers the selected page.
+  // Changing this number centers the selected StoryNode.
   focus: number;
   onSelect: (id: string) => void;
-  onMove: (positions: PagePositions) => void;
-  onConnect: (source: string, edge: PageConnection, target: string) => void;
-  onAdd: (type: NewPage) => void;
+  onMove: (positions: StoryNodePositions) => void;
+  onConnect: (
+    source: string,
+    edge: StoryNodeConnection,
+    target: string,
+  ) => void;
+  onAdd: (type: NewStoryNode) => void;
   onBranch: () => void;
 }) {
   const [view, setView] = useState<View>({ x: 40, y: 40, z: 1 });
-  const [kind, setKind] = useState<NewPage>("text");
+  const [kind, setKind] = useState<NewStoryNode>("text");
   const [link, setLink] = useState<{
     source: string;
-    edge: PageConnection;
+    edge: StoryNodeConnection;
   } | null>(null);
-  const [moving, setMoving] = useState<PagePositions>({});
+  const [moving, setMoving] = useState<StoryNodePositions>({});
   const [panning, setPanning] = useState(false);
   const drag = useRef<{
     id: string;
@@ -66,18 +75,20 @@ export function StoryGraph({
   const pinch = useRef<{ distance: number; view: View } | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const fitted = useRef(false);
-  const points = { ...arrangePages(story), ...positions, ...moving };
-  const pages = Object.values(story.pages);
+  const points = { ...arrangeStoryNodes(story), ...positions, ...moving };
+  const storyNodes = Object.values(story.storyNodes);
   const bounds = {
-    minX: Math.min(...pages.map((p) => points[p.id].x)),
-    minY: Math.min(...pages.map((p) => points[p.id].y)),
-    maxX: Math.max(...pages.map((p) => points[p.id].x + CARD)),
-    maxY: Math.max(...pages.map((p) => points[p.id].y + graphCardHeight(p))),
+    minX: Math.min(...storyNodes.map((p) => points[p.id].x)),
+    minY: Math.min(...storyNodes.map((p) => points[p.id].y)),
+    maxX: Math.max(...storyNodes.map((p) => points[p.id].x + CARD)),
+    maxY: Math.max(
+      ...storyNodes.map((p) => points[p.id].y + graphCardHeight(p)),
+    ),
   };
   const width = bounds.maxX + 400;
   const height = bounds.maxY + 400;
   const clean = () =>
-    Object.fromEntries(pages.map((p) => [p.id, points[p.id]]));
+    Object.fromEntries(storyNodes.map((p) => [p.id, points[p.id]]));
   const size = () => {
     const rect = viewport.current?.getBoundingClientRect();
     return { w: rect?.width ?? 800, h: rect?.height ?? 600 };
@@ -100,7 +111,7 @@ export function StoryGraph({
     setView((v) => ({
       ...v,
       x: w / 2 - (point.x + CARD / 2) * v.z,
-      y: h / 2 - (point.y + graphCardHeight(story.pages[id]) / 2) * v.z,
+      y: h / 2 - (point.y + graphCardHeight(story.storyNodes[id]) / 2) * v.z,
     }));
   };
   // Zoom keeping the canvas point under (px, py) in place.
@@ -117,7 +128,7 @@ export function StoryGraph({
       };
     });
   // First view: the whole story if it fits at a readable size, otherwise
-  // readable cards starting from the first page.
+  // readable cards starting from the first StoryNode.
   const open = () => {
     const { w, h } = size();
     const bw = bounds.maxX - bounds.minX + 80;
@@ -125,7 +136,7 @@ export function StoryGraph({
     const z = clamp(Math.min(w / bw, h / bh, 1));
     if (z >= 0.75) return fit();
     const readable = w < 600 ? 0.7 : 0.85;
-    const entry = points[story.entryPageId] ?? {
+    const entry = points[story.entryStoryNodeId] ?? {
       x: bounds.minX,
       y: bounds.minY,
     };
@@ -150,7 +161,7 @@ export function StoryGraph({
   useEffect(() => {
     if (focus) center(selected);
   }, [focus]);
-  // Wheel needs a non-passive listener to keep the page from scrolling.
+  // Wheel needs a non-passive listener to keep the StoryNode from scrolling.
   useEffect(() => {
     const el = viewport.current;
     if (!el) return;
@@ -182,9 +193,9 @@ export function StoryGraph({
     } else onSelect(id);
   };
   const branchable =
-    story.pages[selected]?.kind !== "ending" &&
+    story.storyNodes[selected]?.kind !== "ending" &&
     ["text", "text-options", "video", "video-options"].includes(
-      story.pages[selected]?.pageType,
+      story.storyNodes[selected]?.storyNodeType,
     );
   const background = (target: EventTarget) =>
     !(target as Element).closest(".graph-card, .graph-floating");
@@ -321,9 +332,9 @@ export function StoryGraph({
                 <path d="M0 0L8 4L0 8" fill="currentColor" />
               </marker>
             </defs>
-            {pages.flatMap((p) =>
+            {storyNodes.flatMap((p) =>
               connections(p).map((edge, i) => {
-                if (!story.pages[edge.target]) return null;
+                if (!story.storyNodes[edge.target]) return null;
                 const from = points[p.id],
                   to = points[edge.target];
                 const x = from.x + CARD,
@@ -342,7 +353,7 @@ export function StoryGraph({
               }),
             )}
           </svg>
-          {pages.map((p) => (
+          {storyNodes.map((p) => (
             <article
               key={p.id}
               className={`graph-card ${selected === p.id ? "is-selected" : ""} ${link ? "is-target" : ""} ${p.kind === "ending" ? "is-ending" : ""}`}
@@ -352,7 +363,7 @@ export function StoryGraph({
                 width: CARD,
                 height: graphCardHeight(p),
               }}
-              data-page-id={p.id}
+              data-story-node-id={p.id}
             >
               <button
                 className="graph-drag"
@@ -421,12 +432,12 @@ export function StoryGraph({
                 }}
               >
                 <span>
-                  {p.id === story.entryPageId
+                  {p.id === story.entryStoryNodeId
                     ? "Start · "
                     : p.kind === "ending"
                       ? "Ending · "
                       : ""}
-                  {pageTypeNames[p.pageType]}
+                  {storyNodeTypeNames[p.storyNodeType]}
                 </span>
                 <span aria-hidden="true">⠿</span>
               </button>
@@ -437,11 +448,11 @@ export function StoryGraph({
                 aria-pressed={selected === p.id}
                 onClick={() => choose(p.id)}
               >
-                <strong>{p.title || "Untitled page"}</strong>
+                <strong>{p.title || "Untitled StoryNode"}</strong>
                 <span>
                   {link
                     ? "Connect here ↙"
-                    : p.transcript || "Select to edit this page"}
+                    : p.transcript || "Select to edit this StoryNode"}
                 </span>
               </button>
               <div className="graph-outputs">
@@ -458,18 +469,19 @@ export function StoryGraph({
                         link.edge.choiceId === edge.choiceId &&
                         link.edge.slot === edge.slot
                       }
-                      title={`${edge.label} → ${story.pages[edge.target]?.title ?? "Missing page"}`}
+                      title={`${edge.label} → ${story.storyNodes[edge.target]?.title ?? "Missing StoryNode"}`}
                       onClick={() => setLink({ source: p.id, edge })}
                     >
                       <span>{edge.label}</span>
                       <small>
-                        {story.pages[edge.target]?.title ?? "Missing page"}
+                        {story.storyNodes[edge.target]?.title ??
+                          "Missing StoryNode"}
                       </small>
                       <i aria-hidden="true">●</i>
                     </button>
                   ))
                 ) : (
-                  <p>Add outputs in page settings</p>
+                  <p>Add outputs in StoryNode settings</p>
                 )}
               </div>
             </article>
@@ -484,30 +496,30 @@ export function StoryGraph({
       >
         <div className="graph-add">
           <select
-            aria-label="New timeline page type"
+            aria-label="New timeline StoryNode type"
             value={kind}
-            onChange={(e) => setKind(e.target.value as NewPage)}
+            onChange={(e) => setKind(e.target.value as NewStoryNode)}
             disabled={disabled}
           >
-            <option value="text">Text page</option>
+            <option value="text">Text StoryNode</option>
             <option value="text-options">Text with options</option>
-            <option value="video">Video page</option>
+            <option value="video">Video StoryNode</option>
             <option value="video-options">Video with options</option>
             <option value="ending">Ending</option>
           </select>
           <Button
-            disabled={disabled || pages.length >= 80}
+            disabled={disabled || storyNodes.length >= 80}
             onClick={() => onAdd(kind)}
           >
-            + Add page
+            + Add StoryNode
           </Button>
         </div>
         <Button
           disabled={
             disabled ||
             !branchable ||
-            pages.length >= 80 ||
-            story.pages[selected].choices.length >= 20
+            storyNodes.length >= 80 ||
+            story.storyNodes[selected].choices.length >= 20
           }
           onClick={onBranch}
         >
@@ -516,13 +528,13 @@ export function StoryGraph({
         <Button
           disabled={disabled}
           onClick={() => {
-            onMove(arrangePages(story));
+            onMove(arrangeStoryNodes(story));
             setMoving({});
           }}
         >
           Arrange tree
         </Button>
-        <span className="graph-count">{pages.length} / 80 pages</span>
+        <span className="graph-count">{storyNodes.length} / 80 StoryNodes</span>
       </div>
 
       <div className="graph-floating graph-zoom" role="group" aria-label="Zoom">
@@ -552,7 +564,7 @@ export function StoryGraph({
           if (e.buttons) jump(e);
         }}
       >
-        {pages.map((p) => (
+        {storyNodes.map((p) => (
           <rect
             key={p.id}
             className={p.id === selected ? "selected" : ""}
@@ -577,15 +589,16 @@ export function StoryGraph({
         {link ? (
           <>
             <span>
-              Connect “{link.edge.label}” from {story.pages[link.source]?.title}
-              . Select a destination page.
+              Connect “{link.edge.label}” from{" "}
+              {story.storyNodes[link.source]?.title}. Select a destination
+              StoryNode.
             </span>
             <Button onClick={() => setLink(null)}>Cancel connection</Button>
           </>
         ) : (
           <span>
-            Drag the background to move around. Select an output, then a page,
-            to connect them.
+            Drag the background to move around. Select an output, then a
+            StoryNode, to connect them.
           </span>
         )}
       </div>

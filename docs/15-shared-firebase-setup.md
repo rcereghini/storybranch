@@ -32,7 +32,7 @@ pnpm seed:firebase
 pnpm dev
 ```
 
-The live seed writes only sample content (`stories`, `catalogue`, `branches`, `placements`). It creates missing records and promotes the known pre-page `v1` sample catalogue/branch/published pointers to `pages-v1`; newer pointers and placements are left alone. Existing immutable versions must have identical hashes. It does not create Auth accounts or demo profiles. Run it with server credentials to publish the three root mock stories. Repeat safely to fill missing sample content.
+The live seed writes only sample content (`stories`, `catalogue`, `branches`, `placements`). It creates missing records and promotes the known pre-StoryNode `v1` sample catalogue/branch/published pointers to `story-nodes-v1`; newer pointers and placements are left alone. Existing immutable versions must have identical hashes. It does not create Auth accounts or demo profiles. Run it with server credentials to publish the three root mock stories. Repeat safely to fill missing sample content.
 
 ## Storage for clip uploads
 
@@ -57,7 +57,7 @@ users/{uid}/clips/{clipId}                 uploaded clip record
 users/{uid}/receipts/{hash}                retry receipts; deleted 30 days after expireAt
 stories/{storyId}                          owner and published-edition pointer
 stories/{storyId}/versions/{versionId}     immutable edition (+ clips it uses)
-stories/{storyId}/versions/{v}/pages/{p}   frozen pages
+stories/{storyId}/versions/{v}/storyNodes/{p}   frozen StoryNodes
 catalogue/{storyId}                        public listing
 branches/{branchId}, placements/{locationId}  community side quests
 
@@ -72,7 +72,7 @@ Until October 2026 the live project kept everything under `storybranch/app/...` 
 
 ## Account access
 
-Publishing, uploads and page sharing, AI generation, Copilot and the admin dashboard are each turned on per account by a flag on the profile: `users/{uid}.features` with `publish`, `generate`, `copilot` and `admin`. `admin` implies all the others (see `20-admin.md`); admins can also change flags from the dashboard's Users tab. A missing flag means no access. The API reads the profile on every request anyway, so a change applies on the account's next request with no redeploy. Players can read their own profile but cannot change these flags: the profile API accepts only presentation fields and Firestore rules deny client writes.
+Publishing, uploads and StoryNode sharing, AI generation, Copilot and the admin dashboard are each turned on per account by a flag on the profile: `users/{uid}.features` with `publish`, `generate`, `copilot` and `admin`. `admin` implies all the others (see `20-admin.md`); admins can also change flags from the dashboard's Users tab. A missing flag means no access. The API reads the profile on every request anyway, so a change applies on the account's next request with no redeploy. Players can read their own profile but cannot change these flags: the profile API accepts only presentation fields and Firestore rules deny client writes.
 
 Manage flags with the local server credential:
 

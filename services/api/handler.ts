@@ -11,15 +11,19 @@ import {
   type Save,
   type Stats,
 } from "../../packages/contracts/index";
-import { isResultPage, start, transition } from "../../packages/domain/index";
+import {
+  isResultStoryNode,
+  start,
+  transition,
+} from "../../packages/domain/index";
 import { ensurePlayerProfile } from "./player-profile";
 import {
   accountFeatures,
   memberFeatures,
 } from "../../packages/contracts/profile";
 import { authoring } from "./authoring";
-import { pageMedia, pageImage, uploads } from "./uploads";
-import { pageLibrary, sharedPage } from "./page-library";
+import { storyNodeMedia, storyNodeImage, uploads } from "./uploads";
+import { storyNodeLibrary, sharedStoryNode } from "./story-node-library";
 import { generation } from "./generation";
 import { copilot } from "./copilot";
 import { assist } from "./assist";
@@ -27,6 +31,13 @@ import { admin } from "./admin";
 import { profileRoutes } from "./profile";
 import { edition } from "./story-store";
 import * as paths from "./paths";
+import {
+  legacyStoryData,
+  readStoryData,
+  storyApiPath,
+  storyContractHeader,
+  storyContractVersion,
+} from "../../packages/contracts/legacy-story-format";
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -53,9 +64,54 @@ const hash = (v: string) => createHash("sha256").update(v).digest("hex");
 async function owned(saveId: string, uid: string) {
   const d = await db.doc(paths.save(uid, saveId)).get();
   if (!d.exists) throw new GameError("NOT_FOUND", "Adventure not found.");
-  return d.data() as Save;
+  return readStoryData<Save>(d.data());
 }
+// Unversioned requests keep their historical response shape. New clients opt
+// into canonical names; the explicitly renamed endpoints do so inherently.
 export async function handle(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const canonicalClient =
+    request.headers.get(storyContractHeader) === storyContractVersion ||
+    /^\/api\/(?:story-nodes|shared-story-nodes)(?:\/|$)/.test(url.pathname);
+  url.pathname = storyApiPath(url.pathname);
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  let body: string | undefined;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    body = await request.text();
+    if (new TextEncoder().encode(body).length > 250000)
+      return json(
+        { error: { code: "VALIDATION_FAILED", message: "Command too large." } },
+        400,
+      );
+    if (!canonicalClient) {
+      try {
+        body = JSON.stringify(readStoryData(JSON.parse(body)));
+      } catch (error) {
+        if (error instanceof GameError)
+          return json(
+            { error: { code: error.code, message: error.message } },
+            400,
+          );
+        // The existing command parser reports malformed JSON.
+      }
+    }
+  }
+  const response = await handleCanonical(
+    new Request(url, {
+      method: request.method,
+      headers,
+      ...(body === undefined ? {} : { body }),
+      signal: request.signal,
+    }),
+  );
+  if (!response.headers.get("content-type")?.includes("application/json"))
+    return response;
+  const data = readStoryData(await response.json());
+  return json(canonicalClient ? data : legacyStoryData(data), response.status);
+}
+
+async function handleCanonical(request: Request): Promise<Response> {
   const correlationId = randomUUID();
   try {
     const url = new URL(request.url);
@@ -66,7 +122,7 @@ export async function handle(request: Request): Promise<Response> {
     if (cursor) id.parse(cursor);
     const limit = Number(url.searchParams.get("limit") ?? 20);
     if (!Number.isInteger(limit) || limit < 1 || limit > 50)
-      throw new GameError("VALIDATION_FAILED", "Page size must be 1–50.");
+      throw new GameError("VALIDATION_FAILED", "Batch size must be 1–50.");
     if (request.method === "GET" && path === "/api/catalogue") {
       let q = db
         .collection("catalogue")
@@ -82,10 +138,10 @@ export async function handle(request: Request): Promise<Response> {
     }
     if (
       request.method === "GET" &&
-      segments[1] === "shared-pages" &&
+      segments[1] === "shared-story-nodes" &&
       segments.length === 4
     )
-      return json(await sharedPage(segments[2], segments[3]));
+      return json(await sharedStoryNode(segments[2], segments[3]));
     const token = request.headers
       .get("authorization")
       ?.match(/^Bearer (.+)$/)?.[1];
@@ -137,9 +193,9 @@ export async function handle(request: Request): Promise<Response> {
     // Streams its reply, so it builds its own response.
     if (segments[1] === "copilot")
       return await copilot(request, uid, segments, features);
-    if (segments[1] === "pages")
+    if (segments[1] === "story-nodes")
       return json(
-        await pageLibrary(request, uid, segments, cursor, limit, features),
+        await storyNodeLibrary(request, uid, segments, cursor, limit, features),
       );
     if (segments[1] === "profile" || segments[1] === "dashboard")
       return json(
@@ -161,7 +217,7 @@ export async function handle(request: Request): Promise<Response> {
         }
         const d = await q.get();
         return json({
-          items: d.docs.map((x) => x.data()),
+          items: d.docs.map((x) => readStoryData(x.data())),
           nextCursor:
             d.size === limit
               ? `${d.docs.at(-1)!.data().updatedAt}_${d.docs.at(-1)!.id}`
@@ -187,26 +243,29 @@ export async function handle(request: Request): Promise<Response> {
           const { story, clips } = await db.runTransaction((tx) =>
             edition(tx, s.storyId, s.versionId),
           );
-          const page = story.pages[s.pageId];
+          const storyNode = story.storyNodes[s.storyNodeId];
           const next =
-            page.choices.length === 1 &&
-            !page.choices[0].availableWhen &&
-            page.choices[0].outcome.kind === "direct"
-              ? story.pages[page.choices[0].outcome.route.targetPageId]
+            storyNode.choices.length === 1 &&
+            !storyNode.choices[0].availableWhen &&
+            storyNode.choices[0].outcome.kind === "direct"
+              ? story.storyNodes[
+                  storyNode.choices[0].outcome.route.targetStoryNodeId
+                ]
               : undefined;
           let branches: unknown[] = [];
           let featuredId: string | null = null;
-          if (page.branchLocation) {
+          if (storyNode.branchLocation) {
             branches = (
               await db
                 .collection("branches")
-                .where("locationId", "==", page.branchLocation)
+                .where("locationId", "==", storyNode.branchLocation)
                 .limit(20)
                 .get()
             ).docs.map((d) => d.data());
             featuredId =
-              (await db.doc(`placements/${page.branchLocation}`).get()).data()
-                ?.nominatedBranchId ?? null;
+              (
+                await db.doc(`placements/${storyNode.branchLocation}`).get()
+              ).data()?.nominatedBranchId ?? null;
           }
           return json({
             save: s,
@@ -219,21 +278,23 @@ export async function handle(request: Request): Promise<Response> {
               id: uid,
               stats: profile.data()!.stats,
               achievements: profile.data()!.achievements ?? [],
-              saveSpots: [{ id: s.id, storyId: s.storyId, pageId: s.pageId }],
+              saveSpots: [
+                { id: s.id, storyId: s.storyId, storyNodeId: s.storyNodeId },
+              ],
             },
-            page,
+            storyNode,
             // Quiz results share as "my result" rather than an ending.
-            result: isResultPage(story, page.id),
-            media: pageMedia(page.video, clips),
-            nextMedia: next?.pageType.startsWith("video")
-              ? pageMedia(next.video, clips)
+            result: isResultStoryNode(story, storyNode.id),
+            media: storyNodeMedia(storyNode.video, clips),
+            nextMedia: next?.storyNodeType.startsWith("video")
+              ? storyNodeMedia(next.video, clips)
               : undefined,
-            image: pageImage(page.image, clips),
+            image: storyNodeImage(storyNode.image, clips),
             // Comic panel images, in panel order.
-            ...(page.comic
+            ...(storyNode.comic
               ? {
-                  panels: page.comic.panels.map((p) =>
-                    pageImage(p.image, clips),
+                  panels: storyNode.comic.panels.map((p) =>
+                    storyNodeImage(p.image, clips),
                   ),
                 }
               : {}),
@@ -286,7 +347,7 @@ export async function handle(request: Request): Promise<Response> {
             "IDEMPOTENCY_CONFLICT",
             "Command key was already used for a different request.",
           );
-        return previous.data()!.result;
+        return readStoryData(previous.data()!.result);
       }
       let save: Save;
       let event: Record<string, unknown>;
@@ -312,7 +373,7 @@ export async function handle(request: Request): Promise<Response> {
         event = {
           label: `Started ${story.title}`,
           from: null,
-          to: save.pageId,
+          to: save.storyNodeId,
           revision: 0,
           at: now,
         };
@@ -321,7 +382,7 @@ export async function handle(request: Request): Promise<Response> {
         const snapshot = await tx.get(ref);
         if (!snapshot.exists)
           throw new GameError("NOT_FOUND", "Adventure not found.");
-        const current = snapshot.data() as Save;
+        const current = readStoryData<Save>(snapshot.data());
         const { story } = await edition(tx, current.storyId, current.versionId);
         if (kind === "choice") {
           const c = choiceCommandSchema.parse(command);
@@ -356,7 +417,8 @@ export async function handle(request: Request): Promise<Response> {
           ).data();
           if (
             !b ||
-            b.locationId !== story.pages[current.pageId].branchLocation ||
+            b.locationId !==
+              story.storyNodes[current.storyNodeId].branchLocation ||
             b.sourceVersionId !== current.versionId
           )
             throw new GameError(
@@ -372,7 +434,7 @@ export async function handle(request: Request): Promise<Response> {
           event = {
             label: "Entered community side quest",
             from: null,
-            to: save.pageId,
+            to: save.storyNodeId,
             revision: 0,
             at: now,
           };

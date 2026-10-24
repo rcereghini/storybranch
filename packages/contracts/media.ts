@@ -75,12 +75,12 @@ export type ClipAsset = {
   status: "pending" | "ready";
   published: boolean;
   createdAt: number;
-  // Present once ready; only ever sent to the owner or for published pages.
+  // Present once ready; only ever sent to the owner or for published StoryNodes.
   media?: SceneMedia;
   url?: string;
 };
 // The Storage file behind an uploaded clip or photo, frozen into a published
-// edition or shared library page.
+// edition or shared library StoryNode.
 export type PublishedClip = {
   path: string;
   token: string;

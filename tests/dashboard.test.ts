@@ -16,7 +16,7 @@ const save = (overrides: Partial<Save>): Save => ({
   storyId: "harbor",
   versionId: "v1",
   rulesetVersion: "prototype-1",
-  pageId: "dock",
+  storyNodeId: "dock",
   revision: 1,
   status: "active",
   stats: baseStats,
@@ -33,7 +33,7 @@ const save = (overrides: Partial<Save>): Save => ({
 });
 const harbor: StoryOutline = {
   title: "The Harbor",
-  pages: {
+  storyNodes: {
     dock: { title: "The dock", kind: "scene" },
     home: { title: "Home again", kind: "ending" },
     sea: { title: "Out to sea", kind: "ending" },
@@ -54,9 +54,9 @@ const catalogue = [entry("harbor", "The Harbor"), entry("door", "The Door")];
 it("derives story status, distinct endings and totals from saves", () => {
   const summary = summarizeDashboard(
     [
-      save({ id: "a", status: "completed", pageId: "home", updatedAt: 3 }),
-      save({ id: "b", status: "completed", pageId: "home", updatedAt: 4 }),
-      save({ id: "c", status: "completed", pageId: "sea", updatedAt: 5 }),
+      save({ id: "a", status: "completed", storyNodeId: "home", updatedAt: 3 }),
+      save({ id: "b", status: "completed", storyNodeId: "home", updatedAt: 4 }),
+      save({ id: "c", status: "completed", storyNodeId: "sea", updatedAt: 5 }),
       save({
         id: "d",
         updatedAt: 6,
@@ -67,7 +67,7 @@ it("derives story status, distinct endings and totals from saves", () => {
         id: "side",
         storyId: "bell",
         versionId: "b1",
-        pageId: "bell-tower",
+        storyNodeId: "bell-tower",
         parentPlaythroughId: "d",
         keys: ["harbor:pass"],
         updatedAt: 7,
@@ -100,13 +100,15 @@ it("derives story status, distinct endings and totals from saves", () => {
     }),
   ]);
   // Most recent first; unknown editions fall back to ids, not errors.
-  expect(summary.continue.map((c) => [c.saveId, c.pageTitle])).toEqual([
+  expect(summary.continue.map((c) => [c.saveId, c.storyNodeTitle])).toEqual([
     ["side", "bell tower"],
     ["d", "The dock"],
   ]);
   expect(summary.continue[0]).toMatchObject({ sideQuest: true, title: "bell" });
   // Reaching "Home again" twice lists it once, at its latest save.
-  expect(summary.recentEndings.map((e) => [e.pageTitle, e.saveId])).toEqual([
+  expect(
+    summary.recentEndings.map((e) => [e.storyNodeTitle, e.saveId]),
+  ).toEqual([
     ["Out to sea", "c"],
     ["Home again", "b"],
   ]);
@@ -114,7 +116,7 @@ it("derives story status, distinct endings and totals from saves", () => {
 
 it("reports a finished story as completed once nothing is active", () => {
   const summary = summarizeDashboard(
-    [save({ status: "completed", pageId: "lost" })],
+    [save({ status: "completed", storyNodeId: "lost" })],
     outlines,
     catalogue,
   );
@@ -132,7 +134,7 @@ it("recommends unplayed favorite genres first, then hidden endings", () => {
     entry("door", "The Door", "Fantasy"),
     entry("rocket", "Rocket", "Sci-fi thriller"),
   ];
-  const finished = [save({ status: "completed", pageId: "home" })];
+  const finished = [save({ status: "completed", storyNodeId: "home" })];
   const picks = summarizeDashboard(
     finished,
     outlines,
@@ -146,7 +148,7 @@ it("recommends unplayed favorite genres first, then hidden endings", () => {
     ["harbor", "2 endings left to find"],
   ]);
   expect(genreOf("Sci-fi thriller")).toBe("sci-fi");
-  expect(genreOf("Mixed-page prototype")).toBeNull();
+  expect(genreOf("Mixed StoryNode prototype")).toBeNull();
 });
 
 it("merges recent story-log events across saves, newest first", () => {
@@ -256,7 +258,7 @@ it("keeps hidden stories for players who started them but never recommends them"
     entry("lamp", "The Lamp"),
   ];
   const summary = summarizeDashboard(
-    [save({ id: "a", status: "completed", pageId: "home" })],
+    [save({ id: "a", status: "completed", storyNodeId: "home" })],
     outlines,
     withHidden,
   );

@@ -7,25 +7,25 @@ export function validatePublication(input: unknown): Story {
     const story = validateStory(input);
     if (!story.title.trim()) throw new Error("Give the story a title.");
     const reached = new Set<string>();
-    const destinations = (pageId: string) =>
-      story.pages[pageId].choices.flatMap((c) =>
-        routesOf(c).map((r) => r.targetPageId),
+    const destinations = (storyNodeId: string) =>
+      story.storyNodes[storyNodeId].choices.flatMap((c) =>
+        routesOf(c).map((r) => r.targetStoryNodeId),
       );
-    const visit = (pageId: string) => {
-      if (reached.has(pageId)) return;
-      reached.add(pageId);
-      destinations(pageId).forEach(visit);
+    const visit = (storyNodeId: string) => {
+      if (reached.has(storyNodeId)) return;
+      reached.add(storyNodeId);
+      destinations(storyNodeId).forEach(visit);
     };
-    visit(story.entryPageId);
-    const unreachable = Object.keys(story.pages).filter(
+    visit(story.entryStoryNodeId);
+    const unreachable = Object.keys(story.storyNodes).filter(
       (id) => !reached.has(id),
     );
     if (unreachable.length)
       throw new Error(
-        `Connect or remove unreachable pages: ${unreachable.join(", ")}`,
+        `Connect or remove unreachable StoryNodes: ${unreachable.join(", ")}`,
       );
     const exits = new Set(
-      Object.values(story.pages)
+      Object.values(story.storyNodes)
         .filter((p) => p.kind === "ending")
         .map((p) => p.id),
     );

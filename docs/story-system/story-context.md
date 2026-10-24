@@ -10,10 +10,11 @@ StoryContext describes **which story edition is being played and what it permits
 | --- | --- |
 | Story identity and edition ID | Stable work and exact immutable publication |
 | Schema/rules/type versions | Versions that define validation and gameplay meaning |
-| Entry and graph | Node placements, content revision references, inputs and output bindings |
+| Title/configuration root | Exactly one StoryTrunk; title/cover/synopsis, Story settings and context definitions, configured outside the playthrough |
+| Entry and graph | StoryTrunk start connection, StoryNodes, content revision references, typed inputs, StoryBranch data/conditions and StoryLeaf completion/reward definitions |
 | Variable/key/item/score definitions | Declared IDs, types, bounds, initial values and permitted effects |
 | Import/export declarations | Which external facts may be read and which verified local facts may be exported |
-| Branch entry/return policy | Allowed child context and parent reference semantics |
+| Child Story entry/return policy | Allowed child context and parent reference semantics; ordinary StoryBranch traversal stays in the current run |
 | Asset manifest | Pinned, validated media used by the edition |
 | Completion and display metadata | Ending definitions, safe titles and presentation policy |
 

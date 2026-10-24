@@ -66,9 +66,9 @@ export function assetView(id: string, asset: DocumentData): ClipAsset {
   };
 }
 
-// Media for a page in a published edition (or a shared library page): a
+// Media for a StoryNode in a published edition (or a shared library StoryNode): a
 // shipped clip or an uploaded file recorded when it was published.
-export function pageMedia(
+export function storyNodeMedia(
   video: string | undefined,
   clips: Record<string, PublishedClip>,
 ) {
@@ -77,7 +77,7 @@ export function pageMedia(
   return clips[assetId] ? clipMedia(clips[assetId]) : undefined;
 }
 
-export function pageImage(
+export function storyNodeImage(
   image: string | undefined,
   clips: Record<string, PublishedClip>,
 ) {

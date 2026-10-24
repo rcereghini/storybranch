@@ -522,18 +522,18 @@ hr {
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
 }
-.reading-page {
+.reading-story-node {
   padding: clamp(24px, 5vw, 64px);
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface-1);
   box-shadow: var(--shadow);
 }
-.reading-page h1 {
+.reading-story-node h1 {
   font: 600 clamp(32px, 5vw, 52px) / 1.1 var(--font-story);
   margin: 16px 0 24px;
 }
-.page-copy {
+.story-node-copy {
   font: 20px/1.8 var(--font-story);
   color: var(--text-body);
   white-space: pre-wrap;
@@ -639,7 +639,7 @@ hr {
   overflow-wrap: anywhere;
   line-height: 1.4;
 }
-.library-page-card {
+.library-story-node-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -723,12 +723,12 @@ hr {
     12px "Segoe UI",
     sans-serif;
 }
-.library-page-card h3 {
+.library-story-node-card h3 {
   margin: 0;
   font-size: 20px;
   overflow-wrap: anywhere;
 }
-.library-page-card .library-excerpt {
+.library-story-node-card .library-excerpt {
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -737,7 +737,7 @@ hr {
   color: var(--muted);
   font-size: 14px;
 }
-.library-page-card .library-completion {
+.library-story-node-card .library-completion {
   margin: 0;
   font-size: 12px;
   color: var(--muted);
@@ -796,21 +796,21 @@ hr {
   background: var(--warning-soft);
   color: var(--warning);
 }
-/* Reusable pages: a compact panel with inline actions. */
-.page-library {
+/* Reusable views: a compact panel with inline actions. */
+.story-node-library {
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface-1);
   box-shadow: var(--shadow);
 }
-.page-library > h2 {
+.story-node-library > h2 {
   margin: 0;
   font: 700 18px/1.3 var(--font-display);
 }
-.page-library > p.studio-sub {
+.story-node-library > p.studio-sub {
   margin-bottom: 12px;
 }
-.page-library > .ui-button {
+.story-node-library > .ui-button {
   display: inline-flex;
   align-items: center;
   min-height: 40px;

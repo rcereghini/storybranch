@@ -14,6 +14,6 @@ export function Story({
 }
 export function useStory() {
   const context = useContext(Context);
-  if (!context) throw new Error("Page must belong to a Story");
+  if (!context) throw new Error("StoryNode must belong to a Story");
   return context;
 }

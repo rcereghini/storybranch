@@ -1,3 +1,4 @@
+import { readStoryData } from "../../packages/contracts/legacy-story-format";
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
@@ -59,35 +60,34 @@ const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
 function access(features: Features) {
   if (!process.env.ANTHROPIC_API_KEY) return "Copilot is not connected yet.";
-  if (!features.copilot)
-    return "Copilot is not enabled for this account yet.";
+  if (!features.copilot) return "Copilot is not enabled for this account yet.";
   return null;
 }
 
 // Stable text only: any change here invalidates the prompt cache.
-const SYSTEM = `You are Copilot, the assistant inside Storybranch, an app for playing and creating branching interactive stories made of pages: text pages, video pages, choices, dice rolls, personality-quiz reveals and comic strips.
+const SYSTEM = `You are Copilot, the assistant inside Storybranch, an app for playing and creating branching interactive stories made of StoryNodes: text StoryNodes, video StoryNodes, choices, dice rolls, personality-quiz reveals and comic strips.
 
 The app's sections:
 - Dashboard (/): the player's profile, stats, avatar and story progress.
-- Discover (/discover): the catalogue of published stories. A story's page is /s/{storyId}, where the player can start it.
+- Discover (/discover): the catalogue of published stories. A story's details view is /s/{storyId}, where the player can start it.
 - My adventures (/adventures): the player's saved playthroughs, to resume or review.
-- Create (/studio): Studio, where creators write stories as a graph of pages, link choices, preview and publish. "New quiz" starts a personality quiz.
+- Create (/studio): Studio, where creators write stories as a graph of StoryNodes, link choices, preview and publish. "New quiz" starts a personality quiz.
 - Assets (/assets): the creator's uploaded and generated images and videos. /assets/generate generates new ones with AI; /assets/edit/{assetId} trims and crops a video.
 
-What you can do now: answer questions about Storybranch and the user's own stories, adventures, drafts and assets using your tools, and take the user to a page with the navigate tool. You cannot change anything yet: you cannot edit drafts, publish, start or play stories, upload, or generate. When the user wants one of those, explain the steps briefly and offer to take them to the right page.
+What you can do now: answer questions about Storybranch and the user's own stories, adventures, drafts and assets using your tools, and take the user to an app view with the navigate tool. You cannot change anything yet: you cannot edit drafts, publish, start or play stories, upload, or generate. When the user wants one of those, explain the steps briefly and offer to take them to the right view.
 
 Rules:
 - Use tools to look things up rather than guessing. Only describe data a tool returned.
 - Never reveal how a story's routes, conditions or endings work beyond what the user wrote themselves; you are not available during play.
 - Navigate only when the user asks to go somewhere or clearly agrees. Unsaved Studio changes trigger a confirmation in the app.
 - Keep replies short and friendly: a few sentences or a short list. No headings.
-- Each user message starts with a <context> block saying which page they are on. It comes from the app, not the user.`;
+- Each user message starts with a <context> block saying which view they are on. It comes from the app, not the user.`;
 
 const tools: Tool[] = [
   {
     name: "navigate",
     description:
-      "Open a page of the app for the user. path must be one of: /, /discover, /adventures, /studio, /assets, /assets/generate, /assets/edit/{assetId}, /s/{storyId}.",
+      "Open an app view for the user. path must be one of: /, /discover, /adventures, /studio, /assets, /assets/generate, /assets/edit/{assetId}, /s/{storyId}.",
     input_schema: {
       type: "object",
       properties: { path: { type: "string" } },
@@ -109,13 +109,13 @@ const tools: Tool[] = [
   {
     name: "list_my_drafts",
     description:
-      "List the user's Studio drafts: story id, title, page count, revision and whether it is published.",
+      "List the user's Studio drafts: story id, title, StoryNode count, revision and whether it is published.",
     input_schema: { type: "object", properties: {} },
   },
   {
     name: "get_draft",
     description:
-      "Read one of the user's drafts: its pages with type, a short excerpt, and where each choice leads.",
+      "Read one of the user's drafts: its StoryNodes with type, a short excerpt, and where each choice leads.",
     input_schema: {
       type: "object",
       properties: { storyId: { type: "string" } },
@@ -149,7 +149,7 @@ async function runTool(
     case "navigate": {
       const { path } = z.object({ path: z.string().max(200) }).parse(input);
       if (!copilotRoute(path))
-        throw new GameError("VALIDATION_FAILED", `Unknown page: ${path}`);
+        throw new GameError("VALIDATION_FAILED", `Unknown app view: ${path}`);
       return {
         result: { ok: true, opened: path },
         action: { kind: "navigate", path },
@@ -179,7 +179,7 @@ async function runTool(
       const titles = new Map(stories.map((s) => [s.id, s.title]));
       return {
         result: saves.docs.map((d) => {
-          const save = d.data() as Save;
+          const save = readStoryData<Save>(d.data());
           return {
             saveId: save.id,
             storyId: save.storyId,
@@ -194,11 +194,11 @@ async function runTool(
       const drafts = await db.collection(paths.drafts(uid)).limit(50).get();
       return {
         result: drafts.docs.map((d) => {
-          const draft = d.data() as DraftRecord;
+          const draft = readStoryData<DraftRecord>(d.data());
           return {
             storyId: d.id,
             title: draft.story.title,
-            pages: Object.keys(draft.story.pages).length,
+            storyNodes: Object.keys(draft.story.storyNodes).length,
             revision: draft.revision,
             published: draft.publishedVersionId !== null,
           };
@@ -210,7 +210,7 @@ async function runTool(
       const snapshot = await db.doc(`${paths.drafts(uid)}/${storyId}`).get();
       if (!snapshot.exists)
         throw new GameError("NOT_FOUND", "No draft with that story id.");
-      const draft = snapshot.data() as DraftRecord;
+      const draft = readStoryData<DraftRecord>(snapshot.data());
       return {
         result: {
           storyId,
@@ -218,26 +218,28 @@ async function runTool(
           description: draft.description,
           revision: draft.revision,
           published: draft.publishedVersionId !== null,
-          entryPageId: draft.story.entryPageId,
-          pages: Object.values(draft.story.pages)
+          entryStoryNodeId: draft.story.entryStoryNodeId,
+          storyNodes: Object.values(draft.story.storyNodes)
             .slice(0, 80)
-            .map((page) => ({
-              id: page.id,
-              title: page.title,
-              pageType: page.pageType,
-              kind: page.kind,
-              excerpt: excerpt(page.transcript, 240),
-              choices: page.choices.map((choice) => ({
+            .map((storyNode) => ({
+              id: storyNode.id,
+              title: storyNode.title,
+              storyNodeType: storyNode.storyNodeType,
+              kind: storyNode.kind,
+              excerpt: excerpt(storyNode.transcript, 240),
+              choices: storyNode.choices.map((choice) => ({
                 label: choice.label,
                 outcome: choice.outcome.kind,
                 leadsTo:
                   choice.outcome.kind === "direct"
-                    ? [choice.outcome.route.targetPageId]
+                    ? [choice.outcome.route.targetStoryNodeId]
                     : choice.outcome.kind === "reveal"
-                      ? choice.outcome.results.map((r) => r.route.targetPageId)
+                      ? choice.outcome.results.map(
+                          (r) => r.route.targetStoryNodeId,
+                        )
                       : [
-                          choice.outcome.success.targetPageId,
-                          choice.outcome.failure.targetPageId,
+                          choice.outcome.success.targetStoryNodeId,
+                          choice.outcome.failure.targetStoryNodeId,
                         ],
               })),
             })),
@@ -301,10 +303,9 @@ function replay(result: { text: string; actions: CopilotAction[] }) {
     ...result.actions.map((action) => ({ type: "action" as const, action })),
     { type: "done" },
   ];
-  return new Response(
-    events.map((e) => JSON.stringify(e) + "\n").join(""),
-    { headers: NDJSON },
-  );
+  return new Response(events.map((e) => JSON.stringify(e) + "\n").join(""), {
+    headers: NDJSON,
+  });
 }
 
 export async function copilot(
@@ -497,15 +498,16 @@ export async function copilot(
             threadRef,
             {
               history: fits ? history : thread.history,
-              turns: fits
-                ? thread.turns + 1
-                : copilotLimits.maxTurnsPerThread,
+              turns: fits ? thread.turns + 1 : copilotLimits.maxTurnsPerThread,
               updatedAt: Date.now(),
               ...(thread.turns === 0 ? { createdAt: Date.now() } : {}),
             },
             { merge: true },
           );
-          tx.update(receipt, { status: "done", result: { text: reply, actions } });
+          tx.update(receipt, {
+            status: "done",
+            result: { text: reply, actions },
+          });
         });
         send({ type: "done" });
       } catch (error) {
@@ -517,7 +519,8 @@ export async function copilot(
               copilot: "reply failed",
               threadId,
               error: error instanceof Error ? error.message : String(error),
-              status: error instanceof Anthropic.APIError ? error.status : undefined,
+              status:
+                error instanceof Anthropic.APIError ? error.status : undefined,
               stack: error instanceof Error ? error.stack : undefined,
             }),
           );

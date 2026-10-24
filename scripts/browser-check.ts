@@ -5,82 +5,93 @@ const browser = await launchBrowser();
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
 });
-const page = await context.newPage();
+const browserTab = await context.newPage();
 const errors: string[] = [];
-page.on("pageerror", (e) => errors.push(e.message));
+browserTab.on("pageerror", (e) => errors.push(e.message));
 const click = async (name: string) => {
-  await page.getByRole("button", { name, exact: false }).first().click();
+  await browserTab.getByRole("button", { name, exact: false }).first().click();
 };
 const heading = async (name: string) => {
   if (!["The Glass Harbor.", "Your story log"].includes(name)) {
-    await page.getByLabel(`${name} scene video`, { exact: true }).waitFor();
+    await browserTab
+      .getByLabel(`${name} scene video`, { exact: true })
+      .waitFor();
     // Most flow checks skip intentionally; automatic start/end is asserted separately.
     if (
-      (await page.locator(".scene-overlay").getAttribute("aria-hidden")) ===
-      "true"
+      (await browserTab
+        .locator(".scene-overlay")
+        .getAttribute("aria-hidden")) === "true"
     )
-      await page
+      await browserTab
         .getByRole("button", { name: "Pause video", exact: true })
         .click();
   }
-  await page.getByRole("heading", { name, exact: true }).waitFor();
+  await browserTab.getByRole("heading", { name, exact: true }).waitFor();
 };
 await mkdir("test-results", { recursive: true });
 await context.tracing.start({ screenshots: true, snapshots: true });
 try {
-  await page.goto("http://127.0.0.1:5173");
+  await browserTab.goto("http://127.0.0.1:5173");
   await heading("The Glass Harbor.");
-  await page.screenshot({
+  await browserTab.screenshot({
     path: "test-results/catalogue-desktop.png",
     fullPage: true,
   });
   await click("Sign in");
-  await page.keyboard.press("Escape");
-  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await browserTab.keyboard.press("Escape");
+  await browserTab.getByRole("dialog").waitFor({ state: "hidden" });
   await click("Sign in");
-  await page
+  await browserTab
     .getByRole("dialog")
     .getByRole("button", { name: "Sign in ↗", exact: true })
     .click();
-  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await browserTab.getByRole("dialog").waitFor({ state: "hidden" });
   // Detail always permits a fresh run, regardless of pre-existing emulator saves.
-  await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
+  await browserTab.goto(
+    "http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor",
+  );
   await click("Start a new journey");
-  await startPlayback(page);
-  await page.waitForFunction(() => {
+  await startPlayback(browserTab);
+  await browserTab.waitForFunction(() => {
     const v = document.querySelector("video");
     return v && !v.paused && v.currentTime > 0;
   });
   assert.equal(
-    await page.getByRole("button", { name: /Speak to the courier/ }).count(),
+    await browserTab
+      .getByRole("button", { name: /Speak to the courier/ })
+      .count(),
     0,
   );
-  await page.waitForFunction(
+  await browserTab.waitForFunction(
     () =>
       getComputedStyle(document.querySelector(".scene-overlay")!).opacity ===
       "0",
   );
-  await page.screenshot({
+  await browserTab.screenshot({
     path: "test-results/playback-active.png",
     fullPage: true,
   });
-  await page.waitForFunction(() => document.querySelector("video")?.ended);
+  await browserTab.waitForFunction(
+    () => document.querySelector("video")?.ended,
+  );
   await heading("A signal in the fog");
   assert(
-    await page
+    await browserTab
       .getByRole("button", { name: /Show your harbor pass/ })
       .isDisabled(),
   );
-  await page.locator("video").evaluate(async (v: HTMLVideoElement) => {
+  await browserTab.locator("video").evaluate(async (v: HTMLVideoElement) => {
     await v.play();
   });
-  await page.waitForFunction(
+  await browserTab.waitForFunction(
     () => document.querySelector("video")!.currentTime > 0,
   );
-  await page.locator("video").evaluate((v: HTMLVideoElement) => v.pause());
+  await browserTab
+    .locator("video")
+    .evaluate((v: HTMLVideoElement) => v.pause());
   // Lose the response after the server commits. Retry must use the same key.
   let dropped = false;
-  await page.route("**/api/playthroughs/*/choices", async (route) => {
+  await browserTab.route("**/api/playthroughs/*/choices", async (route) => {
     if (!dropped) {
       dropped = true;
       await route.fetch();
@@ -88,53 +99,61 @@ try {
     } else await route.continue();
   });
   await click("Speak to the courier");
-  await page.getByRole("button", { name: "Retry same request" }).waitFor();
+  await browserTab
+    .getByRole("button", { name: "Retry same request" })
+    .waitFor();
   await click("Retry same request");
-  await page
+  await browserTab
     .getByLabel("A favor, remembered scene video", { exact: true })
     .waitFor();
-  await page.waitForFunction(() => {
+  await browserTab.waitForFunction(() => {
     const v = document.querySelector("video");
     return v && !v.paused && v.currentTime > 0;
   });
   await heading("A favor, remembered");
-  await page.getByText("✓ Saved · revision 1", { exact: true }).waitFor();
-  await page.unroute("**/api/playthroughs/*/choices");
-  await page.reload();
+  await browserTab.getByText("✓ Saved · revision 1", { exact: true }).waitFor();
+  await browserTab.unroute("**/api/playthroughs/*/choices");
+  await browserTab.reload();
   await heading("A favor, remembered");
   // Missing media remains playable through the complete transcript.
-  await page.route("**/media/*-landscape.mp4", (route) => route.abort());
-  await page.reload();
-  await page.getByText("The clip couldn’t load.", { exact: false }).waitFor();
-  await assert.rejects(() => startPlayback(page), /Playback failed:.*"source"/);
-  await page.unroute("**/media/*-landscape.mp4");
+  await browserTab.route("**/media/*-landscape.mp4", (route) => route.abort());
+  await browserTab.reload();
+  await browserTab
+    .getByText("The clip couldn’t load.", { exact: false })
+    .waitFor();
+  await assert.rejects(
+    () => startPlayback(browserTab),
+    /Playback failed:.*"source"/,
+  );
+  await browserTab.unroute("**/media/*-landscape.mp4");
   await click("Retry video");
   // The retried clip autoplays and makes the choices inert; if that lands
   // between focus and Enter the keypress is lost, so wait for it and skip.
-  await startPlayback(page);
+  await startPlayback(browserTab);
   await click("Skip to choices");
-  await page.getByRole("button", { name: /Follow the lanterns/ }).focus();
-  await page.keyboard.press("Enter");
+  await browserTab.getByRole("button", { name: /Follow the lanterns/ }).focus();
+  await browserTab.keyboard.press("Enter");
   await heading("The lantern market");
   // Check both delivery renditions and overlay bounds around the breakpoint.
   for (const width of [320, 390, 700, 701, 768, 1024, 1440]) {
-    await page.setViewportSize({ width, height: 1000 });
-    await page.waitForFunction(
+    await browserTab.setViewportSize({ width, height: 1000 });
+    await browserTab.waitForFunction(
       (portrait) =>
         document
           .querySelector("video")
           ?.currentSrc.includes(portrait ? "-portrait.mp4" : "-landscape.mp4"),
       width <= 700,
     );
-    await page.waitForFunction(
+    await browserTab.waitForFunction(
       () => document.querySelector("video")!.readyState >= 1,
     );
     if (
-      (await page.locator(".scene-overlay").getAttribute("aria-hidden")) ===
-      "true"
+      (await browserTab
+        .locator(".scene-overlay")
+        .getAttribute("aria-hidden")) === "true"
     )
       await click("Skip to choices");
-    const metrics = await page.evaluate(() => {
+    const metrics = await browserTab.evaluate(() => {
       const v = document.querySelector("video")!;
       const scene = document
         .querySelector(".scene-stage")!
@@ -159,7 +178,7 @@ try {
     assert(
       (metrics.optionsRight <= metrics.sceneRight + 1 &&
         metrics.optionsBottom <= metrics.sceneBottom + 1) ||
-        (await page
+        (await browserTab
           .locator(".scene-overlay")
           .evaluate(
             (e) =>
@@ -169,37 +188,41 @@ try {
       `Overlay out of bounds at ${width}`,
     );
     if (width === 390 || width === 1440)
-      await page.screenshot({
+      await browserTab.screenshot({
         path: `test-results/overlay-${width}.png`,
         fullPage: true,
       });
   }
-  await page
+  await browserTab
     .getByRole("button", { name: /^(Watch scene|Start story with sound)$/ })
     .click();
-  await page.getByRole("button", { name: "Skip to choices" }).waitFor();
+  await browserTab.getByRole("button", { name: "Skip to choices" }).waitFor();
   assert.equal(
-    await page.getByRole("button", { name: /Run across the rooftops/ }).count(),
+    await browserTab
+      .getByRole("button", { name: /Run across the rooftops/ })
+      .count(),
     0,
   );
   await click("Skip to choices");
   await heading("The lantern market");
-  await page.getByText("Share this adventure", { exact: true }).click();
+  await browserTab.getByText("Share this adventure", { exact: true }).click();
   await context.grantPermissions(["clipboard-read", "clipboard-write"], {
     origin: "http://127.0.0.1:5173",
   });
   await click("Copy story link");
   assert.equal(
-    await page.evaluate(() => navigator.clipboard.readText()),
+    await browserTab.evaluate(() => navigator.clipboard.readText()),
     "http://127.0.0.1:5173/s/glass-harbor",
   );
-  const downloadEvent = page.waitForEvent("download");
-  await page.getByRole("link", { name: /Download vertical teaser/ }).click();
+  const downloadEvent = browserTab.waitForEvent("download");
+  await browserTab
+    .getByRole("link", { name: /Download vertical teaser/ })
+    .click();
   const download = await downloadEvent;
   await download.saveAs("test-results/shared-teaser.mp4");
   const file = await readFile("test-results/shared-teaser.mp4");
   assert.equal(file.toString("ascii", 4, 8), "ftyp");
-  const parentUrl = page.url();
+  const parentUrl = browserTab.url();
   // Browser autoplay policy should offer a play gesture, not claim media is broken.
   const blockedTab = await context.newPage();
   await blockedTab.addInitScript(
@@ -235,13 +258,15 @@ try {
   await heading("A small light");
   await click("Return to main adventure");
   await heading("The lantern market");
-  assert.equal(page.url(), parentUrl);
-  await page.getByText("More community stories (1)", { exact: true }).click();
+  assert.equal(browserTab.url(), parentUrl);
+  await browserTab
+    .getByText("More community stories (1)", { exact: true })
+    .click();
   await click("Paper Moon");
   await heading("Paper Moon");
   await click("Return to main adventure");
   await heading("The lantern market");
-  await page.screenshot({
+  await browserTab.screenshot({
     path: "test-results/player-desktop.png",
     fullPage: true,
   });
@@ -256,16 +281,16 @@ try {
     .getByRole("heading", { name: "A signal in the fog", exact: true })
     .waitFor();
   await click("Run across the rooftops");
-  await page
+  await browserTab
     .getByText("Progress changed on another device.", { exact: false })
     .waitFor();
   await click("Reload current progress");
   await heading("A signal in the fog");
   await tab.close();
   await context.setOffline(true);
-  await page.getByText("You’re offline.", { exact: false }).waitFor();
+  await browserTab.getByText("You’re offline.", { exact: false }).waitFor();
   assert(
-    await page
+    await browserTab
       .getByRole("button", { name: /Speak to the courier/ })
       .isDisabled(),
   );
@@ -279,51 +304,51 @@ try {
   await click("Story log");
   await heading("Your story log");
   // Sign out lives in the account menu.
-  await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await browserTab.getByRole("button", { name: "Account menu" }).click();
+  await browserTab.getByRole("button", { name: "Sign out" }).click();
   await click("Sign in");
-  await page
+  await browserTab
     .getByLabel("Email", { exact: true })
     .fill("progressed@storybranch.test");
-  await page
+  await browserTab
     .getByRole("dialog")
     .getByRole("button", { name: "Sign in ↗", exact: true })
     .click();
-  await page.getByRole("dialog").waitFor({ state: "hidden" });
-  await page.goto("http://127.0.0.1:5173/s/glass-harbor");
+  await browserTab.getByRole("dialog").waitFor({ state: "hidden" });
+  await browserTab.goto("http://127.0.0.1:5173/s/glass-harbor");
   await click("Start a new journey");
   await heading("A signal in the fog");
   await click("Slip into the night market");
   await heading("The lantern market");
   await click("Run across the rooftops");
   await heading("The light returns");
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
+  await browserTab.setViewportSize({ width: 390, height: 844 });
+  await browserTab.screenshot({
     path: "test-results/player-mobile.png",
     fullPage: true,
   });
   assert(
-    await page.evaluate(
+    await browserTab.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   );
   await click("Discover");
   await heading("The Glass Harbor.");
-  await page.screenshot({
+  await browserTab.screenshot({
     path: "test-results/catalogue-mobile.png",
     fullPage: true,
   });
   assert(
-    await page.evaluate(
+    await browserTab.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   );
   assert.deepEqual(errors, []);
   console.log(
-    "Browser PASS: full player flow, portrait/landscape overlays at 320/390/700/701/768/1024/1440, watch/skip, public-link clipboard, MP4 download, side quests, stale/retry/offline, both endings, no page errors.",
+    "Browser PASS: full player flow, portrait/landscape overlays at 320/390/700/701/768/1024/1440, watch/skip, public-link clipboard, MP4 download, side quests, stale/retry/offline, both endings, no StoryNode errors.",
   );
 } catch (error) {
-  await page
+  await browserTab
     .screenshot({ path: "test-results/browser-failure.png", fullPage: true })
     .catch(() => {});
   await context.tracing

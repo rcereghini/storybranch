@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import type { StoryPage } from "../../../packages/contracts/index";
+import type { StoryNode } from "../../../packages/contracts/index";
 import {
   contentOf,
-  placePage,
-  type LibraryPage,
-} from "../../../packages/contracts/page-library";
+  placeStoryNode,
+  type LibraryStoryNode,
+} from "../../../packages/contracts/story-node-library";
 import {
   imageTypes,
   videoTypes,
@@ -22,25 +22,25 @@ import "./video-workshop.css";
 import "./assets.css";
 import { uploadAsset } from "./asset-upload";
 type Api = <T>(path: string, body?: unknown) => Promise<T>;
-type PageRequest = { path: string; body: unknown; instanceId?: string };
-const pageTypes = {
-  text: { label: "Text page", icon: "Aa" },
+type LibraryRequest = { path: string; body: unknown; instanceId?: string };
+const storyNodeTypes = {
+  text: { label: "Text StoryNode", icon: "Aa" },
   "text-options": { label: "Text with options", icon: "Aa" },
-  video: { label: "Video page", icon: "▶" },
+  video: { label: "Video StoryNode", icon: "▶" },
   "video-options": { label: "Video with options", icon: "▶" },
 };
 
-// A catalogue summary of content and output labels, not a separate page player.
-function PageCardPreview({
+// A catalogue summary of content and output labels, not a separate StoryNode player.
+function StoryNodeCardPreview({
   item,
   uploads,
 }: {
-  item: LibraryPage;
+  item: LibraryStoryNode;
   uploads?: UploadListing | null;
 }) {
   const [playing, setPlaying] = useState(false);
   const content = item.content;
-  const type = pageTypes[content.pageType];
+  const type = storyNodeTypes[content.storyNodeType];
   const clipId = assetIdOf(content.video);
   const media = clipId
     ? uploads?.items.find((asset) => asset.id === clipId)?.media
@@ -58,7 +58,7 @@ function PageCardPreview({
         <span>Revision {item.revision}</span>
       </div>
       <div className="library-content-preview">
-        {content.pageType.startsWith("video") ? (
+        {content.storyNodeType.startsWith("video") ? (
           media ? (
             playing ? (
               <>
@@ -104,7 +104,7 @@ function PageCardPreview({
           <img src={photo} alt="" loading="lazy" />
         ) : (
           <div className="library-text-preview" aria-hidden="true">
-            Aa<span>Text page</span>
+            Aa<span>Text StoryNode</span>
           </div>
         )}
       </div>
@@ -113,9 +113,10 @@ function PageCardPreview({
         {content.transcript || "No text or transcript added yet."}
       </p>
       <p className="library-completion">
-        {content.pageType.endsWith("options")
+        {content.storyNodeType.endsWith("options")
           ? `Choose from ${content.outputs.length} ${content.outputs.length === 1 ? "option" : "options"}`
-          : content.pageType === "video" && content.videoAdvance !== "continue"
+          : content.storyNodeType === "video" &&
+              content.videoAdvance !== "continue"
             ? "Continues automatically when the video ends"
             : `Continues when “${content.outputs[0].label}” is selected`}
       </p>
@@ -133,52 +134,56 @@ function PageCardPreview({
   );
 }
 
-export function PageLibrary({
+export function StoryNodeLibrary({
   api,
-  page,
+  storyNode,
   disabled,
   onInsert,
   onSaved,
   uploads,
 }: {
   api: Api;
-  page?: StoryPage;
+  storyNode?: StoryNode;
   disabled: boolean;
-  onInsert: (page: StoryPage) => void;
-  onSaved: (record: LibraryPage, instanceId: string) => void;
+  onInsert: (storyNode: StoryNode) => void;
+  onSaved: (record: LibraryStoryNode, instanceId: string) => void;
   uploads?: UploadListing | null;
 }) {
-  const [items, setItems] = useState<LibraryPage[]>([]);
+  const [items, setItems] = useState<LibraryStoryNode[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<PageRequest | null>(null);
+  const [pending, setPending] = useState<LibraryRequest | null>(null);
   const load = async (more?: string) => {
-    const list = await api<{ items: LibraryPage[]; nextCursor: string | null }>(
-      `/pages${more ? `?cursor=${more}` : ""}`,
-    );
+    const list = await api<{
+      items: LibraryStoryNode[];
+      nextCursor: string | null;
+    }>(`/story-nodes${more ? `?cursor=${more}` : ""}`);
     setItems((old) => (more ? [...old, ...list.items] : list.items));
     setCursor(list.nextCursor);
   };
   useEffect(() => {
     void load().catch((e) => setNotice(e.message));
   }, []);
-  const send = async (request: PageRequest) => {
+  const send = async (request: LibraryRequest) => {
     setBusy(true);
     setPending(request);
     try {
-      const record = await api<LibraryPage>(request.path, request.body);
+      const record = await api<LibraryStoryNode>(request.path, request.body);
       setPending(null);
       if (request.path.endsWith("/share"))
         setNotice(
           await copyLink(
-            new URL(`/p/${record.id}/${record.revision}`, location.origin).href,
-            "Page link",
+            new URL(
+              `/story-nodes/${record.id}/${record.revision}`,
+              location.origin,
+            ).href,
+            "StoryNode link",
           ),
         );
       else {
         if (request.instanceId) onSaved(record, request.instanceId);
-        setNotice(`Saved page revision ${record.revision}.`);
+        setNotice(`Saved StoryNode revision ${record.revision}.`);
       }
       await load();
     } catch (e) {
@@ -189,33 +194,33 @@ export function PageLibrary({
     }
   };
   return (
-    <Panel aria-label="Page library" className="page-library">
-      <h2>Reusable pages</h2>
+    <Panel aria-label="StoryNode library" className="story-node-library">
+      <h2>Reusable StoryNodes</h2>
       <p className="studio-sub">
         Save content once, place it in many stories, and connect its outputs in
-        each story. Sharing publishes an isolated page preview.
+        each story. Sharing publishes an isolated StoryNode preview.
       </p>
       <Button
         disabled={
           disabled ||
           busy ||
           !!pending ||
-          !page ||
-          page.pageType === "dice" ||
-          page.pageType === "reveal" ||
-          page.pageType === "comic"
+          !storyNode ||
+          storyNode.storyNodeType === "dice" ||
+          storyNode.storyNodeType === "reveal" ||
+          storyNode.storyNodeType === "comic"
         }
         onClick={() => {
-          if (!page) return;
+          if (!storyNode) return;
           try {
-            const source = page.sourcePage;
+            const source = storyNode.sourceStoryNode;
             void send({
-              instanceId: page.id,
-              path: `/pages/${source?.id ?? crypto.randomUUID()}`,
+              instanceId: storyNode.id,
+              path: `/story-nodes/${source?.id ?? crypto.randomUUID()}`,
               body: {
                 idempotencyKey: crypto.randomUUID(),
                 expectedRevision: source?.revision ?? 0,
-                content: contentOf(page),
+                content: contentOf(storyNode),
               },
             });
           } catch (e) {
@@ -223,32 +228,32 @@ export function PageLibrary({
           }
         }}
       >
-        Save page to library
+        Save StoryNode to library
       </Button>
       <div className="grid gap-3 sm:grid-cols-2">
         {items.map((item) => (
-          <Panel key={item.id} className="library-page-card">
-            <PageCardPreview item={item} uploads={uploads} />
+          <Panel key={item.id} className="library-story-node-card">
+            <StoryNodeCardPreview item={item} uploads={uploads} />
             <div className="library-card-actions flex flex-wrap gap-2">
               <Button
                 disabled={disabled || busy}
                 onClick={() =>
                   onInsert(
-                    placePage(
+                    placeStoryNode(
                       item,
-                      `page-${crypto.randomUUID().slice(0, 8)}`,
+                      `story-node-${crypto.randomUUID().slice(0, 8)}`,
                       "",
                     ),
                   )
                 }
               >
-                Use page
+                Use StoryNode
               </Button>
               <Button
                 disabled={busy || !!pending}
                 onClick={() =>
                   void send({
-                    path: `/pages/${item.id}/share`,
+                    path: `/story-nodes/${item.id}/share`,
                     body: {
                       idempotencyKey: crypto.randomUUID(),
                       revision: item.revision,
@@ -256,7 +261,7 @@ export function PageLibrary({
                   })
                 }
               >
-                Share page
+                Share StoryNode
               </Button>
             </div>
           </Panel>
@@ -267,12 +272,12 @@ export function PageLibrary({
           disabled={busy}
           onClick={() => void load(cursor).catch((e) => setNotice(e.message))}
         >
-          More pages
+          More StoryNodes
         </Button>
       )}
       {pending && (
         <Button disabled={busy} onClick={() => void send(pending)}>
-          Retry page request
+          Retry StoryNode request
         </Button>
       )}
       <Button
@@ -357,7 +362,7 @@ export function AssetLibrary({
     setNotice("");
     try {
       onAsset(await uploadAsset(api, file, setNotice));
-      setNotice(`${file.name} is ready to use on any page.`);
+      setNotice(`${file.name} is ready to use on any StoryNode.`);
     } catch (error) {
       setNotice((error as Error).message);
     }
@@ -373,8 +378,8 @@ export function AssetLibrary({
         <div>
           <h1 id="assets-title">Assets</h1>
           <p className="assets-muted">
-            Your photos and videos. Generate images or upload files, then use them
-            on any page.
+            Your photos and videos. Generate images or upload files, then use
+            them on any StoryNode.
           </p>
         </div>
         <div className="assets-actions">

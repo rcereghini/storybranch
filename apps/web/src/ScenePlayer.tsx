@@ -5,7 +5,7 @@ import type { SceneMedia } from "../../../packages/contracts/media";
 import "./scene-player.css";
 type Props = {
   sceneId: string;
-  page: Story["pages"][string];
+  storyNode: Story["storyNodes"][string];
   media?: SceneMedia;
   poster?: string;
   children: ReactNode;
@@ -17,7 +17,7 @@ type Props = {
 };
 export function ScenePlayer({
   sceneId,
-  page,
+  storyNode,
   media,
   poster,
   children,
@@ -47,7 +47,7 @@ export function ScenePlayer({
   }, []);
   const rendition =
     portrait && media?.portrait ? media.portrait : media?.landscape;
-  const source = rendition?.src ?? page.video;
+  const source = rendition?.src ?? storyNode.video;
   useEffect(() => {
     let active = true;
     setWatching(false);
@@ -74,7 +74,7 @@ export function ScenePlayer({
     element?.load();
     setBuffering(true);
     // Start automatically when the story opens; keep this authorized element
-    // for subsequent pages. A denied play gets one prominent gesture fallback.
+    // for subsequent StoryNodes. A denied play gets one prominent gesture fallback.
     element?.play().catch((error: unknown) => {
       if (
         !active ||
@@ -170,7 +170,7 @@ export function ScenePlayer({
             onComplete?.();
           }}
           onError={fail}
-          aria-label={`${page.title} scene video`}
+          aria-label={`${storyNode.title} scene video`}
         >
           <source
             src={source}
@@ -211,12 +211,12 @@ export function ScenePlayer({
         >
           <div className="scene-copy">
             <p className="eyebrow">
-              {page.kind === "ending"
+              {storyNode.kind === "ending"
                 ? "YOUR STORY, REMEMBERED"
                 : "YOUR NEXT MOVE"}
             </p>
-            <h1>{page.title}</h1>
-            <p>{page.transcript}</p>
+            <h1>{storyNode.title}</h1>
+            <p>{storyNode.transcript}</p>
           </div>
           {children}
         </div>
@@ -251,10 +251,10 @@ export function ScenePlayer({
         >
           {watching
             ? onNext
-              ? page.videoAdvance === "continue"
+              ? storyNode.videoAdvance === "continue"
                 ? "Continue"
-                : "Next page"
-              : page.kind === "ending"
+                : "Next"
+              : storyNode.kind === "ending"
                 ? "Skip to ending"
                 : "Skip to choices"
             : blocked
@@ -300,7 +300,7 @@ export function ScenePlayer({
       )}
       <details className="transcript" id="scene-transcript">
         <summary>Scene transcript</summary>
-        <p>{page.transcript}</p>
+        <p>{storyNode.transcript}</p>
       </details>
     </div>
   );

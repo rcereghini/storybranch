@@ -18,19 +18,19 @@ const deadline = setTimeout(() => {
 }, 90000);
 try {
   const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto("http://127.0.0.1:5173");
-  await page.getByRole("button", { name: "Sign in", exact: false }).click();
-  await page
+  const tab = await context.newPage();
+  await tab.goto("http://127.0.0.1:5173");
+  await tab.getByRole("button", { name: "Sign in", exact: false }).click();
+  await tab
     .getByRole("dialog")
     .getByRole("button", { name: "Sign in ↗", exact: true })
     .click();
-  await page.getByRole("dialog").waitFor({ state: "hidden" });
-  await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
-  await page.getByRole("button", { name: /Start a new journey/ }).click();
-  await page.locator("video").waitFor();
-  await startPlayback(page);
-  const url = page.url();
+  await tab.getByRole("dialog").waitFor({ state: "hidden" });
+  await tab.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
+  await tab.getByRole("button", { name: /Start a new journey/ }).click();
+  await tab.locator("video").waitFor();
+  await startPlayback(tab);
+  const url = tab.url();
   const state = await context.storageState({ indexedDB: true });
 
   const engine = process.argv.includes("--webkit")
@@ -39,7 +39,7 @@ try {
   const fresh = await engine.newContext({ storageState: state });
   fresh.setDefaultTimeout(15000);
   const test = await fresh.newPage();
-  console.log("Playback page created.");
+  console.log("Playback tab created.");
   await test.goto(url);
   await startPlayback(test);
   await test.waitForFunction(() => {

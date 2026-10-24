@@ -9,7 +9,12 @@ export const statId = z.enum([
 ]);
 export type StatId = z.infer<typeof statId>;
 export type Condition =
-  | { kind: "roll"; pageId: string; op: "gte" | "lte" | "eq"; value: number }
+  | {
+      kind: "roll";
+      storyNodeId: string;
+      op: "gte" | "lte" | "eq";
+      value: number;
+    }
   | { kind: "stat"; stat: StatId; op: "gte" | "lte" | "eq"; value: number }
   | { kind: "key"; keyId: string; present: boolean }
   | { kind: "item"; itemId: string; op: "gte" | "lte" | "eq"; quantity: number }
@@ -25,7 +30,7 @@ function conditionAt(depth: number): z.ZodType<Condition> {
     z
       .object({
         kind: z.literal("roll"),
-        pageId: id,
+        storyNodeId: id,
         op: z.enum(["gte", "lte", "eq"]),
         value: integer,
       })
@@ -108,7 +113,7 @@ export const effectSchema = z.discriminatedUnion("kind", [
   z
     .object({ id, kind: z.literal("milestone"), milestoneId: namespaced })
     .strict(),
-  // Quiz points toward a result; only a reveal page reads them.
+  // Quiz points toward a result; only a reveal StoryNode reads them.
   z
     .object({
       id,
@@ -119,7 +124,7 @@ export const effectSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 const route = z
-  .object({ targetPageId: id, effects: z.array(effectSchema).max(20) })
+  .object({ targetStoryNodeId: id, effects: z.array(effectSchema).max(20) })
   .strict();
 export const choiceSchema = z
   .object({
@@ -187,13 +192,13 @@ export const comicSchema = z
   })
   .strict();
 export type Comic = z.infer<typeof comicSchema>;
-export const pageSchema = z
+export const storyNodeSchema = z
   .object({
     id,
     title: z.string().max(160),
     transcript: z.string().max(10000),
     kind: z.enum(["scene", "ending"]),
-    pageType: z.enum([
+    storyNodeType: z.enum([
       "text",
       "text-options",
       "video",
@@ -205,7 +210,7 @@ export const pageSchema = z
     videoAdvance: z.enum(["auto", "continue"]).optional(),
     image: assetImage.optional(),
     comic: comicSchema.optional(),
-    sourcePage: z
+    sourceStoryNode: z
       .object({ id, revision: z.number().int().positive() })
       .strict()
       .optional(),
@@ -226,23 +231,30 @@ export const storySchema = z
     versionId: id,
     rulesetVersion: z.literal("prototype-1"),
     title: z.string(),
-    entryPageId: id,
-    pages: z.record(pageSchema),
+    entryStoryNodeId: id,
+    storyNodes: z.record(storyNodeSchema),
   })
   .strict();
 export type Story = z.infer<typeof storySchema>;
 export type Choice = z.infer<typeof choiceSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 export type Stats = Record<StatId, number>;
-export type StoryPage = Story["pages"][string];
-export type PageOutput = { choiceId: string; action?: "roll" | "continue" };
+export type StoryNode = Story["storyNodes"][string];
+export type StoryNodeOutput = {
+  choiceId: string;
+  action?: "roll" | "continue";
+};
 export type StoryUser = {
   id: string;
   stats: Stats;
   achievements: string[];
-  saveSpots: Array<{ id: string; storyId: string; pageId: string }>;
+  saveSpots: Array<{ id: string; storyId: string; storyNodeId: string }>;
 };
-export type PageInput = { page: StoryPage; context: Save; user: StoryUser };
+export type StoryNodeInput = {
+  storyNode: StoryNode;
+  context: Save;
+  user: StoryUser;
+};
 export type LocalState = {
   stats: Stats;
   keys: string[];
@@ -259,7 +271,7 @@ export type Save = LocalState & {
   storyId: string;
   versionId: string;
   rulesetVersion: string;
-  pageId: string;
+  storyNodeId: string;
   revision: number;
   status: "active" | "completed";
   statsSnapshot: Stats;
@@ -267,7 +279,7 @@ export type Save = LocalState & {
   parentRevision: number | null;
   updatedAt: number;
   lastRoll?: {
-    pageId: string;
+    storyNodeId: string;
     value: number;
     sides: number;
     target: number;

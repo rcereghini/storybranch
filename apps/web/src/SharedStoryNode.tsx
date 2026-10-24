@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { LibraryPage } from "../../../packages/contracts/page-library";
-import { placePage } from "../../../packages/contracts/page-library";
+import type { LibraryStoryNode } from "../../../packages/contracts/story-node-library";
+import { placeStoryNode } from "../../../packages/contracts/story-node-library";
 import type { SceneMedia } from "../../../packages/contracts/media";
 import type {
   Save,
@@ -8,11 +8,11 @@ import type {
 } from "../../../packages/contracts/index";
 import { baseStats, start, transition } from "../../../packages/domain/index";
 import { Story } from "./Story";
-import { Page } from "./Page";
+import { StoryNode } from "./StoryNode";
 import { Button } from "./ui";
-export function SharedPage({ path }: { path: string }) {
+export function SharedStoryNode({ path }: { path: string }) {
   const [record, setRecord] = useState<
-    (LibraryPage & { media?: SceneMedia; image?: string }) | null
+    (LibraryStoryNode & { media?: SceneMedia; image?: string }) | null
   >(null);
   const [preview, setPreview] = useState<{
     story: StoryData;
@@ -25,31 +25,32 @@ export function SharedPage({ path }: { path: string }) {
     setError("");
     setPreview(null);
     const [, , id, revision] = path.split("/");
-    void fetch(`/api/shared-pages/${id}/${revision}`, {
+    void fetch(`/api/shared-story-nodes/${id}/${revision}`, {
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error("This shared page is unavailable.");
-        const record = (await response.json()) as LibraryPage & {
+        if (!response.ok)
+          throw new Error("This shared StoryNode is unavailable.");
+        const record = (await response.json()) as LibraryStoryNode & {
           media?: SceneMedia;
           image?: string;
         };
         if (controller.signal.aborted) return;
         const story: StoryData = {
-          id: "shared-page",
+          id: "shared-story-node",
           versionId: `revision-${record.revision}`,
           title: record.content.title,
           rulesetVersion: "prototype-1",
-          entryPageId: "page",
-          pages: {
-            page: placePage(record, "page", "ending"),
+          entryStoryNodeId: "storyNode",
+          storyNodes: {
+            storyNode: placeStoryNode(record, "storyNode", "ending"),
             ending: {
               id: "ending",
-              title: "Page preview complete",
+              title: "StoryNode preview complete",
               transcript:
-                "This is an individual page preview. Its outputs are connected separately in each story.",
+                "This is an individual StoryNode preview. Its outputs are connected separately in each story.",
               kind: "ending",
-              pageType: "text",
+              storyNodeType: "text",
               entryEffects: [],
               choices: [],
             },
@@ -67,8 +68,8 @@ export function SharedPage({ path }: { path: string }) {
     return () => controller.abort();
   }, [path, attempt]);
   return (
-    <section className="shared-page">
-      <p className="eyebrow p-4">SHARED PAGE · ISOLATED PREVIEW</p>
+    <section className="shared-story-node">
+      <p className="eyebrow p-4">SHARED STORYNODE · ISOLATED PREVIEW</p>
       {error ? (
         <div role="alert">
           {error}
@@ -76,7 +77,7 @@ export function SharedPage({ path }: { path: string }) {
         </div>
       ) : !preview ? (
         <div className="loading-overlay" role="status">
-          Loading page…
+          Loading StoryNode…
         </div>
       ) : (
         <Story
@@ -89,10 +90,14 @@ export function SharedPage({ path }: { path: string }) {
             saveSpots: [],
           }}
         >
-          <Page
-            page={preview.story.pages[preview.save.pageId]}
+          <StoryNode
+            storyNode={preview.story.storyNodes[preview.save.storyNodeId]}
             media={record?.media}
-            image={preview.save.pageId === "page" ? record?.image : undefined}
+            image={
+              preview.save.storyNodeId === "storyNode"
+                ? record?.image
+                : undefined
+            }
             disabled={false}
             transitioning={false}
             onPlaybackChange={() => {}}
@@ -129,12 +134,12 @@ export function SharedPage({ path }: { path: string }) {
                     })
                   }
                 >
-                  Replay page
+                  Replay StoryNode
                 </Button>
                 <a href="/discover">Discover stories</a>
               </>
             )}
-          </Page>
+          </StoryNode>
         </Story>
       )}
     </section>

@@ -22,11 +22,13 @@ flowchart LR
   Publish --> Edition[New immutable edition]
 ```
 
-Accepting a bounded generation plan may authorize automatic placement of its resulting assets into specified draft targets. It does not authorize changing unrelated pages or publishing. Revalidate draft/story/node/field identity and revision before placement; if the creator changed the target after the plan was accepted, offer conflict resolution rather than overwriting newer work silently.
+Accepting a bounded generation plan may authorize automatic placement of its resulting assets into specified draft targets. It does not authorize changing unrelated StoryNodes or publishing. Revalidate draft/story/node/field identity and revision before placement; if the creator changed the target after the plan was accepted, offer conflict resolution rather than overwriting newer work silently.
 
 ## Context sent to AI
 
 Send only the draft slice needed for the action: selected node, surrounding synopsis, declared output slots, allowed type schema, style/cast references and creator instruction. Story text, uploaded references and model output are data, not privileged instructions. Bound lengths, counts and nested structures; escape/encode untrusted content for its transport. Model output must pass runtime validation even with a structured-output provider.
+
+Use the [canonical graph terms](terminology.md) in prompts, suggestions and plans. Include relevant StoryTrunk details/context definitions when needed for the selected task; never invent a second trunk or treat it as playable content. A suggested StoryBranch must declare its destination, typed data mappings and conditions; suggested StoryLeaf rewards use only permitted definitions. In the target workflow, unresolved paths remain draft work with creator diagnostics and disabled, hidden player options under normal graph validation. AI cannot waive that rule or silently fabricate an ending to satisfy it.
 
 Do not send authentication credentials, complete UserContext, billing records, unrelated saves or private form responses by default. A future personalized writing feature needs its own purpose, data projection and consent/retention contract. AI-generated free text cannot become executable conditions or unknown node types.
 
@@ -40,7 +42,7 @@ Generated assets enter the private library, pass the same readiness/ownership ch
 
 ## Current implementation and limits
 
-The latest pull adds `comic` pages, a comic-script companion, cast references and panel generation. Studio assistance produces bounded suggestions that enter the ordinary draft workflow. Comic drawing is coordinated by `apps/web/src/comic-drawing.ts` outside components, so it can continue during in-app navigation and place images when its draft reopens. Reloading/closing the tab stops that placement queue; completed images remain in the asset library. This is not durable browser-independent orchestration.
+The latest pull adds `comic` StoryNodes, a comic-script companion, cast references and panel generation. Studio assistance produces bounded suggestions that enter the ordinary draft workflow. Comic drawing is coordinated by `apps/web/src/comic-drawing.ts` outside components, so it can continue during in-app navigation and place images when its draft reopens. Reloading/closing the tab stops that placement queue; completed images remain in the asset library. This is not durable browser-independent orchestration.
 
 Generation is currently request-driven with job records and stale-job handling. The current daily generation limit is 100 in `packages/contracts/generation.ts`, and the UI exposes remaining allowance. This is an observed alpha setting, not a commitment for future plans. Current model names/prices belong to feature/config documentation and must be checked when integrating providers.
 
@@ -48,4 +50,4 @@ Target safeguards such as accepted-target revision conflict checks and durable p
 
 ## AI development agents
 
-Coding agents follow [the documentation workflow](../development-workflow.md) and [CONTRIBUTING](../../CONTRIBUTING.md). Plans identify the documents/rules read, the current-to-target gap and the verification needed. Generated implementation must preserve portable schemas, shared Page lifecycle and authoritative commands. A model's claim that it reviewed a file is not an independent review or a passing test.
+Coding agents follow [the documentation workflow](../development-workflow.md) and [CONTRIBUTING](../../CONTRIBUTING.md). Plans identify the documents/rules read, the current-to-target gap and the verification needed. Generated implementation must preserve portable schemas, shared StoryNode lifecycle and authoritative commands. A model's claim that it reviewed a file is not an independent review or a passing test.

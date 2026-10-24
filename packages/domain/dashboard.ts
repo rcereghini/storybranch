@@ -7,10 +7,10 @@ import {
   type StoryProgress,
 } from "../contracts/profile";
 
-// The page facts the dashboard needs from one published story edition.
+// The StoryNode facts the dashboard needs from one published story edition.
 export type StoryOutline = {
   title: string;
-  pages: Record<string, { title: string; kind: "scene" | "ending" }>;
+  storyNodes: Record<string, { title: string; kind: "scene" | "ending" }>;
 };
 export type CatalogueOutline = {
   id: string;
@@ -26,7 +26,7 @@ export type CatalogueOutline = {
 export type ActivityEvent = { saveId: string; label: string; at: number };
 export const outlineKey = (storyId: string, versionId: string) =>
   `${storyId}/${versionId}`;
-const humanize = (pageId: string) => pageId.replaceAll("-", " ");
+const humanize = (storyNodeId: string) => storyNodeId.replaceAll("-", " ");
 
 export const genreLabels: Record<GenreId, string> = {
   mystery: "Mystery",
@@ -62,17 +62,17 @@ export function summarizeDashboard(
     outline(s)?.title ??
     catalogue.find((c) => c.id === s.storyId)?.title ??
     s.storyId;
-  const pageTitleOf = (s: Save) =>
-    outline(s)?.pages[s.pageId]?.title ?? humanize(s.pageId);
+  const storyNodeTitleOf = (s: Save) =>
+    outline(s)?.storyNodes[s.storyNodeId]?.title ?? humanize(s.storyNodeId);
   const isEnding = (s: Save) =>
     s.status === "completed" &&
-    (outline(s)?.pages[s.pageId]?.kind ?? "ending") === "ending";
+    (outline(s)?.storyNodes[s.storyNodeId]?.kind ?? "ending") === "ending";
 
   const main = recent.filter((s) => !s.parentPlaythroughId);
   const endingsByStory = new Map<string, Set<string>>();
   for (const s of recent.filter(isEnding)) {
     const found = endingsByStory.get(s.storyId) ?? new Set<string>();
-    found.add(s.pageId);
+    found.add(s.storyNodeId);
     endingsByStory.set(s.storyId, found);
   }
 
@@ -81,9 +81,9 @@ export function summarizeDashboard(
     .filter((c) => !c.hidden || main.some((s) => s.storyId === c.id))
     .map((c) => {
       const published = outlines.get(outlineKey(c.id, c.versionId));
-      const endings = Object.entries(published?.pages ?? {})
-        .filter(([, page]) => page.kind === "ending")
-        .map(([pageId]) => pageId);
+      const endings = Object.entries(published?.storyNodes ?? {})
+        .filter(([, storyNode]) => storyNode.kind === "ending")
+        .map(([storyNodeId]) => storyNodeId);
       const found = endingsByStory.get(c.id) ?? new Set<string>();
       const own = main.filter((s) => s.storyId === c.id);
       const active = own.find((s) => s.status === "active");
@@ -99,7 +99,8 @@ export function summarizeDashboard(
             ? "completed"
             : "not-started",
         activeSaveId: active?.id ?? null,
-        endingsFound: endings.filter((pageId) => found.has(pageId)).length,
+        endingsFound: endings.filter((storyNodeId) => found.has(storyNodeId))
+          .length,
         endingsTotal: endings.length,
       };
     });
@@ -175,7 +176,7 @@ export function summarizeDashboard(
         saveId: s.id,
         storyId: s.storyId,
         title: titleOf(s),
-        pageTitle: pageTitleOf(s),
+        storyNodeTitle: storyNodeTitleOf(s),
         sideQuest: !!s.parentPlaythroughId,
         updatedAt: s.updatedAt,
       })),
@@ -186,16 +187,16 @@ export function summarizeDashboard(
       .filter(
         (s, i, all) =>
           all.findIndex(
-            (o) => o.storyId === s.storyId && o.pageId === s.pageId,
+            (o) => o.storyId === s.storyId && o.storyNodeId === s.storyNodeId,
           ) === i,
       )
       .slice(0, 5)
       .map((s) => ({
         saveId: s.id,
         storyId: s.storyId,
-        pageId: s.pageId,
+        storyNodeId: s.storyNodeId,
         title: titleOf(s),
-        pageTitle: pageTitleOf(s),
+        storyNodeTitle: storyNodeTitleOf(s),
         at: s.updatedAt,
       })),
     activity,

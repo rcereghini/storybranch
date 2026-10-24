@@ -10,9 +10,9 @@ import { Timestamp } from "firebase-admin/firestore";
 //   users/{uid}/clips/{clipId}               uploaded or generated clip/photo
 //   users/{uid}/receipts/{hash}              command idempotency, expires
 //   users/{uid}/copilot/{threadId}           Copilot conversation
-//   stories/{storyId}/versions/{v}/pages/{p} immutable published editions
+//   stories/{storyId}/versions/{v}/storyNodes/{id} immutable published editions
 //   catalogue/{storyId}, branches/{id}, placements/{locationId}
-//   pageLibrary/{pageId}/revisions/{r}       reusable pages (shareable)
+//   storyNodeLibrary/{storyNodeId}/revisions/{r}       reusable StoryNodes (shareable)
 //   generationJobs/{id}, generationQuotas/{id}
 //
 // Storage mirrors it: an uploaded clip's file is users/{uid}/clips/{clipId}.

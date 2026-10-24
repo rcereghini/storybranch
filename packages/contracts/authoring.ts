@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { id, storySchema } from "./index";
-export const pagePositionsSchema = z
+export const storyNodePositionsSchema = z
   .record(
     id,
     z
@@ -12,12 +12,12 @@ export const pagePositionsSchema = z
   )
   .refine(
     (positions) => Object.keys(positions).length <= 80,
-    "At most 80 page positions.",
+    "At most 80 StoryNode positions.",
   );
-export type PagePositions = z.infer<typeof pagePositionsSchema>;
+export type StoryNodePositions = z.infer<typeof storyNodePositionsSchema>;
 // Draft-only comic help: a shared art style and recurring characters, each
 // with a reference image that keeps them consistent across generated panels.
-// Like page positions, it never becomes part of a published edition.
+// Like StoryNode positions, it never becomes part of a published edition.
 export const maxCast = 6;
 export const comicStudioSchema = z
   .object({
@@ -46,15 +46,15 @@ export const draftSchema = z
   .object({
     story: storySchema,
     description: z.string().max(500),
-    pagePositions: pagePositionsSchema.optional(),
+    storyNodePositions: storyNodePositionsSchema.optional(),
     comic: comicStudioSchema.optional(),
   })
   .strict()
   .superRefine((draft, ctx) => {
-    if (Object.keys(draft.story.pages).length > 80)
+    if (Object.keys(draft.story.storyNodes).length > 80)
       ctx.addIssue({
         code: "custom",
-        message: "A draft supports at most 80 pages.",
+        message: "A draft supports at most 80 StoryNodes.",
       });
     if (draft.story.title.length > 160)
       ctx.addIssue({

@@ -1,6 +1,6 @@
 // Light, dark or follow the system. The choice is a per-browser preference:
 // it lives in localStorage (which may be unavailable) and index.html applies
-// it before first paint so the page never flashes the other theme.
+// it before first paint so the view never flashes the other theme.
 export type ThemeMode = "system" | "light" | "dark";
 const KEY = "storybranch-theme";
 
@@ -21,10 +21,13 @@ export function applyThemeMode(mode: ThemeMode) {
     if (mode === "system") localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, mode);
   } catch {
-    // Without storage the choice lasts until the page reloads.
+    // Without storage the choice lasts until the view reloads.
   }
-  // Keep the browser's UI color in step with the page.
+  // Keep the browser's UI color in step with the view.
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", getComputedStyle(root).getPropertyValue("--bg").trim());
+    ?.setAttribute(
+      "content",
+      getComputedStyle(root).getPropertyValue("--bg").trim(),
+    );
 }

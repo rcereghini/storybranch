@@ -9,7 +9,7 @@ import {
   storyLink,
 } from "./share";
 
-// On an ending page the panel leads with a shareable ending card; elsewhere
+// On an ending StoryNode the panel leads with a shareable ending card; elsewhere
 // it shares the story. Links never contain the private playthrough ID.
 export function ShareStory({
   storyId,
@@ -19,12 +19,12 @@ export function ShareStory({
 }: {
   storyId: string;
   storyTitle: string;
-  ending?: { pageId: string; title: string; result?: boolean };
+  ending?: { storyNodeId: string; title: string; result?: boolean };
   media?: SceneMedia;
 }) {
   const [status, setStatus] = useState("");
   const story = storyLink(storyId);
-  const endingUrl = ending ? endingLink(storyId, ending.pageId) : null;
+  const endingUrl = ending ? endingLink(storyId, ending.storyNodeId) : null;
   const what = ending?.result ? "Result link" : "Ending link";
   const clip = media?.socialClip;
   const fileSharing = !!clip && canShareFiles();

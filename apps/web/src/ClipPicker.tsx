@@ -22,7 +22,7 @@ export function ClipPicker({
   onChange,
   onUploaded,
   kind = "video",
-  label = kind === "video" ? "Video clip" : "Page photo",
+  label = kind === "video" ? "Video clip" : "StoryNode photo",
 }: {
   api: Api;
   value: string | undefined;
@@ -51,7 +51,7 @@ export function ClipPicker({
       onUploaded(asset);
       onChange(assetRef(asset.id));
       setStatus(
-        `Uploaded ${file.name}. Available in your asset library. Save the draft if you selected it for a page.`,
+        `Uploaded ${file.name}. Available in your asset library. Save the draft if you selected it for a StoryNode.`,
       );
     } catch (error) {
       setStatus(

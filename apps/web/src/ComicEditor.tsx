@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Comic, StoryPage } from "../../../packages/contracts/index";
+import type { Comic, StoryNode } from "../../../packages/contracts/index";
 import {
   maxCast,
   type ComicStudio,
@@ -16,7 +16,7 @@ import { comicLimits } from "../../../packages/contracts/index";
 import { ClipPicker } from "./ClipPicker";
 import { ComicCompanion } from "./ComicCompanion";
 import { ComicStrip } from "./ComicStrip";
-import { PageImageDialog } from "./StudioAssist";
+import { StoryNodeImageDialog } from "./StudioAssist";
 import {
   castInPanel,
   castPrompt,
@@ -44,14 +44,14 @@ const imageUrl = (uploads: UploadListing | null, ref?: string) =>
 export const panelImages = (comic: Comic, uploads: UploadListing | null) =>
   comic.panels.map((p) => imageUrl(uploads, p.image));
 
-// The comic part of page settings: layout, panels, and the draft's cast and
+// The comic part of StoryNode settings: layout, panels, and the draft's cast and
 // art style. Edits go through Studio's edit(), so they autosave and undo
 // like any other draft change, and late generation results apply to the
 // latest draft rather than the one this render saw.
 export function ComicEditor({
   api,
   draft,
-  page,
+  storyNode,
   uploads,
   busy,
   assistReason,
@@ -64,7 +64,7 @@ export function ComicEditor({
 }: {
   api: Api;
   draft: DraftRecord;
-  page: StoryPage;
+  storyNode: StoryNode;
   uploads: UploadListing | null;
   busy: boolean;
   assistReason: string | null;
@@ -86,22 +86,22 @@ export function ComicEditor({
         .getElementById(`panel-editor-${selectedPanel}`)
         ?.scrollIntoView({ block: "nearest" });
   }, [selectedPanel]);
-  const comic = page.comic;
+  const comic = storyNode.comic;
   if (!comic) return null;
   const studio = draft.comic ?? noStudio;
-  const issue = comicIssue(page);
+  const issue = comicIssue(storyNode);
 
   const editComic = (update: (c: Comic) => Comic) =>
     onEdit((d) => {
-      const current = d.story.pages[page.id];
+      const current = d.story.storyNodes[storyNode.id];
       if (!current?.comic) return d;
       return {
         ...d,
         story: {
           ...d.story,
-          pages: {
-            ...d.story.pages,
-            [page.id]: { ...current, comic: update(current.comic) },
+          storyNodes: {
+            ...d.story.storyNodes,
+            [storyNode.id]: { ...current, comic: update(current.comic) },
           },
         },
       };
@@ -408,7 +408,7 @@ export function ComicEditor({
         <ComicCompanion
           api={api}
           draft={draft}
-          page={page}
+          storyNode={storyNode}
           uploads={uploads}
           assistReason={assistReason}
           onEdit={onEdit}
@@ -416,11 +416,11 @@ export function ComicEditor({
         />
       )}
       {panelIndex >= 0 && (
-        <PageImageDialog
+        <StoryNodeImageDialog
           api={api}
           story={draft.story}
           description={draft.description}
-          page={page}
+          storyNode={storyNode}
           assistReason={assistReason}
           heading={`Generate panel ${panelIndex + 1}`}
           initialPrompt={panelPrompt(
@@ -445,11 +445,11 @@ export function ComicEditor({
         />
       )}
       {member && (
-        <PageImageDialog
+        <StoryNodeImageDialog
           api={api}
           story={draft.story}
           description={draft.description}
-          page={page}
+          storyNode={storyNode}
           assistReason={assistReason}
           heading={`Character sheet: ${member.name.trim()}`}
           initialPrompt={castPrompt(member, studio.style)}
@@ -467,27 +467,29 @@ export function ComicEditor({
 }
 
 // The canvas for a comic draft: the strip as it will read, with panels to
-// select for editing. It is an authoring view; Preview plays the page.
+// select for editing. It is an authoring view; Preview plays the StoryNode.
 export function ComicWorkspace({
-  page,
+  storyNode,
   uploads,
   selectedPanel,
   onSelectPanel,
   onShowMap,
 }: {
-  page: StoryPage;
+  storyNode: StoryNode;
   uploads: UploadListing | null;
   selectedPanel: string | null;
   onSelectPanel: (panelId: string) => void;
   onShowMap: () => void;
 }) {
-  if (!page.comic) return null;
+  if (!storyNode.comic) return null;
   return (
     <div className="comic-workspace">
       <div className="comic-workspace-bar">
         <p className="muted">
-          {page.comic.layout === "grid" ? "Square grid" : "Scrolling strip"} ·{" "}
-          {page.comic.panels.length} panels · Select a panel to edit it
+          {storyNode.comic.layout === "grid"
+            ? "Square grid"
+            : "Scrolling strip"}{" "}
+          · {storyNode.comic.panels.length} panels · Select a panel to edit it
         </p>
         <button
           type="button"
@@ -499,8 +501,8 @@ export function ComicWorkspace({
       </div>
       <div className="comic-workspace-stage">
         <ComicStrip
-          comic={page.comic}
-          images={panelImages(page.comic, uploads)}
+          comic={storyNode.comic}
+          images={panelImages(storyNode.comic, uploads)}
           selected={selectedPanel ?? undefined}
           onPanel={onSelectPanel}
         />

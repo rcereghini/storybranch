@@ -54,7 +54,7 @@ export function Adventures({
   ].filter((g) => g.items.length > 0);
 
   return (
-    <section className="adventures-page" aria-labelledby="adventures-title">
+    <section className="adventures-view" aria-labelledby="adventures-title">
       <h1 id="adventures-title">My adventures</h1>
       <p className="adventures-sub">
         Every journey, side quest and ending you have played.
@@ -106,8 +106,8 @@ export function Adventures({
                     <span className="adventure-copy">
                       <small>{titleOf(s)}</small>
                       <strong>
-                        {s.pageId
-                          ? s.pageId.replaceAll("-", " ")
+                        {s.storyNodeId
+                          ? s.storyNodeId.replaceAll("-", " ")
                           : "Earlier prototype · start a new journey"}
                       </strong>
                       <span className="muted">

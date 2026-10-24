@@ -114,7 +114,9 @@ export function Dashboard({
   const name = view?.displayName.trim() || "Player";
   const progressOf = (storyId: string) =>
     summary?.stories.find((s) => s.storyId === storyId);
-  const spotlightProgress = spotlight ? progressOf(spotlight.storyId) : undefined;
+  const spotlightProgress = spotlight
+    ? progressOf(spotlight.storyId)
+    : undefined;
 
   return (
     <div className="dash">
@@ -140,7 +142,7 @@ export function Dashboard({
                   Continue · {spotlight.sideQuest ? "Side quest · " : ""}
                   {spotlight.title}
                 </p>
-                <h2>{spotlight.pageTitle}</h2>
+                <h2>{spotlight.storyNodeTitle}</h2>
                 <p className="dash-muted">Saved {ago(spotlight.updatedAt)}</p>
                 {spotlightProgress && spotlightProgress.endingsTotal > 0 && (
                   <div
@@ -182,8 +184,8 @@ export function Dashboard({
             <article className="dash-card dash-empty">
               <h2>Pick your first story</h2>
               <p className="dash-muted">
-                Every choice opens a different path. Start one and it will
-                wait for you here.
+                Every choice opens a different path. Start one and it will wait
+                for you here.
               </p>
               <button
                 className="btn btn-primary"
@@ -207,7 +209,7 @@ export function Dashboard({
                       className="thumb"
                     />
                     <span>
-                      <strong>{entry.pageTitle}</strong>
+                      <strong>{entry.storyNodeTitle}</strong>
                       <small>
                         {entry.sideQuest ? "Side quest · " : ""}
                         {entry.title} · {ago(entry.updatedAt)}
@@ -221,7 +223,10 @@ export function Dashboard({
           )}
         </div>
 
-        <aside className="dash-card dash-profile" aria-labelledby="profile-name">
+        <aside
+          className="dash-card dash-profile"
+          aria-labelledby="profile-name"
+        >
           <div className={`dash-banner banner-${view?.bannerId ?? "harbor"}`} />
           {view ? (
             <div className="dash-identity">
@@ -307,7 +312,10 @@ export function Dashboard({
         <section aria-labelledby="next-title" className="dash-section">
           <div className="dash-section-head">
             <h2 id="next-title">Up next for you</h2>
-            <button className="btn-link" onClick={() => onNavigate("/discover")}>
+            <button
+              className="btn-link"
+              onClick={() => onNavigate("/discover")}
+            >
               Browse all stories
             </button>
           </div>
@@ -344,23 +352,23 @@ export function Dashboard({
             {summary.recentEndings.map((ending) => (
               <li key={ending.saveId} className="dash-card">
                 <span>
-                  <strong>{ending.pageTitle}</strong>
+                  <strong>{ending.storyNodeTitle}</strong>
                   <small>
                     {ending.title} · {new Date(ending.at).toLocaleDateString()}
                   </small>
                 </span>
-                {/* Side-quest endings have no public story page. */}
+                {/* Side-quest endings have no public story StoryNode. */}
                 {summary.stories.some((s) => s.storyId === ending.storyId) && (
                   <button
                     className="btn btn-secondary btn-small"
-                    aria-label={`Share ${ending.pageTitle}`}
+                    aria-label={`Share ${ending.storyNodeTitle}`}
                     onClick={async () =>
                       setShareStatus(
                         await shareLink(
                           {
-                            title: `${ending.pageTitle} · ${ending.title}`,
-                            text: `I reached “${ending.pageTitle}” in ${ending.title}. Which ending will you find?`,
-                            url: endingLink(ending.storyId, ending.pageId),
+                            title: `${ending.storyNodeTitle} · ${ending.title}`,
+                            text: `I reached “${ending.storyNodeTitle}” in ${ending.title}. Which ending will you find?`,
+                            url: endingLink(ending.storyId, ending.storyNodeId),
                           },
                           "Ending link",
                         ),
@@ -386,7 +394,9 @@ export function Dashboard({
             {studio === null ? (
               <p className="dash-studio-muted">Loading your drafts…</p>
             ) : studio === "unavailable" ? (
-              <p className="dash-studio-muted">Studio is unavailable right now.</p>
+              <p className="dash-studio-muted">
+                Studio is unavailable right now.
+              </p>
             ) : drafts.length === 0 ? (
               <p className="dash-studio-muted">
                 No drafts yet. Write a branching story or a personality quiz.
@@ -405,14 +415,22 @@ export function Dashboard({
               </ul>
             )}
           </div>
-          <button className="btn btn-coral" onClick={() => onNavigate("/studio")}>
+          <button
+            className="btn btn-coral"
+            onClick={() => onNavigate("/studio")}
+          >
             {drafts.length === 0 ? "Start creating" : "Open Studio"}
           </button>
         </div>
-        <div className="dash-card dash-activity" aria-labelledby="activity-title">
+        <div
+          className="dash-card dash-activity"
+          aria-labelledby="activity-title"
+        >
           <h2 id="activity-title">Recent activity</h2>
           {!summary ? null : summary.activity.length === 0 ? (
-            <p className="dash-muted">Your choices will appear here as you play.</p>
+            <p className="dash-muted">
+              Your choices will appear here as you play.
+            </p>
           ) : (
             <ol>
               {summary.activity.map((item, i) => (

@@ -33,7 +33,7 @@ export type CopilotTranscript = {
   messages: Array<{ role: "user" | "assistant"; text: string }>;
 };
 
-// Pages Copilot may open. Play and shared-page routes are excluded: they
+// App views Copilot may open. Play and shared-story-node routes are excluded: they
 // would let Copilot reveal routes and outcomes, and it is not offered there.
 const routes = [
   /^\/$/,
@@ -48,4 +48,6 @@ const routes = [
 export const copilotRoute = (path: string) =>
   routes.some((route) => route.test(path));
 export const copilotAvailable = (path: string) =>
-  !path.startsWith("/play/") && !path.startsWith("/p/");
+  !path.startsWith("/play/") &&
+  !path.startsWith("/story-nodes/") &&
+  !path.startsWith("/p/");

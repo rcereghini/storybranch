@@ -11,7 +11,7 @@ type Line = { role: "user" | "assistant"; text: string };
 type Failed = { key: string; text: string; message: string };
 
 const toolLabels: Record<string, string> = {
-  navigate: "Opening the page…",
+  navigate: "Opening the view…",
   list_catalogue: "Browsing the catalogue…",
   list_my_adventures: "Checking your adventures…",
   list_my_drafts: "Looking at your drafts…",
@@ -158,7 +158,11 @@ export function Copilot({
         .getReader();
       let buffer = "";
       let finished = false;
-      for (let part = await reader.read(); !part.done; part = await reader.read()) {
+      for (
+        let part = await reader.read();
+        !part.done;
+        part = await reader.read()
+      ) {
         buffer += part.value;
         const rows = buffer.split("\n");
         buffer = rows.pop()!;
@@ -219,10 +223,18 @@ export function Copilot({
           </button>
         </div>
       </div>
-      <div className="copilot-log" ref={log} aria-live="polite" aria-busy={busy}>
+      <div
+        className="copilot-log"
+        ref={log}
+        aria-live="polite"
+        aria-busy={busy}
+      >
         {loaded && !lines.length && !disabled && (
           <div className="copilot-hello">
-            <p>Hi! I can find your drafts, adventures and assets, explain how Storybranch works, and take you where you need to go.</p>
+            <p>
+              Hi! I can find your drafts, adventures and assets, explain how
+              Storybranch works, and take you where you need to go.
+            </p>
             <div className="copilot-suggestions">
               {[
                 "What can I do here?",

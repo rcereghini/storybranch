@@ -23,12 +23,12 @@ const AUDIT = "adminAudit";
 
 async function allAuthUsers() {
   const users: UserRecord[] = [];
-  let page: string | undefined;
+  let cursor: string | undefined;
   do {
-    const result = await auth.listUsers(1000, page);
+    const result = await auth.listUsers(1000, cursor);
     users.push(...result.users);
-    page = result.pageToken;
-  } while (page && users.length < 10000);
+    cursor = result.pageToken;
+  } while (cursor && users.length < 10000);
   return users;
 }
 

@@ -5,7 +5,7 @@ import {
   clampComicScript,
   comicBriefSchema,
 } from "../packages/contracts/assist";
-import { pageSchema, type Story } from "../packages/contracts/index";
+import { storyNodeSchema, type Story } from "../packages/contracts/index";
 import { validatePublication } from "../packages/domain/authoring";
 import {
   baseStats,
@@ -23,8 +23,10 @@ import {
   panelPrompt,
 } from "../apps/web/src/studio-model";
 
-const drawn = (story: Story, pageId = "comic") => {
-  for (const [i, panel] of story.pages[pageId].comic!.panels.entries())
+const drawn = (story: Story, storyNodeId = "comic") => {
+  for (const [i, panel] of story.storyNodes[
+    storyNodeId
+  ].comic!.panels.entries())
     panel.image = `asset:generated-panel-${i}`;
   return story;
 };
@@ -48,75 +50,85 @@ it("starts a comic as a valid private draft that publishes once every panel has 
 
 it("keeps a grid square and bounds a scrolling strip", () => {
   const story = drawn(comicTemplate("story-comic"));
-  const page = story.pages.comic;
-  page.comic!.panels.push(
+  const storyNode = story.storyNodes.comic;
+  storyNode.comic!.panels.push(
     { ...comicPanel(), image: "asset:generated-extra-1" },
     { ...comicPanel(), image: "asset:generated-extra-2" },
   );
-  expect(comicIssue(page)).toBe("A square grid needs 4 or 9 panels.");
+  expect(comicIssue(storyNode)).toBe("A square grid needs 4 or 9 panels.");
   expect(() => validatePublication(story)).toThrow("4 or 9 panels");
-  page.comic!.layout = "scroll";
-  expect(comicIssue(page)).toBeNull();
-  page.comic!.panels = page.comic!.panels.slice(0, 3);
-  expect(comicIssue(page)).toBe("A strip needs 4 to 12 panels.");
+  storyNode.comic!.layout = "scroll";
+  expect(comicIssue(storyNode)).toBeNull();
+  storyNode.comic!.panels = storyNode.comic!.panels.slice(0, 3);
+  expect(comicIssue(storyNode)).toBe("A strip needs 4 to 12 panels.");
   expect(
-    pageSchema.safeParse({
-      ...page,
+    storyNodeSchema.safeParse({
+      ...storyNode,
       comic: {
         layout: "scroll",
         panels: Array.from({ length: 13 }, comicPanel),
       },
     }).success,
   ).toBe(false);
-  page.comic!.panels = [page.comic!.panels[0], ...page.comic!.panels];
-  page.comic!.panels.push(page.comic!.panels[1]);
-  expect(comicIssue(page)).toBe("Each panel needs its own ID.");
+  storyNode.comic!.panels = [
+    storyNode.comic!.panels[0],
+    ...storyNode.comic!.panels,
+  ];
+  storyNode.comic!.panels.push(storyNode.comic!.panels[1]);
+  expect(comicIssue(storyNode)).toBe("Each panel needs its own ID.");
 });
 
-it("rejects panels on other page types and photos or video on a comic", () => {
+it("rejects panels on other StoryNode types and photos or video on a comic", () => {
   const story = drawn(comicTemplate("story-comic"));
   const text = {
     ...story,
-    pages: { comic: { ...story.pages.comic, pageType: "text" as const } },
+    storyNodes: {
+      comic: { ...story.storyNodes.comic, storyNodeType: "text" as const },
+    },
   };
-  expect(() => validatePublication(text)).toThrow("Only a comic page");
+  expect(() => validatePublication(text)).toThrow("Only a comic StoryNode");
   const photo = structuredClone(story);
-  photo.pages.comic.image = "asset:generated-photo";
+  photo.storyNodes.comic.image = "asset:generated-photo";
   expect(() => validatePublication(photo)).toThrow("shows only its panels");
   const empty = structuredClone(story);
-  delete empty.pages.comic.comic;
+  delete empty.storyNodes.comic.comic;
   expect(() => validatePublication(empty)).toThrow("shows only its panels");
 });
 
 it("routes a linear comic through its one server-resolved Next", () => {
   const story = drawn(comicTemplate("story-comic"));
-  story.pages.comic.kind = "scene";
-  story.pages.comic.choices = [
+  story.storyNodes.comic.kind = "scene";
+  story.storyNodes.comic.choices = [
     {
       id: "next",
       label: "Next",
       unavailableDisplay: "locked",
       costs: [],
-      outcome: { kind: "direct", route: { targetPageId: "end", effects: [] } },
+      outcome: {
+        kind: "direct",
+        route: { targetStoryNodeId: "end", effects: [] },
+      },
     },
   ];
-  story.pages.end = {
-    ...story.pages.comic,
+  story.storyNodes.end = {
+    ...story.storyNodes.comic,
     id: "end",
-    pageType: "text",
+    storyNodeType: "text",
     kind: "ending",
     choices: [],
   };
-  delete story.pages.end.comic;
+  delete story.storyNodes.end.comic;
   const published = validatePublication(story);
   const save = start(published, "save", "uid", baseStats, 0);
-  expect(transition(published, save, "next", 0, 1).save.pageId).toBe("end");
+  expect(transition(published, save, "next", 0, 1).save.storyNodeId).toBe(
+    "end",
+  );
   const branching = structuredClone(story);
-  branching.pages.comic.choices.push({
-    ...branching.pages.comic.choices[0],
+  branching.storyNodes.comic.choices.push({
+    ...branching.storyNodes.comic.choices[0],
     id: "other",
   });
-  expect(() => validatePublication(branching)).toThrow("Linear page");
+  expect(() => validatePublication(branching)).toThrow("Linear StoryNode");
 });
 
 it("keeps the cast and style draft-only and bounded", () => {
@@ -131,13 +143,14 @@ it("keeps the cast and style draft-only and bounded", () => {
   ).toBe(false);
   // The published story schema has no place for it.
   expect(
-    pageSchema.safeParse({ ...story.pages.comic, cast: [member] }).success,
+    storyNodeSchema.safeParse({ ...story.storyNodes.comic, cast: [member] })
+      .success,
   ).toBe(false);
 });
 
 it("writes panel prompts that carry the style and cast and ask for no text", () => {
   const story = comicTemplate("story-comic");
-  const comic = story.pages.comic.comic!;
+  const comic = story.storyNodes.comic.comic!;
   comic.panels[1].alt = "dana finds the cat in the fridge";
   const cast = [
     {
@@ -200,10 +213,10 @@ it("asks the companion for a comic only with a brief that fits a layout", () => 
     idempotencyKey: "assist-comic",
     action: "comic-script",
     story: { title: "Untitled comic", description: "" },
-    page: {
+    storyNode: {
       title: "Untitled comic",
       text: "",
-      pageType: "comic",
+      storyNodeType: "comic",
       ending: true,
       outputs: [],
     },
@@ -290,9 +303,11 @@ it("puts a script into the draft and plans only the missing images", () => {
     image: "asset:generated-mo",
     description: "Orange cat, torn ear",
   });
-  const panels = next.story.pages.comic.comic!.panels;
+  const panels = next.story.storyNodes.comic.comic!.panels;
   expect(new Set(panels.map((p) => p.id)).size).toBe(9);
-  expect(comicIssue(next.story.pages.comic)).toBe("Add an image to panel 1.");
+  expect(comicIssue(next.story.storyNodes.comic)).toBe(
+    "Add an image to panel 1.",
+  );
   expect(draftSchema.safeParse(next).success).toBe(false); // has record fields
   const { revision: _r, publishedVersionId: _p, ...plain } = next;
   expect(draftSchema.safeParse(plain).success).toBe(true);

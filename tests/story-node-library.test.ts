@@ -1,60 +1,60 @@
 import { it, expect } from "vitest";
 import {
   contentOf,
-  pageContentSchema,
-  placePage,
-  type LibraryPage,
-} from "../packages/contracts/page-library";
+  storyNodeContentSchema,
+  placeStoryNode,
+  type LibraryStoryNode,
+} from "../packages/contracts/story-node-library";
 import { uploadCommandSchema } from "../packages/contracts/media";
 import { sniffAsset } from "../services/api/video-check";
 import { validatePublication } from "../packages/domain/authoring";
 import { baseStats, start, transition } from "../packages/domain/index";
 import type { Story } from "../packages/contracts/index";
-const record: LibraryPage = {
-  id: "page-library-1",
+const record: LibraryStoryNode = {
+  id: "story-node-library-1",
   revision: 1,
   shared: false,
   content: {
     title: "A film",
     transcript: "A scene",
-    pageType: "video",
+    storyNodeType: "video",
     video: "/media/harbor.mp4",
     videoAdvance: "continue",
     outputs: [{ id: "next", label: "Continue" }],
   },
 };
-it("places one page in independent stories without copying destinations or state into the library", () => {
-  const first = placePage(record, "first", "ending-a");
-  const second = placePage(record, "second", "ending-b");
+it("places one StoryNode in independent stories without copying destinations or state into the library", () => {
+  const first = placeStoryNode(record, "first", "ending-a");
+  const second = placeStoryNode(record, "second", "ending-b");
   expect(contentOf(first)).toEqual(contentOf(second));
   expect(first.choices).not.toEqual(second.choices);
-  expect(first.sourcePage).toEqual(second.sourcePage);
+  expect(first.sourceStoryNode).toEqual(second.sourceStoryNode);
   expect(
-    pageContentSchema.safeParse({ ...record.content, storyId: "other" })
+    storyNodeContentSchema.safeParse({ ...record.content, storyId: "other" })
       .success,
   ).toBe(false);
   expect(
-    pageContentSchema.safeParse({
+    storyNodeContentSchema.safeParse({
       ...record.content,
-      outputs: [{ id: "next", label: "Continue", targetPageId: "forged" }],
+      outputs: [{ id: "next", label: "Continue", targetStoryNodeId: "forged" }],
     }).success,
   ).toBe(false);
 });
-it("validates completion modes and preserves authoritative routing for manual video pages", () => {
+it("validates completion modes and preserves authoritative routing for manual video StoryNodes", () => {
   const story: Story = {
     id: "test",
     versionId: "v1",
     rulesetVersion: "prototype-1",
     title: "Test",
-    entryPageId: "first",
-    pages: {
-      first: placePage(record, "first", "end"),
+    entryStoryNodeId: "first",
+    storyNodes: {
+      first: placeStoryNode(record, "first", "end"),
       end: {
         id: "end",
         title: "End",
         transcript: "",
         kind: "ending",
-        pageType: "text",
+        storyNodeType: "text",
         choices: [],
         entryEffects: [],
       },
@@ -67,13 +67,14 @@ it("validates completion modes and preserves authoritative routing for manual vi
   );
   expect(() => transition(story, save, "forged", 0, 1, () => 1)).toThrow();
   expect(
-    pageContentSchema.safeParse({
+    storyNodeContentSchema.safeParse({
       ...record.content,
-      pageType: "video-options",
+      storyNodeType: "video-options",
     }).success,
   ).toBe(false);
   expect(
-    pageContentSchema.safeParse({ ...record.content, outputs: [] }).success,
+    storyNodeContentSchema.safeParse({ ...record.content, outputs: [] })
+      .success,
   ).toBe(false);
 });
 it("bounds and identifies reusable photo assets", () => {

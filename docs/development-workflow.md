@@ -16,13 +16,13 @@ All paths below are repository-relative. The root instructions and [CONTRIBUTING
 
 | Affected area, including descendants | Required reading before planning |
 | --- | --- |
-| Any Story-related work | [Story index](story-system/README.md), [current contract](16-story-pages.md), then the index's topic-specific documents |
-| `apps/web/src` story/player/rendering/authoring components and styles | [local instructions](../apps/web/src/AGENTS.md), [sibling component guide](../apps/web/src/STORY_COMPONENTS.md), [StoryPage](story-system/story-page.md), [types](story-system/page-types.md); [design system](21-design-system.md) for UI |
+| Any Story-related work | [Story index](story-system/README.md), [canonical terminology](story-system/terminology.md), [current contract](16-story-nodes.md), then the index's topic-specific documents |
+| `apps/web/src` story/player/rendering/authoring components and styles | [local instructions](../apps/web/src/AGENTS.md), [sibling component guide](../apps/web/src/STORY_COMPONENTS.md), [StoryNode rendering](story-system/node-rendering.md), [types](story-system/node-types.md); [design system](21-design-system.md) for UI |
 | `packages/contracts`, `packages/domain`, `packages/api-client` | [nodes](story-system/story-nodes.md), [architecture](story-system/architecture.md), [data/storage](story-system/data-storage.md); context and key documents for state/conditions |
 | `services/api`, `services/functions`, `services/vercel`, `api` | [architecture](story-system/architecture.md), [data/storage](story-system/data-storage.md), [UserContext](story-system/user-context.md); [AI authoring](story-system/ai-authoring.md) for assistant/generation changes |
 | `firebase`, migrations, persistence/seed scripts | [data/storage](story-system/data-storage.md), [keys](story-system/keys.md), [shared Firebase setup](15-shared-firebase-setup.md); affected context contracts |
 | `fixtures`, `tests`, `scripts/*check*`, browser checks | The same contracts as the behavior under test, [examples](story-system/examples.md) and [current-state review](story-system/current-state-review.md) |
-| Studio, graph, outline, reusable library, media tools | [nodes](story-system/story-nodes.md), [types](story-system/page-types.md), [AI authoring](story-system/ai-authoring.md), [Creator Studio](17-creator-studio.md) |
+| Studio, graph, outline, reusable library, media tools | [nodes](story-system/story-nodes.md), [types](story-system/node-types.md), [AI authoring](story-system/ai-authoring.md), [Creator Studio](17-creator-studio.md) |
 | Architecture or process docs, instructions, templates | [Story index precedence](story-system/README.md#authority-and-status), [decisions](story-system/decisions.md), this workflow and all directly affected owning documents |
 
 A file not listed by name is not exempt. Use its responsibility and dependencies. If a new subsystem has no entry point, add a scoped `AGENTS.md` and a link from this table as part of the change. For non-Story work, read the numbered document owning that feature rather than loading every Story document.

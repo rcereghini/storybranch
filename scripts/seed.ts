@@ -1,9 +1,13 @@
+import { legacyStoryStorage } from "../packages/contracts/legacy-story-format";
 import "./local-env";
 import { createHash } from "node:crypto";
 import { db, auth, config } from "../services/api/firebase";
 import { user } from "../services/api/paths";
 import { stories, branches, catalogue } from "../fixtures/stories";
-import { pageStories, pageCatalogue } from "../fixtures/page-stories";
+import {
+  storyNodeStories,
+  storyNodeCatalogue,
+} from "../fixtures/story-node-stories";
 import { baseStats } from "../packages/domain/index";
 import { allFeatures, memberFeatures } from "../packages/contracts/profile";
 async function fixture(path: string, data: Record<string, unknown>) {
@@ -15,16 +19,21 @@ async function fixture(path: string, data: Record<string, unknown>) {
   await db.runTransaction(async (tx) => {
     const existing = await tx.get(ref);
     if (!existing.exists) tx.create(ref, data);
-    // Promote only the known pre-page prototype pointers, never a newer publication.
+    // Promote only the known retired prototype pointers, never a newer publication.
     else if (
-      (existing.data()?.publishedVersionId === "v1" &&
-        data.publishedVersionId === "pages-v1") ||
-      (existing.data()?.versionId === "v1" && data.versionId === "pages-v1")
+      (["v1", legacyStoryStorage.fixtureEdition].includes(
+        existing.data()?.publishedVersionId,
+      ) &&
+        data.publishedVersionId === "story-nodes-v1") ||
+      (["v1", legacyStoryStorage.fixtureEdition].includes(
+        existing.data()?.versionId,
+      ) &&
+        data.versionId === "story-nodes-v1")
     )
       tx.set(ref, data);
   });
 }
-for (const story of [...stories, ...pageStories]) {
+for (const story of [...stories, ...storyNodeStories]) {
   const ref = db.doc(`stories/${story.id}/versions/${story.versionId}`);
   const hash = createHash("sha256").update(JSON.stringify(story)).digest("hex");
   await db.runTransaction(async (tx) => {
@@ -34,15 +43,15 @@ for (const story of [...stories, ...pageStories]) {
         throw new Error("Immutable fixture changed: publish a new version ID.");
       return;
     }
-    const { pages, ...manifest } = story;
+    const { storyNodes, ...manifest } = story;
     tx.create(ref, { ...manifest, manifestHash: hash, ready: true });
-    for (const n of Object.values(pages))
-      tx.create(ref.collection("pages").doc(n.id), n);
+    for (const n of Object.values(storyNodes))
+      tx.create(ref.collection("storyNodes").doc(n.id), n);
   });
   await fixture(`stories/${story.id}`, { publishedVersionId: story.versionId });
 }
 await fixture("catalogue/glass-harbor", catalogue);
-for (const entry of pageCatalogue)
+for (const entry of storyNodeCatalogue)
   await fixture(`catalogue/${entry.id}`, entry);
 for (const branch of branches) await fixture(`branches/${branch.id}`, branch);
 await fixture("placements/harbor-market", {
