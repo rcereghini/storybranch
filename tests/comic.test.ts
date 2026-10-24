@@ -181,6 +181,37 @@ it("writes panel prompts that carry the style and cast and ask for no text", () 
   expect(prompt).toContain("Art style: Thick ink lines.");
   expect(prompt).toContain("No text, no speech bubbles");
   expect(panelPrompt(comic, 0, "", [])).toContain("Bold-outlined cartoon");
+  // Three detailed characters: the cast is shortened, never the style.
+  const detailed = cast
+    .slice(0, 2)
+    .concat({ ...cast[3], name: "Moon" })
+    .map((c) => ({
+      ...c,
+      name: c.name.padEnd(60, "x"),
+      description: "d".repeat(400),
+    }));
+  const long = panelPrompt(
+    { ...comic, panels: [{ ...comic.panels[1], alt: "a".repeat(400) }] },
+    0,
+    "s".repeat(300),
+    detailed,
+  );
+  expect(long.length).toBeLessThanOrEqual(1800);
+  expect(long).toContain(`Art style: ${"s".repeat(300)}.`);
+  expect(long).toContain("No text, no speech bubbles");
+  // Whole names only, including possessives.
+  const named = (alt: string) =>
+    castInPanel(
+      [{ id: "al", name: "Al", description: "", image: "asset:generated-al" }],
+      {
+        ...comic.panels[1],
+        alt,
+        caption: "",
+      },
+    ).length;
+  expect(named("She also waves.")).toBe(0);
+  expect(named("Al's hat falls off.")).toBe(1);
+  expect(named("AL waves.")).toBe(1);
   expect(castPrompt(cast[0], "x".repeat(2000)).length).toBeLessThanOrEqual(
     1800,
   );

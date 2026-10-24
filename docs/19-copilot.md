@@ -33,7 +33,7 @@ Copilot is not available during play (`/play/`, `/story-nodes/` and legacy previ
 
 ## Storage
 
-- `users/{uid}/copilot/{threadId}` — `{ messages, turns, createdAt, updatedAt }`. `messages` holds the Claude API message history (full content blocks). A thread is capped at 40 user turns; the user then starts a new one.
+- `users/{uid}/copilot/{threadId}` — `{ messages, turns, createdAt, updatedAt }`. `messages` holds the Claude API message history (full content blocks). A thread is capped at 40 user turns or about 200,000 characters of history (roughly 50,000 tokens, resent with every message), whichever comes first; the reply that crosses the size budget is kept, and the user then starts a new thread.
 - `users/{uid}/receipts/{hash}` — command receipts, kind `copilot`, with the usual expiry.
 - `copilotQuotas/{hash(uid)}-{day}` — daily message count.
 
@@ -41,6 +41,7 @@ Copilot is not available during play (`/play/`, `/story-nodes/` and legacy previ
 
 - An account needs its `copilot` feature (`pnpm features grant <email> copilot`; see Account access in `15-shared-firebase-setup.md`), and the deployment needs `ANTHROPIC_API_KEY`. Emulator accounts have the feature. The profile's `features.copilot` is true only when both hold, and the app shows the Copilot button only then.
 - 100 messages per account per day; at most 8 model turns per message; 2,000 characters per message.
+- Each paid AI call writes one JSON log line with `aiUsage` set to `copilot`, `assist` or `image`: Claude token counts (input, cache writes, cache reads, output) or the image tier, size, reference count and outcome. Prompts, replies and user IDs are never logged. Read spend per feature from Vercel's runtime logs.
 - Model `claude-opus-5-5` at low effort, which suits chat and keeps replies quick. Server-side refusal fallback (`fallbacks: "default"`) is on, so a declined request is retried on Anthropic's recommended fallback model.
 
 ## Image and video generation

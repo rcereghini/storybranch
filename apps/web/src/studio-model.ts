@@ -215,10 +215,16 @@ export const castInPanel = (
   cast: CastMember[],
   panel: Comic["panels"][number],
 ) => {
-  const text = `${panel.alt ?? ""} ${panel.caption ?? ""}`.toLowerCase();
+  const text = `${panel.alt ?? ""} ${panel.caption ?? ""}`;
+  // Whole names only, so "Al" is not found inside "also".
+  const named = (name: string) =>
+    new RegExp(
+      `(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`,
+      "iu",
+    ).test(text);
   return cast
     .filter((c) => c.image && c.name.trim())
-    .filter((c) => text.includes(c.name.trim().toLowerCase()))
+    .filter((c) => named(c.name.trim()))
     .slice(0, maxReferences);
 };
 export function panelPrompt(
@@ -228,18 +234,28 @@ export function panelPrompt(
   cast: CastMember[],
 ) {
   const panel = comic.panels[index];
-  return [
+  const scene = [
     `Panel ${index + 1} of ${comic.panels.length} in a comic strip.`,
     panel.alt?.trim() || "Describe what happens in this panel.",
+  ].join(" ");
+  const rules = [
     cast.length
-      ? `Characters: ${cast.map((c) => `${c.name.trim()}: ${c.description.trim()}`).join("; ")}. Draw each one exactly as in their reference image.`
+      ? "Draw each character exactly as in their reference image."
       : "",
     `Art style: ${style.trim() || defaultComicStyle}.`,
     "One single panel. No text, no speech bubbles, no captions, no panel borders.",
   ]
     .filter(Boolean)
-    .join(" ")
-    .slice(0, 1800);
+    .join(" ");
+  // The style and rules keep every panel consistent, so a long cast is
+  // shortened rather than them.
+  const characters = cast.length
+    ? `Characters: ${cast.map((c) => `${c.name.trim()}: ${c.description.trim()}`).join("; ")}.`.slice(
+        0,
+        Math.max(0, 1800 - scene.length - rules.length - 2),
+      )
+    : "";
+  return [scene, characters, rules].filter(Boolean).join(" ");
 }
 export const castPrompt = (member: CastMember, style: string) =>
   [
