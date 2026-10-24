@@ -2148,8 +2148,8 @@ it("resends confirmation, weighs high-quality images, and sorts users", async ()
       aspect: "1:1",
     });
     expect(high.status).toBe(400);
-    expect(high.data.error.message).toMatch(
-      /Not enough of today's image allowance left for high quality (4 of 7 left; it uses 5)/,
+    expect(high.data.error.message).toContain(
+      "Not enough of today's image allowance left for high quality (4 of 7 left; it uses 5).",
     );
     expect((await db.doc(imageQuota("player")).get()).data()!.count).toBe(3);
 
