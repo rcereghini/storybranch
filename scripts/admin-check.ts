@@ -107,6 +107,20 @@ try {
   await tab.waitForFunction(
     () => document.querySelectorAll(".admin-bar").length === 7,
   );
+  assert.equal(
+    await tab
+      .getByRole("button", { name: "7 days" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.equal(
+    await tab
+      .getByRole("button", { name: "30 days" })
+      .getAttribute("aria-pressed"),
+    "false",
+  );
+  // Buttons fade their background; let it settle before the screenshot.
+  await tab.waitForTimeout(300);
   await tab.screenshot({ path: "test-results/admin-usage.png" });
 
   await tab.setViewportSize({ width: 390, height: 844 });
