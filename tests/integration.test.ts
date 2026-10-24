@@ -964,6 +964,25 @@ it("bounds lists and supports event cursor pagination", async () => {
   expect(savesSecond.status).toBe(200);
   expect(savesSecond.data.items[0].id).not.toBe(savesFirst.data.items[0].id);
 });
+it("reports an untranslatable stored record as a logged service error", async () => {
+  const s = await begin();
+  // Events are returned as stored, so an ambiguous record reaches translation.
+  await db
+    .doc(`${eventsOf(s.id)}/99999999`)
+    .set({ revision: 99, pageId: "a", storyNodeId: "b" });
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const r = await call(`/playthroughs/${s.id}/events`);
+    expect(r.status).toBe(503);
+    expect(r.data.error.code).toBe("UNAVAILABLE");
+    expect(r.data.error.correlationId).toBeTruthy();
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining(r.data.error.correlationId),
+    );
+  } finally {
+    log.mockRestore();
+  }
+});
 it("Firestore rules deny all authoritative writes and private cross-user reads", async () => {
   const s = await begin();
   const own = rules.authenticatedContext("player").firestore();

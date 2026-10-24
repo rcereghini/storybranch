@@ -2,7 +2,7 @@ import { GameError } from "./index";
 
 // The only domain vocabulary exception: persisted pre-rename records and old
 // clients must remain readable. Keep legacy names at this boundary, not in rules.
-const fields = {
+export const legacyStoryFields = {
   pages: "storyNodes",
   page: "storyNode",
   pageId: "storyNodeId",
@@ -14,9 +14,11 @@ const fields = {
   pageTitle: "storyNodeTitle",
 } as const;
 const reverse = Object.fromEntries(
-  Object.entries(fields).map(([a, b]) => [b, a]),
+  Object.entries(legacyStoryFields).map(([a, b]) => [b, a]),
 );
-const dictionaries = new Set([
+// Fields whose keys are author or player IDs, so an ID such as "pageId" is kept.
+// Every ID-keyed map in the contracts must be listed (see story-naming tests).
+export const storyDictionaries: ReadonlySet<string> = new Set([
   "pages",
   "storyNodes",
   "pagePositions",
@@ -49,14 +51,14 @@ function convert(
         );
       return [
         target,
-        convert(item, names, !dictionary && dictionaries.has(key)),
+        convert(item, names, !dictionary && storyDictionaries.has(key)),
       ];
     }),
   );
 }
 
 export const readStoryData = <T = unknown>(value: unknown): T =>
-  convert(value, fields) as T;
+  convert(value, legacyStoryFields) as T;
 export const legacyStoryData = (value: unknown): unknown =>
   convert(value, reverse);
 export const legacyStoryStorage = {
