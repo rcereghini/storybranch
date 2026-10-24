@@ -55,12 +55,11 @@ export function AdminUsage({
     <section className="panel admin-usage">
       <div className="row-head">
         <h2 className="panel-title">AI usage and spend</h2>
-        <div className="admin-segment" role="group" aria-label="Period">
+        <div className="segmented" role="group" aria-label="Period">
           {usageReportDays.map((d) => (
             <button
               key={d}
               aria-pressed={days === d}
-              className={days === d ? "nav-active" : ""}
               onClick={() => setDays(d)}
             >
               {d} days
