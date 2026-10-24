@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import type { DocumentData } from "firebase-admin/firestore";
 import {
   generationCommand,
-  generationLimits,
   imageCommandProblem,
   type GenerationJob,
   type ImageCommand,
@@ -14,13 +13,17 @@ import * as paths from "./paths";
 import { assetView } from "./uploads";
 import { sniffAsset } from "./video-check";
 import { recordImageUsage } from "./ai-usage";
+import { appSettings } from "./settings";
+import type { AppSettings } from "../../packages/contracts/settings";
 import type { Features } from "../../packages/contracts/profile";
 
 const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
-function access(features: Features) {
+function access(features: Features, settings: AppSettings) {
   if (!process.env.OPENAI_API_KEY)
     return "AI generation is not connected yet. You can still upload photos and videos.";
+  if (!settings.ai.imageGeneration)
+    return "AI generation is turned off for now. You can still upload photos and videos.";
   if (!features.generate)
     return "AI generation is not enabled for this account.";
   return null;
@@ -177,12 +180,14 @@ export async function generation(
       .collection("generationJobs")
       .where("ownerUid", "==", uid)
       .get();
-    const reason = access(features);
+    const settings = await appSettings();
+    const reason = access(features, settings);
     const used = (await quotaOf(uid).get()).data()?.count ?? 0;
     return {
       enabled: !reason,
       reason,
-      remaining: Math.max(0, generationLimits.daily - used),
+      daily: settings.limits.imagesPerDay,
+      remaining: Math.max(0, settings.limits.imagesPerDay - used),
       jobs: records.docs
         .map((d) => view(d.id, d.data()))
         .sort((a, b) => b.createdAt - a.createdAt)
@@ -190,7 +195,8 @@ export async function generation(
     };
   }
   if (request.method === "POST" && segments.length === 2) {
-    const reason = access(features);
+    const settings = await appSettings();
+    const reason = access(features, settings);
     if (reason) throw new GameError("FORBIDDEN", reason);
     const raw = await request.text();
     if (raw.length > 4096)
@@ -249,10 +255,10 @@ export async function generation(
           );
         return false;
       }
-      if ((used.data()?.count ?? 0) >= generationLimits.daily)
+      if ((used.data()?.count ?? 0) >= settings.limits.imagesPerDay)
         throw new GameError(
           "VALIDATION_FAILED",
-          `Daily generation limit reached (${generationLimits.daily} requests). Try again tomorrow.`,
+          `Daily generation limit reached (${settings.limits.imagesPerDay} requests). Try again tomorrow.`,
         );
       tx.create(ref, data);
       tx.set(quota, { count: (used.data()?.count ?? 0) + 1 });

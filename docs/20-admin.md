@@ -22,6 +22,7 @@ The account must have signed up; if it has never opened the app, the command cre
 | Users | Every sign-up with email, display name, status, last sign-in and stored feature flags (search by email, name or ID) | Turn features on or off; disable or re-enable an account |
 | Stories | Published stories with creator, current edition and Discover status | Hide a story from Discover or show it again |
 | Emails | Each system email with what is being sent, a live preview, version history and the email log | Edit, rewrite with AI, send a test to yourself, save a draft, publish, restore an earlier version or the default (see `22-system-emails.md`) |
+| Settings | App-wide settings and who last changed them | Daily limits, AI switches, new-account access and the prices behind spend estimates (below) |
 | Activity | The latest 100 admin changes: who, what, to whom, when | Nothing |
 
 ## Rules
@@ -47,12 +48,28 @@ All routes need the `admin` feature.
 | `GET /api/admin/emails` | Every system email with its draft, published version and history |
 | `POST /api/admin/emails/{id}` | `{ idempotencyKey, action: save \| publish \| restore \| discard \| test \| rewrite, … }` |
 | `GET /api/admin/email-log` | Latest 100 sent, failed or skipped emails |
+| `GET /api/admin/settings` | The stored settings (read fresh), the defaults, revision and last change |
+| `POST /api/admin/settings/app` | `{ idempotencyKey, expectedRevision, settings }`, the whole settings object |
+
+## Settings
+
+App-wide settings live in `settings/app` (`appSettingsSchema` and `defaultAppSettings` in `packages/contracts/settings.ts`; server in `services/api/settings.ts`):
+
+| Setting | Default | Effect |
+|---|---|---|
+| AI requests per person per day | 100 | Copilot messages and Studio writing help together; 0 stops new requests |
+| Images per person per day | 100 | Image generation, including comic panels; shown in the image generator |
+| Copilot, Studio writing help, Image generation | On | Off hides the feature in the app (the profile's `features.copilot`, `writingHelp` and `features.generate`) and refuses its requests, for everyone including admins; account flags still decide who gets it when on |
+| New accounts | Nothing | Flags a new live account starts with: publish, generate, copilot. Never admin. Existing accounts are unchanged; local emulator accounts always get every member feature |
+| Prices | Claude list prices; images unset | Only for Usage & spend estimates. Claude per million tokens per model; images per image, blank meaning counted but not priced |
+
+The server reads settings through a one-minute cache, so other instances apply a change within a minute. A missing record means the defaults; an invalid stored record is logged and the defaults are used, so a bad write can't take the app down. Saving replaces the whole object, is revision-checked (a stale tab gets a reload message), refuses a save that changes nothing, and writes an audit entry listing each changed setting with its before and after values. The editor shows the same list before saving and can restore the defaults.
 
 ## AI usage records
 
 Every paid AI call adds to two server-only records with Firestore increments (`services/api/ai-usage.ts`): `aiUsage/{YYYY-MM-DD}` for the UTC day and `aiUsageUsers/{YYYY-MM-DD}_{uid}` for that user. Claude calls store requests, input, cache-write, cache-read and output tokens and refusals per feature and per model, because a declined request retried on a fallback model bills each step at its own model. Images store returned, refused and uncertain counts per quality tier. A failed write is logged and never fails the user's request. Nothing is recorded from before this release.
 
-Estimated spend (`packages/domain/usage.ts`) multiplies the totals by list prices in `defaultAiPrices` (`packages/contracts/usage.ts`). Claude rates are Anthropic's published prices; image prices are unset, so images are counted but not priced, and the report says how many requests it could not price. Uncertain images are priced as billed. Estimates are not the bill: the Anthropic and OpenAI consoles are. The per-user report reads at most 5,000 user-day records; a much busier app needs monthly totals instead.
+Estimated spend (`packages/domain/usage.ts`) multiplies the totals by the prices in Settings, which start as `defaultAiPrices` (`packages/contracts/usage.ts`). Claude rates start at Anthropic's published prices; image prices start unset, so images are counted but not priced until an admin enters them, and the report says how many requests it could not price. Uncertain images are priced as billed. Estimates are not the bill: the Anthropic and OpenAI consoles are. The per-user report reads at most 5,000 user-day records; a much busier app needs monthly totals instead.
 
 ## Verification
 

@@ -11,6 +11,7 @@ import {
   type StoryOutline,
 } from "../../packages/domain/dashboard";
 import { projectProfile } from "./profile-projection";
+import { appSettings } from "./settings";
 import { version } from "./story-store";
 import * as paths from "./paths";
 
@@ -51,11 +52,16 @@ export async function profileRoutes(
       Object.entries(parsed.data).filter(([, value]) => value !== undefined),
     );
     await db.doc(paths.user(uid)).update(changes);
-    return projectProfile(uid, { ...data, ...changes }, tokenName);
+    return projectProfile(
+      uid,
+      { ...data, ...changes },
+      await appSettings(),
+      tokenName,
+    );
   }
   if (request.method !== "GET")
     throw new GameError("NOT_FOUND", "Route not found.");
-  const profile = projectProfile(uid, data, tokenName);
+  const profile = projectProfile(uid, data, await appSettings(), tokenName);
   if (segments[1] === "profile") return profile;
 
   const [savesSnapshot, catalogueSnapshot] = await Promise.all([

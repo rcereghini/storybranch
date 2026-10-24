@@ -18,10 +18,9 @@ import {
 } from "../../packages/domain/index";
 import { ensurePlayerProfile } from "./player-profile";
 import { passwordReset, sendAccountEmail } from "./email";
-import {
-  accountFeatures,
-  memberFeatures,
-} from "../../packages/contracts/profile";
+import { appSettings } from "./settings";
+import { accountFeatures } from "../../packages/contracts/profile";
+import { newAccountFeatures } from "./access";
 import { authoring } from "./authoring";
 import { storyNodeMedia, storyNodeImage, uploads } from "./uploads";
 import { storyNodeLibrary, sharedStoryNode } from "./story-node-library";
@@ -185,7 +184,7 @@ async function handleCanonical(request: Request): Promise<Response> {
       await ensurePlayerProfile(
         db,
         uid,
-        config.mode === "emulator" ? memberFeatures : undefined,
+        newAccountFeatures(config.mode, await appSettings()),
       )
     )
       await sendAccountEmail(uid);

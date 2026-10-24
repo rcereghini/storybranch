@@ -11,12 +11,13 @@ import {
   type AssistCommand,
   type AssistResult,
 } from "../../packages/contracts/assist";
-import { copilotLimits } from "../../packages/contracts/copilot";
 import { maxCast } from "../../packages/contracts/authoring";
 import type { Features } from "../../packages/contracts/profile";
 import { db } from "./firebase";
 import * as paths from "./paths";
 import { recordClaudeUsage, type UsageMessage } from "./ai-usage";
+import { appSettings } from "./settings";
+import type { AppSettings } from "../../packages/contracts/settings";
 
 // Output shapes per action; the server clamps them again before replying.
 const shapes = {
@@ -82,9 +83,10 @@ export const setAssistModel = (fake: AssistModel | null) => {
 
 const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
-export function assistAccess(features: Features) {
+export function assistAccess(features: Features, settings: AppSettings) {
   if (!process.env.ANTHROPIC_API_KEY)
     return "AI writing help is not connected yet.";
+  if (!settings.ai.writingHelp) return "AI writing help is turned off for now.";
   if (!features.copilot)
     return "AI writing help is not enabled for this account yet.";
   return null;
@@ -216,7 +218,8 @@ export async function assist(
 ): Promise<AssistResult> {
   if (request.method !== "POST" || segments.length !== 2)
     throw new GameError("NOT_FOUND", "Route not found.");
-  const reason = assistAccess(features);
+  const settings = await appSettings();
+  const reason = assistAccess(features, settings);
   if (reason) throw new GameError("FORBIDDEN", reason);
   const command = assistCommandSchema.parse(await request.json());
   const fingerprint = digest(JSON.stringify(legacyStoryData(command)));
@@ -243,10 +246,10 @@ export async function assist(
           "Still writing that suggestion.",
         );
     }
-    if ((used.data()?.count ?? 0) >= copilotLimits.dailyMessages)
+    if ((used.data()?.count ?? 0) >= settings.limits.aiRequestsPerDay)
       throw new GameError(
         "VALIDATION_FAILED",
-        `Daily AI limit reached (${copilotLimits.dailyMessages} requests). Try again tomorrow.`,
+        `Daily AI limit reached (${settings.limits.aiRequestsPerDay} requests). Try again tomorrow.`,
       );
     tx.set(receipt, {
       actor: uid,

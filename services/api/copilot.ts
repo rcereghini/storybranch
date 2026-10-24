@@ -18,6 +18,8 @@ import { db, config } from "./firebase";
 import type { Features } from "../../packages/contracts/profile";
 import * as paths from "./paths";
 import { recordClaudeUsage } from "./ai-usage";
+import { appSettings } from "./settings";
+import type { AppSettings } from "../../packages/contracts/settings";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type Message = Anthropic.Beta.Messages.BetaMessage;
@@ -59,8 +61,9 @@ export const setCopilotModel = (fake: CopilotModel | null) => {
 
 const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
-function access(features: Features) {
+function access(features: Features, settings: AppSettings) {
   if (!process.env.ANTHROPIC_API_KEY) return "Copilot is not connected yet.";
+  if (!settings.ai.copilot) return "Copilot is turned off for now.";
   if (!features.copilot) return "Copilot is not enabled for this account yet.";
   return null;
 }
@@ -315,7 +318,8 @@ export async function copilot(
   segments: string[],
   features: Features,
 ): Promise<Response> {
-  const reason = access(features);
+  const settings = await appSettings();
+  const reason = access(features, settings);
   const threadId = segments[3];
   if (segments[2] !== "threads" || !threadId || segments.length !== 4)
     throw new GameError("NOT_FOUND", "Route not found.");
@@ -375,10 +379,10 @@ export async function copilot(
         "VALIDATION_FAILED",
         "This conversation is full. Start a new one.",
       );
-    if ((used.data()?.count ?? 0) >= copilotLimits.dailyMessages)
+    if ((used.data()?.count ?? 0) >= settings.limits.aiRequestsPerDay)
       throw new GameError(
         "VALIDATION_FAILED",
-        `Daily Copilot limit reached (${copilotLimits.dailyMessages} messages). Try again tomorrow.`,
+        `Daily Copilot limit reached (${settings.limits.aiRequestsPerDay} messages). Try again tomorrow.`,
       );
     tx.set(receipt, {
       actor: uid,

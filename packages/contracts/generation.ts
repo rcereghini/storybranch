@@ -54,7 +54,8 @@ export type GenerationJob = {
 export type GenerationListing = {
   enabled: boolean;
   reason: string | null;
-  // Generations left today.
+  // The daily allowance, and generations left today.
+  daily: number;
   remaining: number;
   jobs: GenerationJob[];
 };

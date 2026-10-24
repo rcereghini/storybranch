@@ -526,7 +526,7 @@ function App() {
               key={user.uid}
               onPlay={start}
               onDirtyChange={setStudioDirty}
-              aiWriting={!!profile?.features?.copilot}
+              aiWriting={!!profile?.writingHelp}
             />
           ) : (
             <section className="empty">

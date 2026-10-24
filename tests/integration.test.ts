@@ -19,6 +19,8 @@ import { getBytes, ref, uploadBytes } from "firebase/storage";
 import { auth, bucket, db } from "../services/api/firebase";
 import { setEmailSender, type EmailMessage } from "../services/api/email";
 import { setEmailModel } from "../services/api/email-ai";
+import { clearSettingsCache } from "../services/api/settings";
+import type { AdminSettings } from "../packages/contracts/settings";
 import { emailTemplates, type AdminEmails } from "../packages/contracts/email";
 import { handle } from "../services/api/handler";
 import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
@@ -1839,6 +1841,117 @@ it("gates publishing, uploads and StoryNode sharing on the account's publish fla
   }
 });
 
+it("applies admin settings to AI switches, daily limits and price estimates", async () => {
+  const keys = {
+    openai: process.env.OPENAI_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY,
+  };
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  const read = async () =>
+    (await call("/admin/settings")).data as AdminSettings;
+  const save = (settings: unknown, expectedRevision: number) =>
+    call("/admin/settings/app", {
+      idempotencyKey: randomUUID(),
+      expectedRevision,
+      settings,
+    });
+  try {
+    expect(
+      (await call("/admin/settings", undefined, "progressed")).status,
+    ).toBe(403);
+    const start = await read();
+    expect(start.settings).toEqual(start.defaults);
+    expect(
+      (await save(start.settings, start.revision)).data.error.message,
+    ).toBe("Nothing has changed.");
+    expect(
+      (
+        await save(
+          {
+            ...start.settings,
+            limits: { aiRequestsPerDay: -1, imagesPerDay: 1 },
+          },
+          start.revision,
+        )
+      ).status,
+    ).toBe(400);
+
+    const next = structuredClone(start.settings);
+    next.ai.copilot = false;
+    next.limits.imagesPerDay = 7;
+    next.prices.images.high = 0.25;
+    expect((await save(next, start.revision)).data).toEqual({
+      revision: start.revision + 1,
+    });
+    expect((await save(next, start.revision)).status).toBe(409);
+    const stored = await read();
+    expect(stored.settings).toEqual(next);
+    expect(stored.updatedBy).toBe("player@storybranch.test");
+
+    // Copilot is hidden and refused; writing help keeps its own switch.
+    const profile = (await call("/profile")).data;
+    expect(profile.features.copilot).toBe(false);
+    expect(profile.writingHelp).toBe(true);
+    const chat = await call(`/copilot/threads/t-${randomUUID()}`, {
+      idempotencyKey: randomUUID(),
+      text: "Hello",
+      context: { path: "/" },
+    });
+    expect(chat.status).toBe(403);
+    expect(chat.data.error.message).toBe("Copilot is turned off for now.");
+
+    // The image limit and prices come from settings.
+    expect((await call("/generation")).data).toMatchObject({
+      enabled: true,
+      daily: 7,
+    });
+    const uid = `priced-${randomUUID()}`;
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await recordImageUsage(uid, {
+      quality: "high",
+      size: "1024x1024",
+      references: 0,
+      outcome: "returned",
+    });
+    log.mockRestore();
+    const usage = (await call("/admin/usage?days=7")).data as AiUsageReport;
+    expect(usage.prices.images.high).toBe(0.25);
+    expect(usage.topUsers.find((u) => u.uid === uid)).toMatchObject({
+      estimatedUsd: 0.25,
+      unpricedRequests: 0,
+    });
+
+    // The change is audited with before and after values.
+    const audit = (await call("/admin/audit")).data.items as Array<{
+      action: string;
+      change: {
+        changes?: Array<{ path: string; before: unknown; after: unknown }>;
+      };
+    }>;
+    expect(audit.find((e) => e.action === "settings")?.change.changes).toEqual([
+      { path: "ai.copilot", before: true, after: false },
+      { path: "limits.imagesPerDay", before: 100, after: 7 },
+      { path: "prices.images.high", before: null, after: 0.25 },
+    ]);
+
+    // A broken stored record falls back to the defaults.
+    await db
+      .doc("settings/app")
+      .set({ settings: { limits: "nope" }, revision: 9 });
+    clearSettingsCache();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await call("/profile")).data.features.copilot).toBe(true);
+    error.mockRestore();
+  } finally {
+    await db.doc("settings/app").delete();
+    clearSettingsCache();
+    if (keys.openai === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = keys.openai;
+    if (keys.anthropic === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = keys.anthropic;
+  }
+});
 it("lets admins draft, test, rewrite, publish and restore system emails", async () => {
   const sent: EmailMessage[] = [];
   setEmailSender(async (message) => {

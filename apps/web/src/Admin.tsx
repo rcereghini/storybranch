@@ -13,17 +13,26 @@ import {
 } from "../../../packages/contracts/profile";
 import { AdminUsage, usd } from "./AdminUsage";
 import { AdminEmails } from "./AdminEmails";
+import { AdminSettings, settingLabel, settingValue } from "./AdminSettings";
 import { emailTemplates, type EmailTemplateId } from "../../../packages/contracts/email";
 import "./admin.css";
 
 type Api = ReturnType<typeof createApi>;
-type Tab = "overview" | "usage" | "users" | "stories" | "emails" | "activity";
+type Tab =
+  | "overview"
+  | "usage"
+  | "users"
+  | "stories"
+  | "emails"
+  | "settings"
+  | "activity";
 const tabs: Array<[Tab, string]> = [
   ["overview", "Overview"],
   ["usage", "Usage & spend"],
   ["users", "Users"],
   ["stories", "Stories"],
   ["emails", "Emails"],
+  ["settings", "Settings"],
   ["activity", "Activity"],
 ];
 const featureLabels: Record<FeatureId, string> = {
@@ -41,6 +50,14 @@ function describe(entry: AdminAuditEntry) {
     status?: string;
     hidden?: boolean;
   };
+  if (entry.action === "settings") {
+    const { changes = [] } = entry.change as {
+      changes?: Array<{ path: string; before: unknown; after: unknown }>;
+    };
+    return `changed settings: ${changes
+      .map((c) => `${settingLabel(c.path)} ${settingValue(c.before)} → ${settingValue(c.after)}`)
+      .join("; ")}`;
+  }
   if (entry.action === "email") {
     const email = change as { action?: string; version?: number; status?: string };
     const label = emailTemplates[entry.target as EmailTemplateId]?.label ?? entry.target;
@@ -377,6 +394,8 @@ export function Admin({
       )}
 
       {tab === "emails" && <AdminEmails api={api} onNotice={setNotice} />}
+
+      {tab === "settings" && <AdminSettings api={api} onNotice={setNotice} />}
 
       {tab === "activity" && (
         <section className="panel">
