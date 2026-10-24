@@ -117,6 +117,29 @@ export type AdminStory = {
   creatorUid: string | null;
   creatorEmail: string | null;
   hidden: boolean;
+  // Accounts that ever played it, and those who reached an ending.
+  players: number;
+  finishers: number;
+};
+export type AdminStoryDetail = {
+  story: AdminStory & { genre: string | null; duration: string | null };
+  stats: {
+    players: number;
+    finishers: number;
+    completionRate: number | null;
+    recentPlayers: number;
+    lastPlayedAt: number | null;
+  };
+  // Published editions, newest first. Editions never change once published.
+  editions: Array<{
+    versionId: string;
+    title: string;
+    current: boolean;
+    storyNodes: number;
+    players: number;
+    finishers: number;
+  }>;
+  audit: AdminAuditEntry[];
 };
 export type AdminAuditEntry = {
   id: string;
@@ -126,4 +149,29 @@ export type AdminAuditEntry = {
   action: "user" | "story" | "email" | "settings";
   target: string;
   change: Record<string, unknown>;
+};
+
+// The activity log, newest first, filtered on the server.
+export const adminAuditActions = [
+  "user",
+  "story",
+  "email",
+  "settings",
+] as const;
+export const adminAuditQuerySchema = z
+  .object({
+    action: z.enum(adminAuditActions).optional(),
+    // Matches the admin's email or the change's target, ignoring case.
+    q: z.string().trim().max(120).default(""),
+    // The last entry ID of the previous page.
+    cursor: z
+      .string()
+      .regex(/^[a-zA-Z0-9_-]{1,80}$/)
+      .optional(),
+  })
+  .strict();
+export type AdminAuditQuery = z.infer<typeof adminAuditQuerySchema>;
+export type AdminAuditPage = {
+  items: AdminAuditEntry[];
+  nextCursor: string | null;
 };

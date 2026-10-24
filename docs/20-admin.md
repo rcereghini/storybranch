@@ -21,10 +21,10 @@ The account must have signed up; if it has never opened the app, the command cre
 | Usage & spend | For the last 7, 30 or 90 UTC days: estimated spend, AI requests, images and refusals; requests per day; totals per feature (Copilot, writing help, images); the 20 heaviest users | Nothing |
 | Analytics | For the last 30 or 90 UTC days: accounts, new sign-ups (and per day), accounts active in the last day, week and month, players in the period, and per story: players, finishers, completion rate, recent players and last played; plus a link to Vercel for page views | Nothing |
 | Users | Sign-ups, newest sign-in first, 50 at a time: search by email, name or ID and filter by status or access, all on the server. Each opens a detail page: email and whether it's confirmed, sign-in methods, joined and last sign-in, access, daily limits and today's usage, published stories, drafts, playthroughs, 30-day AI usage and spend, recent emails and the admin changes made to it | Turn features on or off; disable or re-enable; set the account's own daily limits; reset today's usage |
-| Stories | Published stories with creator, current edition and Discover status | Hide a story from Discover or show it again |
+| Stories | Published stories with creator, players, completion and Discover status. Each opens a page with genre and length, play (players, finished, completion, played in 30 days, last played), every published edition with its StoryNode count and players, and the admin changes to it | Hide a story from Discover or show it again |
 | Emails | Each system email with what is being sent, a live preview, version history and the email log | Edit, rewrite with AI, send a test to yourself, save a draft, publish, restore an earlier version or the default (see `22-system-emails.md`) |
 | Settings | App-wide settings and who last changed them | Daily limits, AI switches, new-account access and the prices behind spend estimates (below) |
-| Activity | The latest 100 admin changes: who, what, to whom, when | Nothing |
+| Activity | Admin changes, newest first, 50 at a time with "Show older": who, what, to whom, when. Filter by type (accounts, stories, emails, settings) and search by admin, account or story | Nothing |
 
 ## Rules
 
@@ -44,9 +44,10 @@ All routes need the `admin` feature.
 | `GET /api/admin/users?q=&status=&feature=&cursor=` | One page of 50 accounts matching the search and filters, with the total (`AdminUsersPage`). Firebase Auth can't search, so the server reads the first 10,000 sign-ups and their profiles, keeps them for 30 seconds, and searches those; a larger app needs the email copied onto profiles for indexed search |
 | `GET /api/admin/users/{uid}` | One account's detail page (`AdminUserDetail`) |
 | `POST /api/admin/users/{uid}` | `{ idempotencyKey, features?: { [feature]: boolean }, status?: "active" | "disabled", limits?: { aiRequestsPerDay, imagesPerDay }, resetToday?: ["ai" | "images"] }` |
-| `GET /api/admin/stories` | Catalogue entries with creator and hidden flag |
+| `GET /api/admin/stories` | Catalogue entries with creator, hidden flag and play counts |
+| `GET /api/admin/stories/{storyId}` | One story's page (`AdminStoryDetail`): play, editions and admin history |
 | `POST /api/admin/stories/{storyId}` | `{ idempotencyKey, hidden }` |
-| `GET /api/admin/audit` | Latest 100 audit entries |
+| `GET /api/admin/audit?action=&q=&cursor=` | One page of 50 audit entries (`AdminAuditPage`). Filtering by type next to the time order would need a composite index, so the server reads the log in time order and filters as it goes, up to 1,000 entries per page; `cursor` is the last entry read |
 | `GET /api/admin/usage?days=7\|30\|90` | AI usage report (`AiUsageReport` in `packages/contracts/usage.ts`) |
 | `GET /api/admin/analytics?days=30|90` | Site analytics (`SiteAnalytics` in `packages/contracts/analytics.ts`) |
 | `GET /api/admin/emails` | Every system email with its draft, published version and history |
@@ -84,7 +85,7 @@ Unit tests cover admin implying every feature and hidden stories on the dashboar
 The Analytics tab is built on request from data the app already keeps, so it has history from before it existed (`services/api/analytics.ts`, counting in `packages/domain/analytics.ts`), and is kept for five minutes:
 
 - **Sign-ups** are account creation times. **Active** uses Firebase's last session refresh for each account, which reflects use better than last sign-in because people stay signed in. Both come from the same account read as Users (the first 10,000 sign-ups).
-- **Stories** come from every saved playthrough (`playerUid`, `storyId`, `status`, `updatedAt` only; up to 20,000, after which the page says the numbers are partial). Players and finishers count each account once per story; completion is finishers over players; "played in the period" means the save changed then. Saves don't record when they started, so starts per day aren't available; past the cap, per-day totals like AI usage would be the next step. Catalogue stories are listed even with no players, and other stories with saves, such as side quests, are listed after.
+- **Stories** come from every saved playthrough (`playerUid`, `storyId`, `versionId`, `status`, `updatedAt` only, a read shared with the Stories tab and kept for five minutes; up to 20,000, after which the page says the numbers are partial). Players and finishers count each account once per story; completion is finishers over players; "played in the period" means the save changed then. Saves don't record when they started, so starts per day aren't available; past the cap, per-day totals like AI usage would be the next step. Catalogue stories are listed even with no players, and other stories with saves, such as side quests, are listed after.
 - **Page views** stay in Vercel (below); the tab links there.
 
 Page views go to Vercel Web Analytics (enabled on the Vercel project; the app loads it through `@vercel/analytics` in `apps/web/src/main.tsx`) and are viewed in Vercel's dashboard. It sets no cookies. Paths carrying private IDs are counted under one shared path before sending (`/play/[saveId]`, `/assets/edit/[assetId]`), and query strings and hashes are dropped (`apps/web/src/analytics.ts`). `vercel.json` keeps `/_vercel/*` out of the app's catch-all rewrite so the analytics script is served.

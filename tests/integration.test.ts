@@ -27,6 +27,10 @@ import type {
 } from "../packages/contracts/admin";
 import { aiQuota } from "../services/api/paths";
 import type { SiteAnalytics } from "../packages/contracts/analytics";
+import type {
+  AdminAuditPage,
+  AdminStoryDetail,
+} from "../packages/contracts/admin";
 import { emailTemplates, type AdminEmails } from "../packages/contracts/email";
 import { handle } from "../services/api/handler";
 import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
@@ -1990,6 +1994,72 @@ it("reports players, sign-ups and story completion to admins only", async () => 
   expect(harbor.activePlayers).toBeGreaterThanOrEqual(1);
   expect(harbor.finishers).toBeLessThanOrEqual(harbor.players);
   expect(report.savesCapped).toBe(false);
+});
+it("shows a story's editions and play, and pages and filters admin activity", async () => {
+  // Stories: the list carries play counts; a story opens with its editions.
+  expect(
+    (await call("/admin/stories/glass-harbor", undefined, "progressed")).status,
+  ).toBe(403);
+  const list = (await call("/admin/stories")).data.items as Array<{
+    id: string;
+    players: number;
+  }>;
+  expect(list.find((s) => s.id === "glass-harbor")!.players).toBeGreaterThan(0);
+  const story = (await call("/admin/stories/glass-harbor"))
+    .data as AdminStoryDetail;
+  expect(story.story).toMatchObject({
+    id: "glass-harbor",
+    title: "The Glass Harbor",
+    genre: "Mystery",
+  });
+  expect(story.stats.players).toBeGreaterThan(0);
+  const current = story.editions.find((e) => e.current)!;
+  expect(current.versionId).toBe(story.story.publishedVersionId);
+  expect(current.storyNodes).toBeGreaterThan(0);
+  expect((await call("/admin/stories/no-such-story")).status).toBe(404);
+
+  // Activity: 60 entries for one target page as 50, then 10, newest first.
+  const target = `paging-${randomUUID()}`;
+  const at = Date.now() + 60000;
+  await Promise.all(
+    Array.from({ length: 60 }, (_, i) =>
+      db.doc(`adminAudit/${target}-${i}`).set({
+        at: at - i,
+        actorUid: "player",
+        actorEmail: "player@storybranch.test",
+        action: "story",
+        target,
+        change: { hidden: i % 2 === 0 },
+      }),
+    ),
+  );
+  try {
+    const page = async (query: string) =>
+      (await call(`/admin/audit?${query}`)).data as AdminAuditPage;
+    const first = await page(`q=${target}&path=admin%2Faudit`);
+    expect(first.items).toHaveLength(50);
+    expect(first.items[0].at).toBe(at);
+    expect(first.nextCursor).not.toBeNull();
+    const second = await page(`q=${target}&cursor=${first.nextCursor}`);
+    expect(second.items).toHaveLength(10);
+    expect(second.items.at(-1)!.at).toBe(at - 59);
+    expect(second.nextCursor).toBeNull();
+    // A type filter excludes the rest.
+    expect((await page(`q=${target}&action=email`)).items).toEqual([]);
+    expect(
+      (await page("action=settings")).items.every(
+        (e) => e.action === "settings",
+      ),
+    ).toBe(true);
+    expect((await call("/admin/audit?cursor=gone-entry")).status).toBe(400);
+    expect((await call("/admin/audit?action=nope")).status).toBe(400);
+  } finally {
+    await Promise.all(
+      Array.from({ length: 60 }, (_, i) =>
+        db.doc(`adminAudit/${target}-${i}`).delete(),
+      ),
+    );
+  }
 });
 it("applies admin settings to AI switches, daily limits and price estimates", async () => {
   const keys = {

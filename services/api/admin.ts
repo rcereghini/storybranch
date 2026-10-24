@@ -1,13 +1,11 @@
-import { FieldPath } from "firebase-admin/firestore";
 import type { UserRecord } from "firebase-admin/auth";
 import { GameError } from "../../packages/contracts/index";
 import {
   adminStoryCommandSchema,
   adminUserCommandSchema,
   adminUsersQuerySchema,
-  type AdminAuditEntry,
+  adminAuditQuerySchema,
   type AdminOverview,
-  type AdminStory,
   type AdminUser,
 } from "../../packages/contracts/admin";
 import {
@@ -23,7 +21,8 @@ import {
 import { auth, db } from "./firebase";
 import * as paths from "./paths";
 import { aiUsageDays, usageReport } from "./usage-report";
-import { AUDIT, run } from "./admin-audit";
+import { auditPage, run } from "./admin-audit";
+import { listStories, storyDetail } from "./admin-stories";
 import {
   appSettings,
   clearSettingsCache,
@@ -133,52 +132,21 @@ export async function admin(
       Number(new URL(request.url).searchParams.get("days") ?? 30),
     );
 
-  if (request.method === "GET" && area === "stories" && !target) {
-    const catalogue = await db
-      .collection("catalogue")
-      .orderBy(FieldPath.documentId())
-      .get();
-    const roots = await Promise.all(
-      catalogue.docs.map((d) => db.doc(`stories/${d.id}`).get()),
-    );
-    const creators = [
-      ...new Set(roots.map((r) => r.data()?.creatorUid).filter(Boolean)),
-    ] as string[];
-    const emails = new Map(
-      creators.length
-        ? (
-            await auth.getUsers(creators.map((creator) => ({ uid: creator })))
-          ).users.map((u) => [u.uid, u.email ?? null])
-        : [],
-    );
-    const list: AdminStory[] = catalogue.docs.map((d, i) => {
-      const data = d.data();
-      const creatorUid = roots[i].data()?.creatorUid ?? null;
-      return {
-        id: d.id,
-        title: data.title ?? d.id,
-        description: data.description ?? "",
-        publishedVersionId: data.publishedVersionId ?? data.versionId ?? null,
-        creatorUid,
-        creatorEmail: creatorUid ? (emails.get(creatorUid) ?? null) : null,
-        hidden: data.hidden === true,
-      };
-    });
-    return { items: list };
-  }
+  if (request.method === "GET" && area === "stories" && !target)
+    return listStories();
+  if (request.method === "GET" && area === "stories" && target)
+    return storyDetail(target);
 
   if (request.method === "GET" && area === "audit" && !target) {
-    const entries = await db
-      .collection(AUDIT)
-      .orderBy("at", "desc")
-      .limit(100)
-      .get();
-    return {
-      items: entries.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      })) as AdminAuditEntry[],
-    };
+    // Named parameters only: Vercel's /api rewrite adds others.
+    const params = new URL(request.url).searchParams;
+    return auditPage(
+      adminAuditQuerySchema.parse({
+        action: params.get("action") || undefined,
+        q: params.get("q") ?? undefined,
+        cursor: params.get("cursor") || undefined,
+      }),
+    );
   }
 
   if (request.method === "GET" && area === "emails" && !target)

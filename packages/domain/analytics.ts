@@ -114,3 +114,59 @@ export function siteAnalytics({
     savesCapped,
   };
 }
+
+export type StoryStats = {
+  players: number;
+  finishers: number;
+  completionRate: number | null;
+  // Players whose save changed in the last 30 days.
+  recentPlayers: number;
+  lastPlayedAt: number | null;
+  // The same counts per published edition, by version ID.
+  byEdition: Record<string, { players: number; finishers: number }>;
+};
+
+// One story's play, counting each account once (per edition, too).
+export function storyStats(
+  saves: Array<AnalyticsSave & { versionId: string | null }>,
+  storyId: string,
+  now: number,
+): StoryStats {
+  const players = new Set<string>();
+  const finishers = new Set<string>();
+  const recent = new Set<string>();
+  const editions = new Map<
+    string,
+    { players: Set<string>; finishers: Set<string> }
+  >();
+  let last: number | null = null;
+  for (const s of saves) {
+    if (s.storyId !== storyId) continue;
+    players.add(s.playerUid);
+    if (s.status === "completed") finishers.add(s.playerUid);
+    if (now - s.updatedAt <= 30 * dayMs) recent.add(s.playerUid);
+    last = Math.max(last ?? 0, s.updatedAt);
+    if (s.versionId) {
+      const e =
+        editions.get(s.versionId) ??
+        editions
+          .set(s.versionId, { players: new Set(), finishers: new Set() })
+          .get(s.versionId)!;
+      e.players.add(s.playerUid);
+      if (s.status === "completed") e.finishers.add(s.playerUid);
+    }
+  }
+  return {
+    players: players.size,
+    finishers: finishers.size,
+    completionRate: players.size ? finishers.size / players.size : null,
+    recentPlayers: recent.size,
+    lastPlayedAt: last,
+    byEdition: Object.fromEntries(
+      [...editions].map(([id, e]) => [
+        id,
+        { players: e.players.size, finishers: e.finishers.size },
+      ]),
+    ),
+  };
+}
