@@ -412,7 +412,7 @@ export function AdminUsers({
                       {emailTemplates[e.template]?.label ?? e.template}
                       {e.test ? " (test)" : ""} ·{" "}
                       <span
-                        className={`admin-badge ${e.status === "sent" ? "admin-active" : "admin-disabled"}`}
+                        className={`admin-badge ${e.status === "sent" ? "admin-active" : e.status === "failed" ? "admin-disabled" : "admin-no-profile"}`}
                       >
                         {e.status}
                       </span>
