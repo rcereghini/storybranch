@@ -1863,6 +1863,12 @@ it("searches users, shows one account, and applies its own limits and disabling"
     const found = await page("q=PROGRESSED%40storybranch");
     expect(found.items.map((u) => u.uid)).toEqual(["progressed"]);
     expect(found).toMatchObject({ total: 1, nextCursor: null });
+    // Vercel's /api rewrite adds its own parameters; they're ignored.
+    expect(
+      (await page("q=progressed%40&path=admin%2Fusers")).items.map(
+        (u) => u.uid,
+      ),
+    ).toEqual(["progressed"]);
     expect((await page("feature=admin")).items.map((u) => u.uid)).toContain(
       "player",
     );

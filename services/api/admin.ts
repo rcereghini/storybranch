@@ -112,12 +112,19 @@ export async function admin(
     return usageReport(days);
   }
 
-  if (request.method === "GET" && area === "users" && !target)
+  if (request.method === "GET" && area === "users" && !target) {
+    // Only the list's own parameters: Vercel's /api rewrite adds others
+    // (such as path), which must not fail validation.
+    const params = new URL(request.url).searchParams;
     return listUsers(
-      adminUsersQuerySchema.parse(
-        Object.fromEntries(new URL(request.url).searchParams),
-      ),
+      adminUsersQuerySchema.parse({
+        q: params.get("q") ?? undefined,
+        status: params.get("status") || undefined,
+        feature: params.get("feature") || undefined,
+        cursor: params.get("cursor") || undefined,
+      }),
     );
+  }
   if (request.method === "GET" && area === "users" && target)
     return userDetail(target);
 
