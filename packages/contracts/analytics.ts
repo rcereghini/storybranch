@@ -6,6 +6,8 @@ export const analyticsDays = [30, 90] as const;
 export type AnalyticsStory = {
   id: string;
   title: string;
+  // In the catalogue (Discover); side quests and unlisted stories aren't.
+  listed: boolean;
   hidden: boolean;
   // Distinct players with a save for the story, ever.
   players: number;

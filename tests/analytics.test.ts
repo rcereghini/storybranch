@@ -80,6 +80,7 @@ describe("Site analytics", () => {
       {
         id: "harbor",
         title: "The Harbor",
+        listed: true,
         hidden: false,
         players: 2,
         finishers: 1,
@@ -90,6 +91,7 @@ describe("Site analytics", () => {
       {
         id: "side-quest",
         title: "side-quest",
+        listed: false,
         hidden: false,
         players: 1,
         finishers: 1,
@@ -100,6 +102,7 @@ describe("Site analytics", () => {
       {
         id: "quiet",
         title: "A Quiet Story",
+        listed: true,
         hidden: true,
         players: 0,
         finishers: 0,

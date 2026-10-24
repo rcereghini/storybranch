@@ -103,8 +103,15 @@ export function AdminAnalytics({
                   <tr key={story.id}>
                     <td>
                       <strong>{story.title}</strong>
-                      {story.hidden && (
+                      <code className="admin-sub">{story.id}</code>
+                      {story.hidden ? (
                         <span className="admin-sub">Hidden from Discover</span>
+                      ) : (
+                        !story.listed && (
+                          <span className="admin-sub">
+                            Not in Discover (such as a side quest)
+                          </span>
+                        )
                       )}
                     </td>
                     <td>{story.players}</td>

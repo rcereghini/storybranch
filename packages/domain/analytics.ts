@@ -86,6 +86,7 @@ export function siteAnalytics({
       return {
         id,
         title: titles.get(id)?.title ?? id,
+        listed: titles.has(id),
         hidden: titles.get(id)?.hidden ?? false,
         players,
         finishers,
