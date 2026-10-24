@@ -28,6 +28,10 @@ export type AdminOverview = {
   hiddenStories: number;
   drafts: number;
   playthroughs: number;
+  // Claude calls plus returned images over the last 30 UTC days, and their
+  // estimated cost at list prices (priced usage only).
+  aiRequests30d: number;
+  aiEstimatedUsd30d: number;
 };
 export type AdminUser = {
   uid: string;

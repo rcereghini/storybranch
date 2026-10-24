@@ -13,7 +13,7 @@ import { db, bucket } from "./firebase";
 import * as paths from "./paths";
 import { assetView } from "./uploads";
 import { sniffAsset } from "./video-check";
-import { logImageUsage } from "./ai-usage";
+import { recordImageUsage } from "./ai-usage";
 import type { Features } from "../../packages/contracts/profile";
 
 const digest = (text: string) =>
@@ -267,9 +267,9 @@ export async function generation(
       };
       try {
         bytes = await openai(prepared.path, prepared.body);
-        logImageUsage({ ...usage, outcome: "returned" });
+        await recordImageUsage(uid, { ...usage, outcome: "returned" });
       } catch (error) {
-        logImageUsage({
+        await recordImageUsage(uid, {
           ...usage,
           outcome: error instanceof Refused ? "refused" : "uncertain",
         });

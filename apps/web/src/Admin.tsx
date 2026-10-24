@@ -11,12 +11,14 @@ import {
   type FeatureId,
   type Features,
 } from "../../../packages/contracts/profile";
+import { AdminUsage, usd } from "./AdminUsage";
 import "./admin.css";
 
 type Api = ReturnType<typeof createApi>;
-type Tab = "overview" | "users" | "stories" | "activity";
+type Tab = "overview" | "usage" | "users" | "stories" | "activity";
 const tabs: Array<[Tab, string]> = [
   ["overview", "Overview"],
+  ["usage", "Usage & spend"],
   ["users", "Users"],
   ["stories", "Stories"],
   ["activity", "Activity"],
@@ -169,6 +171,8 @@ export function Admin({
                 ["Hidden stories", overview.hiddenStories],
                 ["Drafts", overview.drafts],
                 ["Playthroughs", overview.playthroughs],
+                ["AI requests, 30 days", overview.aiRequests30d],
+                ["Estimated AI spend, 30 days", usd(overview.aiEstimatedUsd30d)],
               ] as const
             ).map(([label, value]) => (
               <div key={label} className="panel admin-stat">
@@ -180,6 +184,8 @@ export function Admin({
         ) : (
           <div className="admin-placeholder" aria-hidden="true" />
         ))}
+
+      {tab === "usage" && <AdminUsage api={api} onError={setNotice} />}
 
       {tab === "users" && (
         <section className="panel">

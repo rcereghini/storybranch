@@ -176,3 +176,118 @@
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Usage & spend. The readout line keeps its height, so hovering a day
+   replaces its text without moving anything. */
+.admin-usage {
+  display: grid;
+  gap: 16px;
+}
+.admin-usage .admin-stat {
+  background: var(--surface-2);
+}
+.admin-segment {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.admin-segment button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+.admin-segment .nav-active {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.admin-subtitle {
+  margin: 8px 0 0;
+  font-size: 16px;
+}
+.admin-chart {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.admin-chart figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.admin-readout {
+  min-height: 1.4em;
+  color: var(--text);
+}
+.admin-plot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  height: 180px;
+}
+.admin-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.admin-axis span {
+  line-height: 0;
+}
+.admin-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  /* Hairline gridlines at 0, half and the top. */
+  background:
+    linear-gradient(var(--border), var(--border)) top / 100% 1px no-repeat,
+    linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat,
+    linear-gradient(var(--border-strong), var(--border-strong)) bottom / 100%
+      1px no-repeat;
+}
+/* The whole column is the hit target; the bar inside is capped at 24px. */
+.admin-bar {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  cursor: default;
+}
+.admin-bar span {
+  width: 100%;
+  max-width: 24px;
+  min-height: 0;
+  border-radius: 4px 4px 0 0;
+  background: var(--primary);
+}
+.admin-bar-on span,
+.admin-bar:focus-visible span {
+  background: var(--primary-hover);
+  box-shadow:
+    0 0 0 2px var(--surface-1),
+    0 0 0 4px var(--primary);
+}
+.admin-dates {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 32px;
+  color: var(--muted);
+  font-size: 12px;
+}

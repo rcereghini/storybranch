@@ -14,8 +14,18 @@ import {
   storedFeatures,
   type Features,
 } from "../../packages/contracts/profile";
+import {
+  defaultAiPrices,
+  usageReportDays,
+} from "../../packages/contracts/usage";
+import {
+  addTotals,
+  emptyTotals,
+  usageTotals,
+} from "../../packages/domain/usage";
 import { auth, db } from "./firebase";
 import * as paths from "./paths";
+import { aiUsageDays, usageReport } from "./usage-report";
 
 // Admin routes: everything here is reached only by accounts whose features
 // include admin; the handler passes the effective flags in.
@@ -57,14 +67,19 @@ export async function admin(
   if (rest.length) throw new GameError("NOT_FOUND", "Route not found.");
 
   if (request.method === "GET" && area === "overview" && !target) {
-    const [users, profiles, catalogue, drafts, playthroughs] =
+    const [users, profiles, catalogue, drafts, playthroughs, usage] =
       await Promise.all([
         allAuthUsers(),
         db.collection("users").get(),
         db.collection("catalogue").get(),
         db.collectionGroup("drafts").count().get(),
         db.collectionGroup("playthroughs").count().get(),
+        aiUsageDays(30),
       ]);
+    const ai = usage.reduce(
+      (sum, day) => addTotals(sum, usageTotals(day, defaultAiPrices)),
+      emptyTotals(),
+    );
     const overview: AdminOverview = {
       users: users.length,
       disabledUsers: profiles.docs.filter((d) => d.data().status === "disabled")
@@ -76,8 +91,17 @@ export async function admin(
         .length,
       drafts: drafts.data().count,
       playthroughs: playthroughs.data().count,
+      aiRequests30d: ai.claudeRequests + ai.images,
+      aiEstimatedUsd30d: ai.estimatedUsd,
     };
     return overview;
+  }
+
+  if (request.method === "GET" && area === "usage" && !target) {
+    const days = Number(new URL(request.url).searchParams.get("days") ?? 30);
+    if (!(usageReportDays as readonly number[]).includes(days))
+      throw new GameError("VALIDATION_FAILED", "Choose 7, 30 or 90 days.");
+    return usageReport(days);
   }
 
   if (request.method === "GET" && area === "users" && !target) {

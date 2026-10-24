@@ -31,6 +31,8 @@ import {
 } from "../packages/contracts/story-node-library";
 import { draftCommandSchema } from "../packages/contracts/authoring";
 import { receipt } from "../services/api/paths";
+import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
+import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
 let rules: RulesTestEnvironment;
 // Seeded accounts: player is the local admin, the rest are members with
@@ -1834,6 +1836,84 @@ it("gates publishing, uploads and StoryNode sharing on the account's publish fla
   }
 });
 
+it("records AI usage per day and per user and reports it only to admins", async () => {
+  const uid = `usage-${randomUUID()}`;
+  const report = async () =>
+    (await call("/admin/usage?days=7")).data as AiUsageReport;
+  const before = await report();
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  try {
+    await recordClaudeUsage(uid, "copilot", {
+      model: "claude-opus-5-5",
+      stop_reason: "end_turn",
+      usage: {
+        input_tokens: 1_000_000,
+        output_tokens: 100_000,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      },
+    } as never);
+    // Declined, then answered by a fallback: each step at its own model.
+    await recordClaudeUsage(uid, "assist", {
+      model: "claude-fallback",
+      stop_reason: "end_turn",
+      usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+        iterations: [
+          {
+            type: "message",
+            model: "claude-opus-5-5",
+            input_tokens: 0,
+            output_tokens: 50_000,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+          },
+          {
+            type: "fallback_message",
+            model: "claude-fallback",
+            input_tokens: 10,
+            output_tokens: 10,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+          },
+        ],
+      },
+    } as never);
+    for (const outcome of ["returned", "refused", "uncertain"] as const)
+      await recordImageUsage(uid, {
+        quality: "high",
+        size: "1024x1024",
+        references: 0,
+        outcome,
+      });
+  } finally {
+    log.mockRestore();
+  }
+  const after = await report();
+  const mine = after.topUsers.find((u) => u.uid === uid)!;
+  // $4 input + $2 output for Copilot, $1 for the declined assist step;
+  // the fallback model and the images have no price yet.
+  expect(mine).toMatchObject({
+    claudeRequests: 2,
+    images: 1,
+    unpricedRequests: 1 + 2,
+    email: null,
+  });
+  expect(mine.estimatedUsd).toBeCloseTo(7);
+  expect(after.byFeature.copilot.claudeRequests).toBe(
+    before.byFeature.copilot.claudeRequests + 1,
+  );
+  expect(after.byFeature.image.images).toBe(before.byFeature.image.images + 1);
+  expect(after.days).toHaveLength(7);
+  const today = after.days.at(-1)!;
+  expect(today.claude.assist?.["claude-fallback"]?.requests).toBeGreaterThan(0);
+  expect((await call("/admin/usage?days=8")).status).toBe(400);
+  expect(
+    (await call("/admin/usage?days=7", undefined, "progressed")).status,
+  ).toBe(403);
+  expect((await call("/admin/overview")).data.aiRequests30d).toBeGreaterThan(0);
+});
 it("lets only admins manage accounts and stories, with guards, retries and an audit log", async () => {
   const key = () => randomUUID();
   // Seeded: player is the local admin, progressed a member.

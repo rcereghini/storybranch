@@ -16,7 +16,7 @@ import { maxCast } from "../../packages/contracts/authoring";
 import type { Features } from "../../packages/contracts/profile";
 import { db } from "./firebase";
 import * as paths from "./paths";
-import { logClaudeUsage } from "./ai-usage";
+import { recordClaudeUsage, type UsageMessage } from "./ai-usage";
 
 // Output shapes per action; the server clamps them again before replying.
 const shapes = {
@@ -40,10 +40,12 @@ export type AssistModel = (request: {
   system: string;
   user: string;
   shape: Shape;
+  // Called with every billed reply, refusals included.
+  onUsage: (message: UsageMessage) => Promise<void>;
 }) => Promise<unknown>;
 
 let client: Anthropic | null = null;
-const claude: AssistModel = async ({ system, user, shape }) => {
+const claude: AssistModel = async ({ system, user, shape, onUsage }) => {
   client ??= new Anthropic();
   const response = await client.beta.messages.parse({
     model: "claude-opus-5-5",
@@ -60,7 +62,7 @@ const claude: AssistModel = async ({ system, user, shape }) => {
     system,
     messages: [{ role: "user", content: user }],
   });
-  logClaudeUsage("assist", response);
+  await onUsage(response);
   if (response.stop_reason === "refusal")
     throw new GameError(
       "VALIDATION_FAILED",
@@ -265,6 +267,7 @@ export async function assist(
         system: SYSTEM,
         user: userMessage(command),
         shape: shapeOf[command.action],
+        onUsage: (message) => recordClaudeUsage(uid, "assist", message),
       }),
     );
   } catch (error) {
