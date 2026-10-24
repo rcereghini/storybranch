@@ -15,6 +15,6 @@
       "source": "/s/glass-harbor/:path*",
       "destination": "/s/glass-harbor/index.html"
     },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|_vercel/).*)", "destination": "/index.html" }
   ]
 }

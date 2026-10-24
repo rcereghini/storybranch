@@ -1,6 +1,8 @@
 import { storyPreviewPath } from "../../../packages/contracts/legacy-story-format";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
+import { analyticsUrl } from "./analytics";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth, emulatorMode } from "./firebase";
 import { AuthForm } from "./AuthForm";
@@ -913,5 +915,8 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
+    <Analytics
+      beforeSend={(event) => ({ ...event, url: analyticsUrl(event.url) })}
+    />
   </React.StrictMode>,
 );
