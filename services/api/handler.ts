@@ -107,8 +107,23 @@ export async function handle(request: Request): Promise<Response> {
   );
   if (!response.headers.get("content-type")?.includes("application/json"))
     return response;
-  const data = readStoryData(await response.json());
-  return json(canonicalClient ? data : legacyStoryData(data), response.status);
+  try {
+    const data = readStoryData(await response.json());
+    return json(
+      canonicalClient ? data : legacyStoryData(data),
+      response.status,
+    );
+  } catch (error) {
+    // The command already ran; a stored record that cannot be translated is
+    // a service incident, not the client's mistake.
+    return failure(
+      new Error(
+        `Response translation failed: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+      request,
+      randomUUID(),
+    );
+  }
 }
 
 async function handleCanonical(request: Request): Promise<Response> {
@@ -459,53 +474,57 @@ async function handleCanonical(request: Request): Promise<Response> {
     });
     return json(result);
   } catch (error) {
-    const code =
-      error instanceof GameError
-        ? error.code
-        : error instanceof ZodError
-          ? "VALIDATION_FAILED"
-          : "UNAVAILABLE";
-    // Expected failures (validation, auth, conflicts) are answers, not
-    // incidents; anything else goes to the runtime log with the ID the
-    // user sees, so it can be found in Vercel's logs.
-    if (code === "UNAVAILABLE")
-      console.error(
-        JSON.stringify({
-          correlationId,
-          method: request.method,
-          path: new URL(request.url).pathname,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        }),
-      );
-    const status =
-      code === "UNAUTHENTICATED"
-        ? 401
-        : code === "FORBIDDEN"
-          ? 403
-          : code === "NOT_FOUND"
-            ? 404
-            : code === "STALE_REVISION" || code === "IDEMPOTENCY_CONFLICT"
-              ? 409
-              : code === "VALIDATION_FAILED"
-                ? 400
-                : 503;
-    return json(
-      {
-        error: {
-          code,
-          message:
-            error instanceof GameError
-              ? error.message
-              : code === "VALIDATION_FAILED"
-                ? "Invalid command."
-                : config.mode === "emulator"
-                  ? "The local service is unavailable. Check the emulators and retry."
-                  : "The story service is unavailable. Please try again shortly.",
-          correlationId,
-        },
-      },
-      status,
-    );
+    return failure(error, request, correlationId);
   }
+}
+
+function failure(error: unknown, request: Request, correlationId: string) {
+  const code =
+    error instanceof GameError
+      ? error.code
+      : error instanceof ZodError
+        ? "VALIDATION_FAILED"
+        : "UNAVAILABLE";
+  // Expected failures (validation, auth, conflicts) are answers, not
+  // incidents; anything else goes to the runtime log with the ID the
+  // user sees, so it can be found in Vercel's logs.
+  if (code === "UNAVAILABLE")
+    console.error(
+      JSON.stringify({
+        correlationId,
+        method: request.method,
+        path: new URL(request.url).pathname,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      }),
+    );
+  const status =
+    code === "UNAUTHENTICATED"
+      ? 401
+      : code === "FORBIDDEN"
+        ? 403
+        : code === "NOT_FOUND"
+          ? 404
+          : code === "STALE_REVISION" || code === "IDEMPOTENCY_CONFLICT"
+            ? 409
+            : code === "VALIDATION_FAILED"
+              ? 400
+              : 503;
+  return json(
+    {
+      error: {
+        code,
+        message:
+          error instanceof GameError
+            ? error.message
+            : code === "VALIDATION_FAILED"
+              ? "Invalid command."
+              : config.mode === "emulator"
+                ? "The local service is unavailable. Check the emulators and retry."
+                : "The story service is unavailable. Please try again shortly.",
+        correlationId,
+      },
+    },
+    status,
+  );
 }
