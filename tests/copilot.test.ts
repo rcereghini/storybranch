@@ -7,7 +7,7 @@ import {
   copilotRoute,
 } from "../packages/contracts/copilot";
 
-it("opens only known app pages, never play or shared pages", () => {
+it("opens only known app views, never play or shared StoryNodes", () => {
   for (const path of [
     "/",
     "/discover",
@@ -32,7 +32,7 @@ it("opens only known app pages, never play or shared pages", () => {
     expect(copilotRoute(path)).toBe(false);
 });
 
-it("is offered everywhere except during play and on shared pages", () => {
+it("is offered everywhere except during play and on shared StoryNodes", () => {
   expect(copilotAvailable("/studio")).toBe(true);
   expect(copilotAvailable("/s/glass-harbor")).toBe(true);
   expect(copilotAvailable("/play/save-1")).toBe(false);
@@ -62,16 +62,16 @@ describe("Studio writing help requests", () => {
     action: "rewrite",
     instruction: "more suspense",
     story: { title: "The Glass Harbor", description: "" },
-    page: {
+    storyNode: {
       title: "Arrival",
       text: "You step off the ferry.",
-      pageType: "text",
+      storyNodeType: "text",
       ending: false,
       outputs: ["Continue"],
     },
     before: [],
   };
-  it("accepts page context and rejects extra controls or oversized context", () => {
+  it("accepts StoryNode context and rejects extra controls or oversized context", () => {
     expect(assistCommandSchema.safeParse(command).success).toBe(true);
     expect(
       assistCommandSchema.safeParse({ ...command, model: "other" }).success,
@@ -88,7 +88,7 @@ describe("Studio writing help requests", () => {
     expect(
       assistCommandSchema.safeParse({
         ...command,
-        page: { ...command.page, text: "x".repeat(10001) },
+        storyNode: { ...command.storyNode, text: "x".repeat(10001) },
       }).success,
     ).toBe(false);
   });

@@ -4,18 +4,25 @@ These rules separate account progression, saved adventures, story authorship, an
 
 ## Vocabulary
 
+The [canonical Story glossary](story-system/terminology.md) owns graph terminology, including the user's title/configuration-root definition of StoryTrunk. Existing implementation identifiers and product labels are mapped there rather than renamed by this specification.
+
 | Term | Meaning |
 | --- | --- |
 | Story | A creator owned work with identity, metadata, drafts, and published versions. |
+| StoryTrunk | The single title/configuration root of the Story, selected by default in authoring and outside the playthrough. |
+| StoryNode | A connected unit of content/interaction, such as Video or DiceRoll, with one or more outgoing StoryBranches. |
+| StoryBranch | A connection from StoryTrunk or StoryNode to StoryNode/StoryLeaf; may carry typed data and conditions. In-play connections stay in the same run. |
+| StoryLeaf | An endpoint completing the current Story run, with configurable end-of-path rewards and shared replay/return/discovery exits. |
 | Version | An immutable published graph and its rules. |
-| Node | A video scene, combat encounter, or ending in a version. |
 | Choice | A player action with conditions, effects, and an explicit destination or success and failure destinations. |
 | Key | A namespaced narrative flag, scoped to a playthrough. |
 | Playthrough | One saved execution of a pinned story version. |
 | Branch location | A stable attachment point on an original story node where community side quests may begin. |
-| Community branch | A separately authored story linked to a branch location and source version. |
+| Community branch (existing product/record label) | A separately authored community side Story linked to a branch location and source version; distinct from an ordinary in-story StoryBranch. |
 | Featured placement | The exclusive right to nominate the community branch prominently presented at a location, subject to publication and moderation rules. |
 | Credits | Purchased or promotional units spent on creation services. They are separate from RPG gold and XP. |
+
+Every playable StoryNode connects into the graph from the unique StoryTrunk. A StoryNode may have several outgoing StoryBranches, and every enabled branch must eventually lead to a StoryLeaf. Notify the creator of an unfinished path, disable its branch and hide its option from players. Preserve draft work; revalidate the remaining graph and propagate unsafe required outcomes upstream. See [connectivity and termination](story-system/story-nodes.md). These suppression rules are target behavior; current publication rejects invalid graphs.
 
 ## Player stats and levels
 
@@ -35,7 +42,7 @@ Shared stat definitions do not make all items or flags universal. An author cann
 
 ## Choices and state transitions
 
-Each choice can have an availability condition and a separate outcome check. Availability failures show a locked choice and a useful reason by default. An author may mark a choice hidden for a narrative secret. Outcome checks permit attempts that can fail, with both routes fully authored. For example, Escape has no availability condition, but `agility >= 8` selects the escape clip; lower agility selects the capture clip.
+Each choice can have an availability condition and a separate outcome check. For structurally valid paths, availability failures show a locked choice and a useful reason by default. An author may mark a choice hidden for a narrative secret. An unfinished path with no StoryLeaf is always disabled and hidden from players under the target rule above. Outcome checks permit attempts that can fail, with both routes fully authored. For example, Escape has no availability condition, but `agility >= 8` selects the escape clip; lower agility selects the capture clip.
 
 Conditions are structured data with `all`, `any`, `not`, stat comparisons, key presence, and item quantity comparisons. Effects are an allowlisted set: grant or remove a key, adjust local items, adjust bounded local stats, adjust health, record a local milestone, or move to a destination. There is no arbitrary JavaScript in stories.
 
@@ -49,7 +56,7 @@ Failure may end a story, lead to a new scene, or offer a retry from a checkpoint
 
 An open story exposes explicit branch locations. Multiple authors may publish a branch at a location. Each branch preserves source story, node, location, version, attribution, and the permission receipt under which it was created. Proposed v1 branches attach to base stories only; nested community branches are deferred.
 
-Starting a branch creates a child playthrough with `parentPlaythroughId` and the parent's current revision. It snapshots effective shared stats and only the entry contract's allowlisted narrative state. Keys remain namespaced. Child mutations never write to the parent. Returning navigates to the saved parent, even if it has advanced in another tab. Completing the child may grant an idempotent platform achievement, but proposed v1 has no automatic item, stat, or key merge into the parent.
+Starting a separately authored community side Story creates a child playthrough with `parentPlaythroughId` and the parent's current revision. Following an ordinary in-story StoryBranch does not. The child snapshots effective shared stats and only the entry contract's allowlisted narrative state. Keys remain namespaced. Child mutations never write to the parent. Returning navigates to the saved parent, even if it has advanced in another tab. Completing the child may grant an idempotent platform achievement, but proposed v1 has no automatic item, stat, or key merge into the parent.
 
 Starting a side quest and authoring a side quest are separate actions. Playing an existing branch does not spend generation credits. Creating videos for a branch does. Branch creation can begin from a player's current location without altering that player's save.
 

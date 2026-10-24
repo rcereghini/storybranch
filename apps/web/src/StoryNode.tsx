@@ -1,6 +1,9 @@
 import { Button } from "./ui";
 import { useEffect, useRef, type ReactNode } from "react";
-import type { StoryPage, PageOutput } from "../../../packages/contracts/index";
+import type {
+  StoryNode as StoryNodeData,
+  StoryNodeOutput,
+} from "../../../packages/contracts/index";
 import { evaluate } from "../../../packages/domain/index";
 import type { SceneMedia } from "../../../packages/contracts/media";
 import { ScenePlayer } from "./ScenePlayer";
@@ -8,8 +11,8 @@ import { ComicStrip } from "./ComicStrip";
 import { useStory } from "./Story";
 
 // Every renderer shares the same persisted input and server-validated outputs.
-export function Page({
-  page,
+export function StoryNode({
+  storyNode,
   media,
   nextMedia,
   image,
@@ -21,7 +24,7 @@ export function Page({
   transitioning,
   result,
 }: {
-  page: StoryPage;
+  storyNode: StoryNodeData;
   result?: boolean;
   media?: SceneMedia;
   nextMedia?: SceneMedia;
@@ -30,7 +33,7 @@ export function Page({
   panels?: Array<string | undefined>;
   children: ReactNode;
   onPlaybackChange: (playing: boolean) => void;
-  onOutput: (output: PageOutput) => void;
+  onOutput: (output: StoryNodeOutput) => void;
   disabled: boolean;
   transitioning: boolean;
 }) {
@@ -59,24 +62,29 @@ export function Page({
   useEffect(() => {
     if (!disabled) emitted.current = false;
   }, [disabled, save.id, save.revision]);
-  const emit = (output: PageOutput) => {
+  const emit = (output: StoryNodeOutput) => {
     if (disabled || emitted.current) return;
     emitted.current = true;
     onOutput(output);
   };
   const heading = useRef<HTMLHeadingElement>(null);
-  const type = page.pageType;
+  const type = storyNode.storyNodeType;
   const video = type === "video" || type === "video-options";
   const lastVideo = useRef<{
-    page: StoryPage;
+    storyNode: StoryNodeData;
     media?: SceneMedia;
     sceneId: string;
   } | null>(null);
   if (video)
-    lastVideo.current = { page, media, sceneId: `${save.id}-${save.revision}` };
-  const rolled = save.lastRoll?.pending && save.lastRoll.pageId === page.id;
+    lastVideo.current = {
+      storyNode,
+      media,
+      sceneId: `${save.id}-${save.revision}`,
+    };
+  const rolled =
+    save.lastRoll?.pending && save.lastRoll.storyNodeId === storyNode.id;
   const outputs = (
-    <section className="choices" aria-label="Page outputs">
+    <section className="choices" aria-label="StoryNode outputs">
       <p className="eyebrow">
         {save.status === "completed"
           ? "YOUR STORY, REMEMBERED"
@@ -86,7 +94,7 @@ export function Page({
               ? "YOUR ANSWERS ARE IN"
               : "WHAT WILL YOU DO?"}
       </p>
-      {page.choices.map((output, i) => {
+      {storyNode.choices.map((output, i) => {
         const locked =
           !!output.availableWhen && !evaluate(output.availableWhen, save);
         if (locked && output.unavailableDisplay === "hidden") return null;
@@ -107,7 +115,7 @@ export function Page({
               {locked ? "⌑" : String(i + 1).padStart(2, "0")}
             </span>
             <span>
-              {type === "dice" && rolled ? "Next page" : output.label}
+              {type === "dice" && rolled ? "Next" : output.label}
               {output.hint && <small>{output.hint}</small>}
             </span>
             <span>{locked ? "Locked" : "↗"}</span>
@@ -125,9 +133,12 @@ export function Page({
       heading.current?.focus();
       heading.current?.scrollIntoView({ block: "center" });
     }
-  }, [page.id, video]);
+  }, [storyNode.id, video]);
   return (
-    <article className={`story-page page-${type}`} data-page-type={type}>
+    <article
+      className={`story-node story-node-${type}`}
+      data-story-node-type={type}
+    >
       {lastVideo.current && (
         <div hidden={!video}>
           {/* Both video types share this retained player. Completion callbacks
@@ -135,23 +146,23 @@ export function Page({
           <ScenePlayer
             pending={transitioning}
             sceneId={lastVideo.current.sceneId}
-            page={lastVideo.current.page}
+            storyNode={lastVideo.current.storyNode}
             media={lastVideo.current.media}
             poster={image}
             active={video}
             onComplete={
               video &&
               type === "video" &&
-              page.videoAdvance !== "continue" &&
-              page.choices.length === 1
+              storyNode.videoAdvance !== "continue" &&
+              storyNode.choices.length === 1
                 ? () => {
-                    emit({ choiceId: page.choices[0].id });
+                    emit({ choiceId: storyNode.choices[0].id });
                   }
                 : undefined
             }
             onNext={
-              video && type === "video" && page.choices.length === 1
-                ? () => emit({ choiceId: page.choices[0].id })
+              video && type === "video" && storyNode.choices.length === 1
+                ? () => emit({ choiceId: storyNode.choices[0].id })
                 : undefined
             }
             onPlaybackChange={onPlaybackChange}
@@ -161,7 +172,10 @@ export function Page({
         </div>
       )}
       {!video && (
-        <section key={`${save.id}-${page.id}`} className="reading-page">
+        <section
+          key={`${save.id}-${storyNode.id}`}
+          className="reading-story-node"
+        >
           <p className="eyebrow">
             {type === "dice"
               ? "DICE ROLL"
@@ -171,17 +185,17 @@ export function Page({
                   ? "YOUR RESULT"
                   : type === "comic"
                     ? "COMIC"
-                    : "STORY PAGE"}
+                    : "STORYNODE"}
           </p>
           <h1 ref={heading} tabIndex={-1}>
-            {page.title}
+            {storyNode.title}
           </h1>
-          {type === "comic" && page.comic ? (
-            <ComicStrip comic={page.comic} images={panels ?? []} />
+          {type === "comic" && storyNode.comic ? (
+            <ComicStrip comic={storyNode.comic} images={panels ?? []} />
           ) : (
-            image && <img className="page-photo" src={image} alt="" />
+            image && <img className="story-node-photo" src={image} alt="" />
           )}
-          <p className="page-copy">{page.transcript}</p>
+          <p className="story-node-copy">{storyNode.transcript}</p>
           {type === "dice" && (
             <div
               className="dice-face"
@@ -195,7 +209,7 @@ export function Page({
               <strong>
                 {rolled
                   ? save.lastRoll!.value
-                  : `◇ d${page.choices[0].outcome.kind === "dice" ? page.choices[0].outcome.sides : "?"}`}
+                  : `◇ d${storyNode.choices[0].outcome.kind === "dice" ? storyNode.choices[0].outcome.sides : "?"}`}
               </strong>
               <span className="dice-result-detail">
                 {rolled

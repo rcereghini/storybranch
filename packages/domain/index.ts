@@ -16,13 +16,15 @@ export const routesOf = (c: Choice) =>
     : c.outcome.kind === "reveal"
       ? c.outcome.results.map((r) => r.route)
       : [c.outcome.success, c.outcome.failure];
-// A quiz result is a page a reveal page can send the player to.
-export const isResultPage = (story: Story, pageId: string) =>
-  Object.values(story.pages).some((p) =>
+// A quiz result is a StoryNode a reveal StoryNode can send the player to.
+export const isResultStoryNode = (story: Story, storyNodeId: string) =>
+  Object.values(story.storyNodes).some((p) =>
     p.choices.some(
       (c) =>
         c.outcome.kind === "reveal" &&
-        c.outcome.results.some((r) => r.route.targetPageId === pageId),
+        c.outcome.results.some(
+          (r) => r.route.targetStoryNodeId === storyNodeId,
+        ),
     ),
   );
 // Highest score wins; a tie goes to the result listed first.
@@ -47,7 +49,7 @@ export function evaluate(c: Condition, s: Save): boolean {
   switch (c.kind) {
     case "roll":
       return (
-        s.lastRoll?.pageId === c.pageId &&
+        s.lastRoll?.storyNodeId === c.storyNodeId &&
         compare(s.lastRoll.value, c.op, c.value)
       );
     case "stat":
@@ -105,7 +107,7 @@ function effects(s: Save, list: Effect[], once = false) {
   }
 }
 function enter(s: Save, story: Story) {
-  const n = story.pages[s.pageId];
+  const n = story.storyNodes[s.storyNodeId];
   if (!n) throw new GameError("VALIDATION_FAILED", "Missing destination.");
   effects(s, n.entryEffects, true);
   s.status = n.kind === "ending" ? "completed" : "active";
@@ -126,7 +128,7 @@ export function start(
       storyId: story.id,
       versionId: story.versionId,
       rulesetVersion: story.rulesetVersion,
-      pageId: story.entryPageId,
+      storyNodeId: story.entryStoryNodeId,
       revision: 0,
       status: "active",
       statsSnapshot: { ...stats },
@@ -160,7 +162,9 @@ export function transition(
       "STALE_REVISION",
       "Progress changed on another device. Reload current progress.",
     );
-  const c = story.pages[input.pageId]?.choices.find((c) => c.id === choiceId);
+  const c = story.storyNodes[input.storyNodeId]?.choices.find(
+    (c) => c.id === choiceId,
+  );
   if (
     !c ||
     input.status !== "active" ||
@@ -171,9 +175,12 @@ export function transition(
   if (action === "roll") {
     if (
       c.outcome.kind !== "dice" ||
-      (s.lastRoll?.pending && s.lastRoll.pageId === s.pageId)
+      (s.lastRoll?.pending && s.lastRoll.storyNodeId === s.storyNodeId)
     )
-      throw new GameError("VALIDATION_FAILED", "This page cannot roll again.");
+      throw new GameError(
+        "VALIDATION_FAILED",
+        "This StoryNode cannot roll again.",
+      );
     const value = roll?.(c.outcome.sides);
     if (!Number.isInteger(value) || value! < 1 || value! > c.outcome.sides)
       throw new GameError(
@@ -181,7 +188,7 @@ export function transition(
         "A trusted dice result is required.",
       );
     s.lastRoll = {
-      pageId: s.pageId,
+      storyNodeId: s.storyNodeId,
       value: value!,
       sides: c.outcome.sides,
       target: c.outcome.target,
@@ -195,8 +202,8 @@ export function transition(
       event: {
         choiceId,
         label: "Rolled dice",
-        from: s.pageId,
-        to: s.pageId,
+        from: s.storyNodeId,
+        to: s.storyNodeId,
         outcome: "rolled",
         revision: s.revision,
         at: now,
@@ -213,7 +220,7 @@ export function transition(
   if (c.outcome.kind === "check")
     success = evaluate(c.outcome.condition, input);
   if (c.outcome.kind === "dice") {
-    if (!s.lastRoll?.pending || s.lastRoll.pageId !== s.pageId)
+    if (!s.lastRoll?.pending || s.lastRoll.storyNodeId !== s.storyNodeId)
       throw new GameError("VALIDATION_FAILED", "Roll before continuing.");
     success = s.lastRoll.passed;
     s.lastRoll.pending = false;
@@ -227,7 +234,7 @@ export function transition(
           ? c.outcome.success
           : c.outcome.failure;
   effects(s, r.effects);
-  s.pageId = r.targetPageId;
+  s.storyNodeId = r.targetStoryNodeId;
   s.revision++;
   s.updatedAt = now;
   return {
@@ -235,8 +242,8 @@ export function transition(
     event: {
       choiceId,
       label: c.label,
-      from: input.pageId,
-      to: s.pageId,
+      from: input.storyNodeId,
+      to: s.storyNodeId,
       outcome: success ? "success" : "failure",
       revision: s.revision,
       at: now,
@@ -244,12 +251,14 @@ export function transition(
     },
   };
 }
-// A comic's panels replace the page's video and photo; every panel needs an
+// A comic's panels replace the StoryNode's video and photo; every panel needs an
 // image, and a grid must stay square. Studio shows the same message inline.
-export function comicIssue(page: Story["pages"][string]): string | null {
-  const { comic } = page;
-  if (!comic || page.video || page.image)
-    return "A comic page shows only its panels.";
+export function comicIssue(
+  storyNode: Story["storyNodes"][string],
+): string | null {
+  const { comic } = storyNode;
+  if (!comic || storyNode.video || storyNode.image)
+    return "A comic StoryNode shows only its panels.";
   const count = comic.panels.length;
   const [min, max] = comicLimits.scroll;
   if (comic.layout === "grid" && !comicLimits.grid.includes(count as 4 | 9))
@@ -263,11 +272,11 @@ export function comicIssue(page: Story["pages"][string]): string | null {
 }
 export function validateStory(value: unknown): Story {
   const story = storySchema.parse(value);
-  const pages = Object.values(story.pages);
-  if (pages.length > 100 || !story.pages[story.entryPageId])
+  const storyNodes = Object.values(story.storyNodes);
+  if (storyNodes.length > 100 || !story.storyNodes[story.entryStoryNodeId])
     throw new Error("Invalid graph entry or size");
   const effectIds = new Set<string>();
-  for (const [key, n] of Object.entries(story.pages)) {
+  for (const [key, n] of Object.entries(story.storyNodes)) {
     if (
       key !== n.id ||
       new Set(n.choices.map((c) => c.id)).size !== n.choices.length
@@ -275,57 +284,63 @@ export function validateStory(value: unknown): Story {
       throw new Error("Duplicate or mismatched node/choice ID");
     if (n.kind === "ending" && n.choices.length)
       throw new Error("Ending has choices");
-    const pageType = n.pageType;
-    if (n.videoAdvance && pageType !== "video")
+    const storyNodeType = n.storyNodeType;
+    if (n.videoAdvance && storyNodeType !== "video")
       throw new Error(
-        "Only linear video pages can configure automatic advance.",
+        "Only linear video StoryNodes can configure automatic advance.",
       );
-    if (pageType.startsWith("video") && !n.video)
-      throw new Error("Video page requires media");
-    if (n.comic && pageType !== "comic")
-      throw new Error("Only a comic page can have panels");
-    const comic = pageType === "comic" && comicIssue(n);
+    if (storyNodeType.startsWith("video") && !n.video)
+      throw new Error("Video StoryNode requires media");
+    if (n.comic && storyNodeType !== "comic")
+      throw new Error("Only a comic StoryNode can have panels");
+    const comic = storyNodeType === "comic" && comicIssue(n);
     if (comic) throw new Error(`${n.title}: ${comic}`);
     if (
-      (pageType === "text" || pageType === "video" || pageType === "comic") &&
+      (storyNodeType === "text" ||
+        storyNodeType === "video" ||
+        storyNodeType === "comic") &&
       n.kind !== "ending" &&
       (n.choices.length !== 1 ||
         n.choices[0].outcome.kind !== "direct" ||
         n.choices[0].availableWhen ||
         n.choices[0].costs.length)
     )
-      throw new Error("Linear page requires one unconditional next output");
+      throw new Error(
+        "Linear StoryNode requires one unconditional next output",
+      );
     if (
-      pageType === "dice" &&
+      storyNodeType === "dice" &&
       (n.choices.length !== 1 ||
         n.choices[0].outcome.kind !== "dice" ||
         n.choices[0].availableWhen ||
         n.choices[0].costs.length)
     )
-      throw new Error("Dice page requires one roll output");
+      throw new Error("Dice StoryNode requires one roll output");
     if (
-      pageType === "reveal" &&
+      storyNodeType === "reveal" &&
       (n.choices.length !== 1 ||
         n.choices[0].outcome.kind !== "reveal" ||
         n.choices[0].availableWhen ||
         n.choices[0].costs.length)
     )
-      throw new Error("Reveal page requires one reveal output");
+      throw new Error("Reveal StoryNode requires one reveal output");
     for (const choice of n.choices) {
       if (
         choice.outcome.kind === "dice" &&
-        (pageType !== "dice" || choice.outcome.target > choice.outcome.sides)
+        (storyNodeType !== "dice" ||
+          choice.outcome.target > choice.outcome.sides)
       )
-        throw new Error("Invalid dice page or threshold");
+        throw new Error("Invalid dice StoryNode or threshold");
       if (choice.outcome.kind === "reveal") {
         const { results } = choice.outcome;
-        if (pageType !== "reveal")
-          throw new Error("Only a reveal page can reveal a result");
+        if (storyNodeType !== "reveal")
+          throw new Error("Only a reveal StoryNode can reveal a result");
         if (new Set(results.map((r) => r.scoreId)).size !== results.length)
           throw new Error("Each result needs its own score");
         if (
           results.some(
-            (r) => story.pages[r.route.targetPageId]?.kind === "scene",
+            (r) =>
+              story.storyNodes[r.route.targetStoryNodeId]?.kind === "scene",
           )
         )
           throw new Error("A quiz result must be an ending");
@@ -337,7 +352,8 @@ export function validateStory(value: unknown): Story {
     }
     for (const c of n.choices)
       for (const r of routesOf(c))
-        if (!story.pages[r.targetPageId]) throw new Error("Dangling route");
+        if (!story.storyNodes[r.targetStoryNodeId])
+          throw new Error("Dangling route");
   }
   function checkNamespaces(v: unknown): void {
     if (!v || typeof v !== "object") return;
@@ -356,11 +372,11 @@ export function validateStory(value: unknown): Story {
   function visit(id: string) {
     if (seen.has(id)) return;
     seen.add(id);
-    for (const c of story.pages[id].choices)
-      for (const r of routesOf(c)) visit(r.targetPageId);
+    for (const c of story.storyNodes[id].choices)
+      for (const r of routesOf(c)) visit(r.targetStoryNodeId);
   }
-  visit(story.entryPageId);
-  if (!pages.some((n) => seen.has(n.id) && n.kind === "ending"))
+  visit(story.entryStoryNodeId);
+  if (!storyNodes.some((n) => seen.has(n.id) && n.kind === "ending"))
     throw new Error("No reachable ending");
   return story;
 }

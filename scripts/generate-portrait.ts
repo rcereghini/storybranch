@@ -3,14 +3,14 @@ import { launchBrowser } from "./browser";
 // New delivery rendition IDs: never overwrite the published landscape source.
 const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.evaluate("globalThis.__name = (fn) => fn");
+  const tab = await browser.newPage();
+  await tab.evaluate("globalThis.__name = (fn) => fn");
   const svg = await readFile(
     "apps/web/public/media/harbor-portrait-v1.svg",
     "utf8",
   );
   for (const social of [false, true]) {
-    const bytes = await page.evaluate(
+    const bytes = await tab.evaluate(
       async ({ svg, social }) => {
         const canvas = document.createElement("canvas");
         canvas.width = 1080;

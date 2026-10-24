@@ -13,7 +13,13 @@ import { db, config } from "./firebase";
 import * as paths from "./paths";
 import { publishedClip } from "./uploads";
 import type { Features } from "../../packages/contracts/profile";
-import { contentOf } from "../../packages/contracts/page-library";
+import { contentOf } from "../../packages/contracts/story-node-library";
+import {
+  legacyCommand,
+  legacyStoryData,
+  readStoryData,
+} from "../../packages/contracts/legacy-story-format";
+import { libraryRecord } from "./story-storage";
 
 export async function authoring(
   request: Request,
@@ -46,7 +52,7 @@ export async function authoring(
   if (request.method === "GET" && segments.length === 3) {
     const record = await ref.get();
     if (!record.exists) throw new GameError("NOT_FOUND", "Draft not found.");
-    return record.data();
+    return readStoryData(record.data());
   }
   const publishing = segments.length === 4 && segments[3] === "publish";
   if (request.method !== "POST" || (!publishing && segments.length !== 3))
@@ -69,7 +75,7 @@ export async function authoring(
     ? publishCommandSchema.parse(body)
     : draftCommandSchema.parse(body);
   const fingerprint = createHash("sha256")
-    .update(JSON.stringify({ segments, command }))
+    .update(JSON.stringify(legacyCommand({ segments, command })))
     .digest("hex");
   const receipt = db.doc(paths.receipt(uid, "author", command.idempotencyKey));
   return db.runTransaction(async (tx) => {
@@ -80,10 +86,10 @@ export async function authoring(
           "IDEMPOTENCY_CONFLICT",
           "This request key was already used. Reload the saved draft.",
         );
-      return previous.data()!.result;
+      return readStoryData(previous.data()!.result);
     }
     const current = await tx.get(ref);
-    const old = current.data() as DraftRecord | undefined;
+    const old = readStoryData<DraftRecord | undefined>(current.data());
     const root = db.doc(`stories/${storyId}`);
     const rootSnapshot = await tx.get(root);
     if (rootSnapshot.exists && rootSnapshot.data()!.creatorUid !== uid)
@@ -119,32 +125,28 @@ export async function authoring(
       // each file so players never read the creator's clip records.
       const clips = new Map<string, DocumentReference>();
       const published: Record<string, PublishedClip> = {};
-      for (const page of Object.values(story.pages)) {
-        if (page.sourcePage) {
-          const root = (
-            await tx.get(db.doc(`pageLibrary/${page.sourcePage.id}`))
-          ).data();
-          const source = (
-            await tx.get(
-              db.doc(
-                `pageLibrary/${page.sourcePage.id}/revisions/${page.sourcePage.revision}`,
-              ),
-            )
-          ).data();
+      for (const storyNode of Object.values(story.storyNodes)) {
+        if (storyNode.sourceStoryNode) {
+          const root = await libraryRecord(storyNode.sourceStoryNode.id, tx);
+          const source = await libraryRecord(
+            `${storyNode.sourceStoryNode.id}/revisions/${storyNode.sourceStoryNode.revision}`,
+            tx,
+          );
           if (
             root?.ownerUid !== uid ||
             !source ||
-            JSON.stringify(contentOf(page)) !== JSON.stringify(source.content)
+            JSON.stringify(contentOf(storyNode)) !==
+              JSON.stringify(source.content)
           )
             throw new GameError(
               "VALIDATION_FAILED",
-              `${page.title}: the linked page revision does not match. Save it to the library again.`,
+              `${storyNode.title}: the linked StoryNode revision does not match. Save it to the library again.`,
             );
         }
-        // The page photo and every comic panel.
+        // The StoryNode photo and every comic panel.
         for (const ref of [
-          page.image,
-          ...(page.comic?.panels.map((p) => p.image) ?? []),
+          storyNode.image,
+          ...(storyNode.comic?.panels.map((p) => p.image) ?? []),
         ]) {
           const imageId = assetIdOf(ref);
           if (!imageId || published[imageId]?.contentType.startsWith("image/"))
@@ -157,28 +159,31 @@ export async function authoring(
           )
             throw new GameError(
               "VALIDATION_FAILED",
-              `${page.title}: choose one of your finished photos.`,
+              `${storyNode.title}: choose one of your finished photos.`,
             );
           clips.set(imageId, image);
           published[imageId] = publishedClip(asset);
         }
-        const assetId = assetIdOf(page.video);
+        const assetId = assetIdOf(storyNode.video);
         if (assetId) {
           const clip = db.doc(paths.clip(uid, assetId));
           const asset = (await tx.get(clip)).data();
-          if (asset?.status !== "ready" || !asset.contentType.startsWith("video/"))
+          if (
+            asset?.status !== "ready" ||
+            !asset.contentType.startsWith("video/")
+          )
             throw new GameError(
               "VALIDATION_FAILED",
-              `${page.title}: choose one of your finished uploads or a sample clip.`,
+              `${storyNode.title}: choose one of your finished uploads or a sample clip.`,
             );
           clips.set(assetId, clip);
           published[assetId] = publishedClip(asset);
-        } else if (page.video && !resolveFixtureMedia(page.video))
+        } else if (storyNode.video && !resolveFixtureMedia(storyNode.video))
           throw new GameError(
             "VALIDATION_FAILED",
-            `${page.title}: choose an available sample clip.`,
+            `${storyNode.title}: choose an available sample clip.`,
           );
-        if (page.branchLocation)
+        if (storyNode.branchLocation)
           throw new GameError(
             "VALIDATION_FAILED",
             "Community location authoring is not available yet.",
@@ -189,21 +194,31 @@ export async function authoring(
       const manifestHash = createHash("sha256")
         .update(JSON.stringify(story))
         .digest("hex");
-      if (existing.exists && existing.data()!.manifestHash !== manifestHash)
+      const legacyHash = createHash("sha256")
+        .update(JSON.stringify(legacyStoryData(story)))
+        .digest("hex");
+      if (
+        existing.exists &&
+        existing.data()!.manifestHash !== manifestHash &&
+        existing.data()!.manifestHash !== legacyHash
+      )
         throw new GameError(
           "IDEMPOTENCY_CONFLICT",
           "Published editions cannot change. Save a new draft revision.",
         );
       if (!existing.exists) {
-        const { pages, ...manifest } = story;
+        const { storyNodes, ...manifest } = story;
         tx.create(version, {
           ...manifest,
           ready: true,
           manifestHash,
           ...(clips.size ? { clips: published } : {}),
         });
-        for (const page of Object.values(pages))
-          tx.create(version.collection("pages").doc(page.id), page);
+        for (const storyNode of Object.values(storyNodes))
+          tx.create(
+            version.collection("storyNodes").doc(storyNode.id),
+            storyNode,
+          );
       }
       // Published clips stay available to every pinned save.
       for (const clip of clips.values()) tx.update(clip, { published: true });

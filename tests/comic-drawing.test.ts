@@ -94,18 +94,20 @@ it("draws in the background, sheets first, and places images in their draft", as
   expect(placed).toHaveLength(4); // sheet + 3 panels; panel 3 was refused
   expect(counts(currentDrawing()!)).toEqual({ done: 4, failed: 1 });
   expect(currentDrawing()!.jobs[3].message).toBe("Blocked");
-  const panels = open.story.pages.comic.comic!.panels;
+  const panels = open.story.storyNodes.comic.comic!.panels;
   expect(panels.filter((p) => p.image)).toHaveLength(3);
   // A draft opened later gets the same images.
   const reopened = withDrawnImages(start);
   expect(
-    reopened.story.pages.comic.comic!.panels.filter((p) => p.image),
+    reopened.story.storyNodes.comic.comic!.panels.filter((p) => p.image),
   ).toHaveLength(3);
   expect(withDrawnImages(reopened)).toBe(reopened);
   // Retrying the refused panel draws only it.
   retryDrawing(api as never, open);
   await settle(() => currentDrawing()?.running === false);
-  expect(open.story.pages.comic.comic!.panels.every((p) => p.image)).toBe(true);
+  expect(open.story.storyNodes.comic.comic!.panels.every((p) => p.image)).toBe(
+    true,
+  );
   expect(requests).toHaveLength(6);
   dismissDrawing();
   expect(currentDrawing()).toBeNull();
@@ -116,29 +118,29 @@ it("draws in the background, sheets first, and places images in their draft", as
 it("only places an image in the draft it was drawn for", () => {
   const d = draft();
   const other = { ...d, story: { ...d.story, id: "story-other" } };
-  const panel = d.story.pages.comic.comic!.panels[0];
+  const panel = d.story.storyNodes.comic.comic!.panels[0];
   const job = { kind: "panel" as const, targetId: panel.id };
   expect(
     placeImage(
       other,
-      { storyId: "story-comic", pageId: "comic" },
+      { storyId: "story-comic", storyNodeId: "comic" },
       job,
       "asset:generated-a",
     ),
   ).toBe(other);
   const placed = placeImage(
     d,
-    { storyId: "story-comic", pageId: "comic" },
+    { storyId: "story-comic", storyNodeId: "comic" },
     job,
     "asset:generated-a",
   );
-  expect(placed.story.pages.comic.comic!.panels[0].image).toBe(
+  expect(placed.story.storyNodes.comic.comic!.panels[0].image).toBe(
     "asset:generated-a",
   );
   expect(
     placeImage(
       placed,
-      { storyId: "story-comic", pageId: "comic" },
+      { storyId: "story-comic", storyNodeId: "comic" },
       job,
       "asset:generated-a",
     ),

@@ -1,5 +1,5 @@
-/* Studio. The drafts list is an ordinary page; an open draft becomes a
-   full-window editor: top bar, then pages | map | settings. On phones one
+/* Studio. The drafts list is an ordinary view; an open draft becomes a
+   full-window editor: top bar, then views | map | settings. On phones one
    part fills the screen at a time, chosen by the view switch. */
 
 /* While editing, the footer and phone tab bar make room for the editor. */
@@ -254,7 +254,7 @@ html.studio-editing .tab-bar {
   color: var(--muted);
   font-size: 12px;
 }
-.studio .outline-page {
+.studio .outline-story-node {
   display: flex;
   width: 100%;
   margin: 0 0 2px;
@@ -268,10 +268,10 @@ html.studio-editing .tab-bar {
   color: var(--text);
   text-align: left;
 }
-.studio .outline-page:hover:not(:disabled) {
+.studio .outline-story-node:hover:not(:disabled) {
   background: var(--surface-2);
 }
-.studio .outline-page[aria-current="true"] {
+.studio .outline-story-node[aria-current="true"] {
   background: var(--primary-soft);
   box-shadow: inset 3px 0 var(--primary);
 }
@@ -281,14 +281,14 @@ html.studio-editing .tab-bar {
   letter-spacing: 0.6px;
   text-transform: uppercase;
 }
-.outline-page strong {
+.outline-story-node strong {
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   font: 600 14px var(--font-ui);
 }
-.outline-page small {
+.outline-story-node small {
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
@@ -296,30 +296,30 @@ html.studio-editing .tab-bar {
   color: var(--muted);
   font-size: 12px;
 }
-.outline-page small.outline-warning {
+.outline-story-node small.outline-warning {
   color: var(--warning);
 }
 
 /* Library in the side pane: one column, no card chrome. */
-.studio-side .page-library {
+.studio-side .story-node-library {
   margin: 0;
   padding: 14px 12px 24px;
   border-radius: 0;
   box-shadow: none;
 }
-.studio-side .page-library > h2 {
+.studio-side .story-node-library > h2 {
   font-size: 16px;
 }
-.studio-side .page-library .grid {
+.studio-side .story-node-library .grid {
   grid-template-columns: minmax(0, 1fr);
 }
-.studio-side .library-page-card {
+.studio-side .library-story-node-card {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: none;
 }
-.studio-side .library-page-card h3 {
+.studio-side .library-story-node-card h3 {
   font-size: 16px;
 }
 
@@ -574,7 +574,7 @@ html.studio-editing .tab-bar {
   padding: 16px;
 }
 
-/* Laptops: a narrower page list and settings. */
+/* Laptops: a narrower view list and settings. */
 @media (max-width: 1240px) {
   .studio-body {
     grid-template-columns: 236px minmax(0, 1fr) 340px;
@@ -640,7 +640,7 @@ html.studio-editing .tab-bar {
     inset: 0;
     border: 0;
   }
-  .studio-shell:not([data-view="pages"]) .studio-side,
+  .studio-shell:not([data-view="storyNodes"]) .studio-side,
   .studio-shell:not([data-view="map"]) .studio-canvas,
   .studio-shell:not([data-view="panel"]) .studio-panel {
     display: none;

@@ -22,7 +22,7 @@ export const sceneMedia = Object.fromEntries(
   sceneVariants.map((scene) => {
     const id = sceneAssetId(scene);
     return [
-      `${scene.story}/pages-v1/${scene.node}`,
+      `${scene.story}/story-nodes-v1/${scene.node}`,
       mediaSchema.parse({
         landscape: {
           src: `/media/${id}-landscape.mp4`,

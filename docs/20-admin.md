@@ -44,7 +44,7 @@ All routes need the `admin` feature.
 
 ## Verification
 
-Unit tests cover admin implying every feature and hidden stories on the dashboard. An emulator integration test covers member refusal on every route, feature changes, retries and key conflicts, the self-lockout rules, disabling and re-enabling, hiding (Discover, new starts refused, existing saves still play, dashboard kept but not recommended) and the audit log. `scripts/admin-check.ts`, run in CI, drives the page as the local admin: navigation, overview, a feature toggle, locked self controls, hide and show, activity, no horizontal overflow at 1024 and 390 px, and a member seeing neither the nav item nor the page.
+Unit tests cover admin implying every feature and hidden stories on the dashboard. An emulator integration test covers member refusal on every route, feature changes, retries and key conflicts, the self-lockout rules, disabling and re-enabling, hiding (Discover, new starts refused, existing saves still play, dashboard kept but not recommended) and the audit log. `scripts/admin-check.ts`, run in CI, drives the admin view as the local admin: navigation, overview, a feature toggle, locked self controls, hide and show, activity, no horizontal overflow at 1024 and 390 px, and a member seeing neither the nav item nor the admin view.
 
 ## Next
 

@@ -177,7 +177,7 @@ export function ImageGenerator({
           <h1 id="imagegen-title">Generate an image</h1>
           <p className="imagegen-muted">
             Describe the scene. Results are saved to your assets, ready to use
-            on any page.
+            on any StoryNode.
           </p>
         </div>
       </div>

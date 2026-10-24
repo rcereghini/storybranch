@@ -1,27 +1,27 @@
-import type { Choice, StoryPage } from "../packages/contracts/index";
+import type { Choice, StoryNode } from "../packages/contracts/index";
 import { validateStory } from "../packages/domain/index";
 const next = (
-  targetPageId: string,
+  targetStoryNodeId: string,
   label = "Continue",
   extra: Partial<Choice> = {},
 ): Choice => ({
-  id: targetPageId,
+  id: targetStoryNodeId,
   label,
   costs: [],
   unavailableDisplay: "locked",
-  outcome: { kind: "direct", route: { targetPageId, effects: [] } },
+  outcome: { kind: "direct", route: { targetStoryNodeId, effects: [] } },
   ...extra,
 });
-const page = (
+const storyNode = (
   id: string,
-  pageType: StoryPage["pageType"],
+  storyNodeType: StoryNode["storyNodeType"],
   title: string,
   transcript: string,
   choices: Choice[],
-  extra: Partial<StoryPage> = {},
-): StoryPage => ({
+  extra: Partial<StoryNode> = {},
+): StoryNode => ({
   id,
-  pageType,
+  storyNodeType,
   title,
   transcript,
   kind: choices.length ? "scene" : "ending",
@@ -30,15 +30,15 @@ const page = (
   ...extra,
 });
 const film = "/media/glass-harbor-market-mock-v1-landscape.mp4";
-export const pageStories = [
+export const storyNodeStories = [
   validateStory({
     id: "clockwork-door",
-    versionId: "pages-v1",
+    versionId: "story-nodes-v1",
     rulesetVersion: "prototype-1",
     title: "The Clockwork Door",
-    entryPageId: "letter",
-    pages: {
-      letter: page(
+    entryStoryNodeId: "letter",
+    storyNodes: {
+      letter: storyNode(
         "letter",
         "text",
         "A letter at midnight",
@@ -55,7 +55,7 @@ export const pageStories = [
           ],
         },
       ),
-      hall: page(
+      hall: storyNode(
         "hall",
         "text-options",
         "The thirteenth chime",
@@ -79,14 +79,14 @@ export const pageStories = [
           next("sealed", "Walk away"),
         ],
       ),
-      study: page(
+      study: storyNode(
         "study",
         "text",
         "A familiar signature",
         "The gears spell your name. This machine was built for you.",
         [next("room")],
       ),
-      room: page(
+      room: storyNode(
         "room",
         "video",
         "The city beyond the door",
@@ -94,14 +94,14 @@ export const pageStories = [
         [next("home")],
         { video: film },
       ),
-      home: page(
+      home: storyNode(
         "home",
         "text",
         "A new beginning",
         "You step through. The key becomes a compass. This is where your next story begins.",
         [],
       ),
-      sealed: page(
+      sealed: storyNode(
         "sealed",
         "text",
         "Some doors can wait",
@@ -112,12 +112,12 @@ export const pageStories = [
   }),
   validateStory({
     id: "storm-signal",
-    versionId: "pages-v1",
+    versionId: "story-nodes-v1",
     rulesetVersion: "prototype-1",
     title: "The Storm Signal",
-    entryPageId: "approach",
-    pages: {
-      approach: page(
+    entryStoryNodeId: "approach",
+    storyNodes: {
+      approach: storyNode(
         "approach",
         "video-options",
         "The last transmission",
@@ -125,7 +125,7 @@ export const pageStories = [
         [next("roll", "Climb the mast"), next("shelter", "Take shelter")],
         { video: "/media/glass-harbor-guard-mock-v1-landscape.mp4" },
       ),
-      roll: page(
+      roll: storyNode(
         "roll",
         "dice",
         "Hold fast",
@@ -141,7 +141,7 @@ export const pageStories = [
               sides: 20,
               target: 10,
               success: {
-                targetPageId: "signal",
+                targetStoryNodeId: "signal",
                 effects: [
                   {
                     id: "signal-key",
@@ -151,12 +151,12 @@ export const pageStories = [
                   },
                 ],
               },
-              failure: { targetPageId: "shelter", effects: [] },
+              failure: { targetStoryNodeId: "shelter", effects: [] },
             },
           },
         ],
       ),
-      signal: page(
+      signal: storyNode(
         "signal",
         "text-options",
         "A voice through the storm",
@@ -172,7 +172,7 @@ export const pageStories = [
           next("shelter", "Leave the relay transmitting"),
         ],
       ),
-      rescued: page(
+      rescued: storyNode(
         "rescued",
         "video",
         "Lights on the horizon",
@@ -180,7 +180,7 @@ export const pageStories = [
         [],
         { video: "/media/glass-harbor-success-mock-v1-landscape.mp4" },
       ),
-      shelter: page(
+      shelter: storyNode(
         "shelter",
         "text",
         "Safe until morning",
@@ -191,7 +191,7 @@ export const pageStories = [
   }),
 ];
 // A personality quiz: each answer adds a point toward one result, and the
-// reveal page sends the player to the result with the most points.
+// reveal StoryNode sends the player to the result with the most points.
 const types = {
   navigator: "Ask the stars which way is home.",
   tinkerer: "Take something apart to see how it works.",
@@ -204,7 +204,7 @@ const answer = (question: string, type: keyof typeof types, label: string) =>
     outcome: {
       kind: "direct",
       route: {
-        targetPageId: question,
+        targetStoryNodeId: question,
         effects: [
           {
             id: `${question}-${type}`,
@@ -222,7 +222,7 @@ const question = (
   title: string,
   labels: Record<keyof typeof types, string>,
 ) =>
-  page(
+  storyNode(
     id,
     "text-options",
     title,
@@ -233,12 +233,12 @@ const question = (
   );
 export const explorerQuiz = validateStory({
   id: "explorer-quiz",
-  versionId: "pages-v1",
+  versionId: "story-nodes-v1",
   rulesetVersion: "prototype-1",
   title: "What Kind of Explorer Are You?",
-  entryPageId: "welcome",
-  pages: {
-    welcome: page(
+  entryStoryNodeId: "welcome",
+  storyNodes: {
+    welcome: storyNode(
       "welcome",
       "text",
       "Before the voyage",
@@ -284,7 +284,7 @@ export const explorerQuiz = validateStory({
         spark: "The one thing nobody can explain",
       },
     ),
-    reveal: page(
+    reveal: storyNode(
       "reveal",
       "reveal",
       "Your compass is spinning",
@@ -300,35 +300,35 @@ export const explorerQuiz = validateStory({
             results: (Object.keys(types) as (keyof typeof types)[]).map(
               (type) => ({
                 scoreId: `explorer-quiz:${type}`,
-                route: { targetPageId: type, effects: [] },
+                route: { targetStoryNodeId: type, effects: [] },
               }),
             ),
           },
         },
       ],
     ),
-    navigator: page(
+    navigator: storyNode(
       "navigator",
       "text",
       "The Navigator",
       `${types.navigator} You read the sky like a book and never lose your bearings. Crews trust you to find the way.`,
       [],
     ),
-    tinkerer: page(
+    tinkerer: storyNode(
       "tinkerer",
       "text",
       "The Tinkerer",
       `${types.tinkerer} Every broken thing is a puzzle to you, and you usually leave it better than you found it.`,
       [],
     ),
-    keeper: page(
+    keeper: storyNode(
       "keeper",
       "text",
       "The Keeper",
       `${types.keeper} You notice who's missing before anyone else does. With you aboard, nobody gets left behind.`,
       [],
     ),
-    spark: page(
+    spark: storyNode(
       "spark",
       "video",
       "The Spark",
@@ -338,13 +338,13 @@ export const explorerQuiz = validateStory({
     ),
   },
 });
-pageStories.push(explorerQuiz);
-export const pageCatalogue = pageStories.map((story) => ({
+storyNodeStories.push(explorerQuiz);
+export const storyNodeCatalogue = storyNodeStories.map((story) => ({
   id: story.id,
   title: story.title,
   versionId: story.versionId,
   creator: "Storybranch Studio",
-  genre: "Mixed-page prototype",
+  genre: "Mixed StoryNode prototype",
   duration: "2–3 min",
   rating: "Everyone · mild peril",
   description:

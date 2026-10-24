@@ -11,6 +11,20 @@ docs/01-product-requirements.md, docs/02-game-and-community-rules.md, and
 docs/10-decisions-and-open-questions.md before making changes. Then read the
 architecture, contracts, and acceptance criteria relevant to this task.
 
+Before planning, read root and applicable scoped AGENTS.md files,
+CONTRIBUTING.md and docs/development-workflow.md. For Story work, start with
+docs/story-system/README.md and docs/16-story-nodes.md, then follow the task's
+reading set. Cite relevant rules and distinguish target design from current
+support. Do not restore historical node-only formats from older examples.
+Complete the documentation-impact review before committing.
+
+Use docs/story-system/terminology.md: Story, StoryTrunk, StoryNode,
+StoryBranch and StoryLeaf. Every published StoryNode connects to the trunk,
+other nodes and/or leaves; a node may have several outgoing StoryBranches.
+Use canonical names in code, UI and new stored/API contracts; isolate prior
+spellings in the compatibility boundary. Ordinary StoryBranches stay within the current run;
+separately authored community side Stories have isolated child runs.
+
 Preserve these invariants: published story versions are immutable; saved runs
 pin their versions; side quests have independent saves; shared account stats
 are distinct from local story state; a location permits multiple community
@@ -57,7 +71,7 @@ Leave real payments and video generation outside this milestone.
 Implement M2. Read docs/03-experience-and-interface.md and the publication and
 asset contracts. Build graph and outline authoring, scene inspection, uploads,
 condition editing, preview state controls, validation, and immutable publishing.
-Add authenticated catalogue home, creator library pages, story links, and share
+Add authenticated catalogue home, creator library StoryNodes, story links, and share
 controls with crawler-visible metadata. Verify a creator-to-player workflow,
 private asset access, concurrent draft edits, and incomplete publication recovery.
 ```

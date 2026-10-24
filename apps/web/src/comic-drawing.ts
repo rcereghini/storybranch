@@ -11,7 +11,7 @@ import { generateImage } from "./StudioAssist";
 import { castInPanel, castPrompt, drawPlan, panelPrompt } from "./studio-model";
 
 // The comic companion's drawing, kept outside any component so it carries on
-// when the dialog closes, the creator edits another page, or leaves Studio.
+// when the dialog closes, the creator edits another StoryNode, or leaves Studio.
 // Studio registers a placer that puts each image into the open draft; images
 // for a draft that isn't open are placed when it is opened again. A reload
 // stops placing (finished images stay in the asset library).
@@ -31,7 +31,7 @@ export type DrawJob = {
 };
 export type Drawing = {
   storyId: string;
-  pageId: string;
+  storyNodeId: string;
   title: string;
   jobs: DrawJob[];
   running: boolean;
@@ -75,7 +75,7 @@ export const setPlacer = (next: Placer | null) => {
 // drawn for. Unchanged when it is already there or its target was removed.
 export function placeImage(
   d: DraftRecord,
-  drawing: Pick<Drawing, "storyId" | "pageId">,
+  drawing: Pick<Drawing, "storyId" | "storyNodeId">,
   job: Pick<DrawJob, "kind" | "targetId">,
   image: string,
 ): DraftRecord {
@@ -91,20 +91,20 @@ export function placeImage(
       },
     };
   }
-  const page = d.story.pages[drawing.pageId];
-  const panel = page?.comic?.panels.find((p) => p.id === job.targetId);
-  if (!page?.comic || !panel || panel.image === image) return d;
+  const storyNode = d.story.storyNodes[drawing.storyNodeId];
+  const panel = storyNode?.comic?.panels.find((p) => p.id === job.targetId);
+  if (!storyNode?.comic || !panel || panel.image === image) return d;
   return {
     ...d,
     story: {
       ...d.story,
-      pages: {
-        ...d.story.pages,
-        [drawing.pageId]: {
-          ...page,
+      storyNodes: {
+        ...d.story.storyNodes,
+        [drawing.storyNodeId]: {
+          ...storyNode,
           comic: {
-            ...page.comic,
-            panels: page.comic.panels.map((p) =>
+            ...storyNode.comic,
+            panels: storyNode.comic.panels.map((p) =>
               p === panel ? { ...p, image } : p,
             ),
           },
@@ -145,7 +145,7 @@ async function drawOne(
         return patch(job.key, { status: "failed", message: "Removed" });
       prompt = castPrompt(member, studio.style);
     } else {
-      const comic = base.story.pages[drawing.pageId]?.comic;
+      const comic = base.story.storyNodes[drawing.storyNodeId]?.comic;
       const index = comic?.panels.findIndex((p) => p.id === job.targetId) ?? -1;
       if (!comic || index < 0)
         return patch(job.key, { status: "failed", message: "Removed" });
@@ -251,12 +251,12 @@ export const counts = (drawing: Drawing) => ({
 export function startDrawing(
   api: Api,
   draft: DraftRecord,
-  pageId: string,
+  storyNodeId: string,
   title: string,
 ) {
   if (state?.running) return;
-  const plan = drawPlan(draft, pageId);
-  const panels = draft.story.pages[pageId]?.comic?.panels ?? [];
+  const plan = drawPlan(draft, storyNodeId);
+  const panels = draft.story.storyNodes[storyNodeId]?.comic?.panels ?? [];
   const jobs: DrawJob[] = [
     ...plan.cast.map((c) => ({
       key: `cast-${c.id}`,
@@ -274,7 +274,7 @@ export function startDrawing(
     })),
   ];
   if (!jobs.length) return;
-  set({ storyId: draft.story.id, pageId, title, jobs, running: true });
+  set({ storyId: draft.story.id, storyNodeId, title, jobs, running: true });
   void run(
     api,
     jobs.map((j) => j.key),
@@ -304,7 +304,7 @@ export const dismissDrawing = () => {
   if (!state?.running) set(null);
 };
 
-// Leaving the page would stop placing images.
+// Leaving the StoryNode would stop placing images.
 if (typeof addEventListener !== "undefined")
   addEventListener("beforeunload", (event) => {
     if (state?.running) event.preventDefault();

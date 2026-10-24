@@ -1,5 +1,7 @@
 # Storybranch product requirements
 
+Use [the canonical Story terminology](story-system/terminology.md): a Story contains its StoryTrunk, connected StoryNodes, their StoryBranches and StoryLeaves. Separately authored community side Stories retain their own run/context; an ordinary StoryBranch is an in-story route. The requirements below retain existing product labels where applicable.
+
 Storybranch lets people play, create, and expand video based choose your own adventure stories. Its defining experience is a cinematic story with meaningful RPG choices, plus community side quests that preserve the player's original adventure.
 
 ## Confirmed requirements

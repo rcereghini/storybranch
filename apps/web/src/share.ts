@@ -1,8 +1,8 @@
 // Public share links name a story or an ending, never a private playthrough.
 export const storyLink = (storyId: string) =>
   new URL(`/s/${storyId}`, location.origin).href;
-export const endingLink = (storyId: string, pageId: string) =>
-  new URL(`/s/${storyId}/ending/${pageId}`, location.origin).href;
+export const endingLink = (storyId: string, storyNodeId: string) =>
+  new URL(`/s/${storyId}/ending/${storyNodeId}`, location.origin).href;
 
 export async function copyLink(url: string, what = "Link") {
   try {

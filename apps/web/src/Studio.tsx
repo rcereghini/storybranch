@@ -7,7 +7,7 @@ import { auth } from "./firebase";
 import {
   type Choice,
   type Story as StoryData,
-  type StoryPage,
+  type StoryNode as StoryNodeData,
   type Save,
 } from "../../../packages/contracts/index";
 import { type DraftRecord } from "../../../packages/contracts/authoring";
@@ -15,18 +15,18 @@ import type { AssistChoice } from "../../../packages/contracts/assist";
 import { validatePublication } from "../../../packages/domain/authoring";
 import {
   baseStats,
-  isResultPage,
+  isResultStoryNode,
   start,
   transition,
 } from "../../../packages/domain/index";
 import { resolveFixtureMedia } from "../../../fixtures/media";
 import { Story } from "./Story";
-import { Page } from "./Page";
+import { StoryNode } from "./StoryNode";
 import { ClipPicker } from "./ClipPicker";
-import { PageLibrary } from "./Library";
+import { StoryNodeLibrary } from "./Library";
 import { StoryGraph } from "./StoryGraph";
 import { StoryOutline } from "./StoryOutline";
-import { PageAssist, PageImageDialog } from "./StudioAssist";
+import { StoryNodeAssist, StoryNodeImageDialog } from "./StudioAssist";
 import { ComicEditor, ComicWorkspace, panelImages } from "./ComicEditor";
 import { DrawingStatus } from "./ComicCompanion";
 import {
@@ -37,7 +37,7 @@ import {
   type Drawing,
   type Placer,
 } from "./comic-drawing";
-import { connectPage } from "../../../packages/domain/story-graph";
+import { connectStoryNode } from "../../../packages/domain/story-graph";
 import {
   assetIdOf,
   assetRef,
@@ -50,7 +50,7 @@ import {
   comicTemplate,
   countToward,
   ending,
-  makePage,
+  makeStoryNode,
   media,
   newComic,
   quizTemplate,
@@ -79,12 +79,12 @@ type Listing = {
 // What undo restores: everything the creator edits in a draft.
 type Snapshot = Pick<
   DraftRecord,
-  "story" | "description" | "pagePositions" | "comic"
+  "story" | "description" | "storyNodePositions" | "comic"
 >;
 type Request = { path: string; body: unknown; version: number };
 type SaveState = "idle" | "saving" | "saved" | "error" | "conflict";
 // Phone layout: which part of the editor fills the screen.
-type View = "pages" | "map" | "panel";
+type View = "storyNodes" | "map" | "panel";
 const AUTOSAVE_MS = 2000;
 const RETRY_MS = 8000;
 const typing = (target: EventTarget | null) =>
@@ -121,10 +121,10 @@ export function Studio({
   const [offline, setOffline] = useState(!navigator.onLine);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [focus, setFocus] = useState(0);
-  const [view, setView] = useState<View>("pages");
-  const [back, setBack] = useState<View>("pages");
-  const [pane, setPane] = useState<"page" | "story">("page");
-  const [side, setSide] = useState<"pages" | "library">("pages");
+  const [view, setView] = useState<View>("storyNodes");
+  const [back, setBack] = useState<View>("storyNodes");
+  const [pane, setPane] = useState<"storyNode" | "story">("storyNode");
+  const [side, setSide] = useState<"storyNodes" | "library">("storyNodes");
   const [imageDialog, setImageDialog] = useState(false);
   // Comics: the panel being edited, and whether a comic draft shows the map.
   const [panel, setPanel] = useState<string | null>(null);
@@ -205,7 +205,7 @@ export function Studio({
   const snapshot = (d: DraftRecord): Snapshot => ({
     story: d.story,
     description: d.description,
-    pagePositions: d.pagePositions,
+    storyNodePositions: d.storyNodePositions,
     comic: d.comic,
   });
   // Every edit goes through here: it marks the draft for autosave and keeps
@@ -239,7 +239,8 @@ export function Studio({
     editVersion.current++;
     setDirty(true);
     setHistoryTick((t) => t + 1);
-    if (!next.story.pages[selected]) setSelected(next.story.entryPageId);
+    if (!next.story.storyNodes[selected])
+      setSelected(next.story.entryStoryNodeId);
   };
   const undo = () => restore(past, future);
   const redo = () => restore(future, past);
@@ -247,7 +248,7 @@ export function Studio({
     edit((d) => ({ ...d, story }));
     setNotice("");
   };
-  const page = draft?.story.pages[selected];
+  const storyNode = draft?.story.storyNodes[selected];
   // Each background-drawn image goes into the open draft it was drawn for.
   const placer = useRef<Placer>(() => {});
   placer.current = (shown, job, image, asset) => {
@@ -267,11 +268,11 @@ export function Studio({
           items: [asset, ...old.items.filter((a) => a.id !== asset.id)],
         },
     );
-  const updatePage = (value: StoryPage) =>
+  const updateStoryNode = (value: StoryNodeData) =>
     draft &&
     change({
       ...draft.story,
-      pages: { ...draft.story.pages, [value.id]: value },
+      storyNodes: { ...draft.story.storyNodes, [value.id]: value },
     });
 
   // Saves the current draft (or resends an unanswered save with its key).
@@ -288,9 +289,9 @@ export function Studio({
         draft: {
           story: current.story,
           description: current.description,
-          pagePositions: Object.fromEntries(
-            Object.entries(current.pagePositions ?? {}).filter(
-              ([id]) => current.story.pages[id],
+          storyNodePositions: Object.fromEntries(
+            Object.entries(current.storyNodePositions ?? {}).filter(
+              ([id]) => current.story.storyNodes[id],
             ),
           ),
           ...(current.comic ? { comic: current.comic } : {}),
@@ -385,7 +386,7 @@ export function Studio({
     if (d !== loaded) isDirty = true;
     draftRef.current = d;
     setDraft(d);
-    setSelected(d.story.entryPageId);
+    setSelected(d.story.entryStoryNodeId);
     setDirty(isDirty);
     setPreview(null);
     setRetry(null);
@@ -395,15 +396,18 @@ export function Studio({
     editVersion.current++;
     savedVersion.current = isDirty ? -1 : editVersion.current;
     setView("map");
-    setPane("page");
+    setPane("storyNode");
     setFocus(0);
     setPanel(null);
     setCompanion(false);
     setComicMap(false);
     const shown = reopen.current;
     reopen.current = null;
-    if (shown?.storyId === d.story.id && d.story.pages[shown.pageId]) {
-      setSelected(shown.pageId);
+    if (
+      shown?.storyId === d.story.id &&
+      d.story.storyNodes[shown.storyNodeId]
+    ) {
+      setSelected(shown.storyNodeId);
       setCompanion(true);
     }
   };
@@ -411,9 +415,9 @@ export function Studio({
   // first when another one (or none) is open.
   const showDrawing = (shown: Drawing) => {
     if (draftRef.current?.story.id === shown.storyId) {
-      setSelected(shown.pageId);
+      setSelected(shown.storyNodeId);
       setComicMap(false);
-      setPane("page");
+      setPane("storyNode");
       setCompanion(true);
       return;
     }
@@ -505,32 +509,32 @@ export function Studio({
       setNotice((e as Error).message);
     }
   };
-  // Selecting a page edits it: on a phone the settings fill the screen.
+  // Selecting a StoryNode edits it: on a phone the settings fill the screen.
   const select = (id: string, from: View) => {
     setSelected(id);
-    setPane("page");
+    setPane("storyNode");
     setBack(from);
     setView("panel");
     if (from !== "map") setFocus((f) => f + 1);
   };
 
-  const setType = (type: StoryPage["pageType"]) => {
-    if (!page || !draft) return;
+  const setType = (type: StoryNodeData["storyNodeType"]) => {
+    if (!storyNode || !draft) return;
     const {
       video: _,
       videoAdvance: _advance,
-      sourcePage: _source,
+      sourceStoryNode: _source,
       comic: _comic,
       ...rest
-    } = page;
+    } = storyNode;
     if (type === "comic") {
-      // Panels replace the page photo; the page keeps its one output.
+      // Panels replace the StoryNode photo; the StoryNode keeps its one output.
       const { image: _image, ...plain } = rest;
-      updatePage({
+      updateStoryNode({
         ...plain,
-        pageType: type,
-        comic: page.comic ?? newComic(),
-        choices: page.kind === "ending" ? [] : [choice()],
+        storyNodeType: type,
+        comic: storyNode.comic ?? newComic(),
+        choices: storyNode.kind === "ending" ? [] : [choice()],
       });
       return;
     }
@@ -539,17 +543,17 @@ export function Studio({
       const ids = [`result-${shortId()}`, `result-${shortId()}`];
       change({
         ...draft.story,
-        pages: {
-          ...draft.story.pages,
+        storyNodes: {
+          ...draft.story.storyNodes,
           ...Object.fromEntries(
             ids.map((r, i) => [
               r,
               ending(r, `Result ${i + 1}`, "Describe this result."),
             ]),
           ),
-          [page.id]: {
+          [storyNode.id]: {
             ...rest,
-            pageType: type,
+            storyNodeType: type,
             kind: "scene",
             choices: [revealChoice(ids.map((r) => result(draft.story.id, r)))],
           },
@@ -568,12 +572,12 @@ export function Studio({
         failure: route("ending"),
       };
     }
-    updatePage({
+    updateStoryNode({
       ...rest,
-      pageType: type,
-      kind: type === "dice" ? "scene" : page.kind,
+      storyNodeType: type,
+      kind: type === "dice" ? "scene" : storyNode.kind,
       ...(type.startsWith("video") ? { video: media[0].landscape.src } : {}),
-      choices: page.kind === "ending" && type !== "dice" ? [] : [c],
+      choices: storyNode.kind === "ending" && type !== "dice" ? [] : [c],
     });
   };
   const targetSelect = (
@@ -589,7 +593,7 @@ export function Studio({
         onChange={(e) => update(e.target.value)}
       >
         {draft &&
-          Object.values(draft.story.pages).map((p) => (
+          Object.values(draft.story.storyNodes).map((p) => (
             <option key={p.id} value={p.id}>
               {p.title} ({p.id})
             </option>
@@ -597,108 +601,119 @@ export function Studio({
       </select>
     </label>
   );
-  // Results come from the story's reveal pages, named by their page titles.
+  // Results come from the story's reveal StoryNodes, named by their StoryNode titles.
   const quizResults = draft
-    ? Object.values(draft.story.pages).flatMap((p) =>
+    ? Object.values(draft.story.storyNodes).flatMap((p) =>
         p.choices.flatMap((c) =>
           c.outcome.kind === "reveal" ? c.outcome.results : [],
         ),
       )
     : [];
   const editChoice = (index: number, c: Choice) =>
-    page &&
-    updatePage({
-      ...page,
-      choices: page.choices.map((old, i) => (i === index ? c : old)),
+    storyNode &&
+    updateStoryNode({
+      ...storyNode,
+      choices: storyNode.choices.map((old, i) => (i === index ? c : old)),
     });
-  const addGraphPage = (
+  const addGraphStoryNode = (
     type: "text" | "text-options" | "video" | "video-options" | "ending",
     branch = false,
   ) => {
-    if (!draft || Object.keys(draft.story.pages).length >= 80) return;
-    const id = `page-${shortId()}`;
+    if (!draft || Object.keys(draft.story.storyNodes).length >= 80) return;
+    const id = `story-node-${shortId()}`;
     const target =
-      Object.values(draft.story.pages).find((p) => p.kind === "ending")?.id ??
-      draft.story.entryPageId;
+      Object.values(draft.story.storyNodes).find((p) => p.kind === "ending")
+        ?.id ?? draft.story.entryStoryNodeId;
     const linear =
-      page?.choices.length === 1 &&
-      page.choices[0].outcome.kind === "direct" &&
-      !page.pageType.endsWith("options");
+      storyNode?.choices.length === 1 &&
+      storyNode.choices[0].outcome.kind === "direct" &&
+      !storyNode.storyNodeType.endsWith("options");
     const next =
-      linear && !branch && page.choices[0].outcome.kind === "direct"
-        ? page.choices[0].outcome.route.targetPageId
+      linear && !branch && storyNode.choices[0].outcome.kind === "direct"
+        ? storyNode.choices[0].outcome.route.targetStoryNodeId
         : target;
-    const added: StoryPage = {
-      ...makePage(id),
-      title: type === "ending" ? "New ending" : "New page",
-      pageType: type === "ending" ? "text" : type,
+    const added: StoryNodeData = {
+      ...makeStoryNode(id),
+      title: type === "ending" ? "New ending" : "New StoryNode",
+      storyNodeType: type === "ending" ? "text" : type,
       kind: type === "ending" ? "ending" : "scene",
       choices: type === "ending" ? [] : [choice(next)],
       ...(type.startsWith("video") ? { video: media[0].landscape.src } : {}),
     };
     let story = {
       ...draft.story,
-      pages: { ...draft.story.pages, [id]: added },
+      storyNodes: { ...draft.story.storyNodes, [id]: added },
     };
-    if (branch && page) {
-      const { sourcePage: _source, videoAdvance: _advance, ...rest } = page;
-      story.pages[page.id] = {
+    if (branch && storyNode) {
+      const {
+        sourceStoryNode: _source,
+        videoAdvance: _advance,
+        ...rest
+      } = storyNode;
+      story.storyNodes[storyNode.id] = {
         ...rest,
-        pageType: page.pageType.startsWith("video")
+        storyNodeType: storyNode.storyNodeType.startsWith("video")
           ? "video-options"
           : "text-options",
         choices: [
-          ...page.choices,
-          { ...choice(id), label: `Option ${page.choices.length + 1}` },
+          ...storyNode.choices,
+          { ...choice(id), label: `Option ${storyNode.choices.length + 1}` },
         ],
       };
-    } else if (linear && page)
-      story = connectPage(
+    } else if (linear && storyNode)
+      story = connectStoryNode(
         story,
-        page.id,
-        { choiceId: page.choices[0].id, slot: 0 },
+        storyNode.id,
+        { choiceId: storyNode.choices[0].id, slot: 0 },
         id,
       );
     change(story);
     setSelected(id);
-    setPane("page");
+    setPane("storyNode");
     setFocus((f) => f + 1);
     setPreview(null);
   };
-  // Accepted AI choices: each becomes an option leading to a new page that
-  // continues where this page's single output went (or to an ending).
+  // Accepted AI choices: each becomes an option leading to a new StoryNode that
+  // continues where this StoryNode's single output went (or to an ending).
   const addSuggestedChoices = (suggested: AssistChoice[]) => {
-    if (!draft || !page) return;
-    const room = 80 - Object.keys(draft.story.pages).length;
+    if (!draft || !storyNode) return;
+    const room = 80 - Object.keys(draft.story.storyNodes).length;
     const picks = suggested.slice(0, Math.max(0, room));
     if (!picks.length) {
-      setNotice("This story has the most pages it can hold (80).");
+      setNotice("This story has the most StoryNodes it can hold (80).");
       return;
     }
     const fallback =
-      Object.values(draft.story.pages).find((p) => p.kind === "ending")?.id ??
-      draft.story.entryPageId;
+      Object.values(draft.story.storyNodes).find((p) => p.kind === "ending")
+        ?.id ?? draft.story.entryStoryNodeId;
     const onward =
-      page.choices.length === 1 && page.choices[0].outcome.kind === "direct"
-        ? page.choices[0].outcome.route.targetPageId
+      storyNode.choices.length === 1 &&
+      storyNode.choices[0].outcome.kind === "direct"
+        ? storyNode.choices[0].outcome.route.targetStoryNodeId
         : fallback;
     const created = picks.map((pick) => ({
-      ...makePage(`page-${shortId()}`),
+      ...makeStoryNode(`story-node-${shortId()}`),
       title: pick.title,
       transcript: pick.text || "What happens here?",
       choices: [choice(onward)],
     }));
-    const { sourcePage: _source, videoAdvance: _advance, ...rest } = page;
-    // A plain page becomes an options page; its old "Continue" is replaced.
-    const keep = page.pageType.endsWith("options") ? page.choices : [];
+    const {
+      sourceStoryNode: _source,
+      videoAdvance: _advance,
+      ...rest
+    } = storyNode;
+    // A plain StoryNode becomes an options StoryNode; its old "Continue" is replaced.
+    const keep = storyNode.storyNodeType.endsWith("options")
+      ? storyNode.choices
+      : [];
     change({
       ...draft.story,
-      pages: {
-        ...draft.story.pages,
+      storyNodes: {
+        ...draft.story.storyNodes,
         ...Object.fromEntries(created.map((p) => [p.id, p])),
-        [page.id]: {
+        [storyNode.id]: {
           ...rest,
-          pageType: page.pageType.startsWith("video")
+          storyNodeType: storyNode.storyNodeType.startsWith("video")
             ? "video-options"
             : "text-options",
           choices: [
@@ -830,8 +845,8 @@ export function Studio({
           <div className="studio-start">
             <h2>Start your first story</h2>
             <p className="studio-sub">
-              A story is a set of pages linked by choices: text, video, dice
-              rolls, quiz results and comics. Start from a blank story, a
+              A story is a set of StoryNodes linked by choices: text, video,
+              dice rolls, quiz results and comics. Start from a blank story, a
               ready-made quiz or a four-panel comic.
             </p>
           </div>
@@ -849,7 +864,8 @@ export function Studio({
     );
 
   // A comic draft edits its comic on the canvas instead of the story map.
-  const comicView = !!draft.comic && page?.pageType === "comic" && !comicMap;
+  const comicView =
+    !!draft.comic && storyNode?.storyNodeType === "comic" && !comicMap;
   const canUndo = past.current.length > 0;
   const canRedo = future.current.length > 0;
   return (
@@ -958,7 +974,7 @@ export function Studio({
       <nav className="studio-views" aria-label="Editor views">
         {(
           [
-            ["pages", "Pages"],
+            ["storyNodes", "StoryNodes"],
             ["map", comicView ? "Comic" : "Map"],
           ] as const
         ).map(([value, label]) => (
@@ -977,18 +993,18 @@ export function Studio({
             setView("panel");
           }}
         >
-          {pane === "story" ? "Story" : "Edit page"}
+          {pane === "story" ? "Story" : "Edit StoryNode"}
         </button>
       </nav>
 
       <div className="studio-body">
-        <aside className="studio-side" aria-label="Pages and library">
+        <aside className="studio-side" aria-label="StoryNodes and library">
           <div className="studio-tabs" role="group" aria-label="Side panel">
             <button
-              aria-pressed={side === "pages"}
-              onClick={() => setSide("pages")}
+              aria-pressed={side === "storyNodes"}
+              onClick={() => setSide("storyNodes")}
             >
-              Pages
+              StoryNodes
             </button>
             <button
               aria-pressed={side === "library"}
@@ -998,18 +1014,18 @@ export function Studio({
             </button>
           </div>
           <div className="studio-scroll">
-            {side === "pages" ? (
+            {side === "storyNodes" ? (
               <>
                 <StoryOutline
                   story={draft.story}
                   selected={selected}
-                  onSelect={(id) => select(id, "pages")}
+                  onSelect={(id) => select(id, "storyNodes")}
                 />
                 <Button
                   className="btn btn-secondary btn-small studio-story-link"
                   onClick={() => {
                     setPane("story");
-                    setBack("pages");
+                    setBack("storyNodes");
                     setView("panel");
                   }}
                 >
@@ -1017,25 +1033,27 @@ export function Studio({
                 </Button>
               </>
             ) : (
-              <PageLibrary
+              <StoryNodeLibrary
                 api={api}
                 uploads={uploads}
-                page={page}
-                disabled={busy || Object.keys(draft.story.pages).length >= 80}
+                storyNode={storyNode}
+                disabled={
+                  busy || Object.keys(draft.story.storyNodes).length >= 80
+                }
                 key={draft.story.id}
                 onSaved={(record, instanceId) => {
                   edit((current) => {
-                    const instance = current.story.pages[instanceId];
+                    const instance = current.story.storyNodes[instanceId];
                     if (!instance) return current;
                     return {
                       ...current,
                       story: {
                         ...current.story,
-                        pages: {
-                          ...current.story.pages,
+                        storyNodes: {
+                          ...current.story.storyNodes,
                           [instanceId]: {
                             ...instance,
-                            sourcePage: {
+                            sourceStoryNode: {
                               id: record.id,
                               revision: record.revision,
                             },
@@ -1046,11 +1064,13 @@ export function Studio({
                   });
                 }}
                 onInsert={(instance) => {
-                  const target = Object.values(draft.story.pages).find(
+                  const target = Object.values(draft.story.storyNodes).find(
                     (p) => p.kind === "ending",
                   )?.id;
                   if (!target) {
-                    setNotice("Add an ending before placing a reusable page.");
+                    setNotice(
+                      "Add an ending before placing a reusable StoryNode.",
+                    );
                     return;
                   }
                   instance.choices = instance.choices.map((c) => ({
@@ -1059,7 +1079,10 @@ export function Studio({
                   }));
                   change({
                     ...draft.story,
-                    pages: { ...draft.story.pages, [instance.id]: instance },
+                    storyNodes: {
+                      ...draft.story.storyNodes,
+                      [instance.id]: instance,
+                    },
                   });
                   setSelected(instance.id);
                   setFocus((f) => f + 1);
@@ -1070,7 +1093,7 @@ export function Studio({
         </aside>
 
         <div className={`studio-canvas${draft.comic ? " is-comic" : ""}`}>
-          {draft.comic && comicMap && page?.pageType === "comic" && (
+          {draft.comic && comicMap && storyNode?.storyNodeType === "comic" && (
             <div className="comic-workspace-bar">
               <p className="muted">Story map</p>
               <button
@@ -1081,14 +1104,14 @@ export function Studio({
               </button>
             </div>
           )}
-          {comicView && page ? (
+          {comicView && storyNode ? (
             <ComicWorkspace
-              page={page}
+              storyNode={storyNode}
               uploads={uploads}
               selectedPanel={panel}
               onSelectPanel={(id) => {
                 setPanel(id);
-                setPane("page");
+                setPane("storyNode");
                 setBack("map");
                 setView("panel");
               }}
@@ -1098,24 +1121,24 @@ export function Studio({
             <StoryGraph
               key={draft.story.id}
               story={draft.story}
-              positions={draft.pagePositions}
+              positions={draft.storyNodePositions}
               selected={selected}
               disabled={busy}
               focus={focus}
               onSelect={(id) => select(id, "map")}
-              onMove={(pagePositions) =>
-                edit((current) => ({ ...current, pagePositions }))
+              onMove={(storyNodePositions) =>
+                edit((current) => ({ ...current, storyNodePositions }))
               }
               onConnect={(source, edge, target) => {
                 try {
-                  change(connectPage(draft.story, source, edge, target));
+                  change(connectStoryNode(draft.story, source, edge, target));
                   setPreview(null);
                 } catch (e) {
                   setNotice((e as Error).message);
                 }
               }}
-              onAdd={(type) => addGraphPage(type)}
-              onBranch={() => addGraphPage("text", true)}
+              onAdd={(type) => addGraphStoryNode(type)}
+              onBranch={() => addGraphStoryNode("text", true)}
             />
           )}
         </div>
@@ -1130,10 +1153,10 @@ export function Studio({
               ←
             </button>
             <button
-              aria-pressed={pane === "page"}
-              onClick={() => setPane("page")}
+              aria-pressed={pane === "storyNode"}
+              onClick={() => setPane("storyNode")}
             >
-              Page
+              StoryNode
             </button>
             <button
               aria-pressed={pane === "story"}
@@ -1159,9 +1182,10 @@ export function Studio({
                   />
                 </label>
                 {targetSelect(
-                  "First page",
-                  draft.story.entryPageId,
-                  (entryPageId) => change({ ...draft.story, entryPageId }),
+                  "First StoryNode",
+                  draft.story.entryStoryNodeId,
+                  (entryStoryNodeId) =>
+                    change({ ...draft.story, entryStoryNodeId }),
                 )}
                 <p className="studio-publish-note">
                   Publish makes this story public in Discover. Only publish
@@ -1194,12 +1218,12 @@ export function Studio({
                 )}
               </fieldset>
             ) : (
-              <fieldset className="studio-page-inspector" disabled={busy}>
-                <legend>Page settings</legend>
+              <fieldset className="studio-story-node-inspector" disabled={busy}>
+                <legend>StoryNode settings</legend>
                 <label>
-                  Edit page
+                  Edit StoryNode
                   <select
-                    aria-label="Edit page"
+                    aria-label="Edit StoryNode"
                     value={selected}
                     onChange={(e) => {
                       setSelected(e.target.value);
@@ -1207,32 +1231,37 @@ export function Studio({
                       setPreview(null);
                     }}
                   >
-                    {Object.values(draft.story.pages).map((p) => (
+                    {Object.values(draft.story.storyNodes).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title} ({p.id})
                       </option>
                     ))}
                   </select>
                 </label>
-                {page && (
+                {storyNode && (
                   <>
                     <label>
-                      Page title
+                      StoryNode title
                       <input
                         maxLength={160}
-                        value={page.title}
+                        value={storyNode.title}
                         onChange={(e) =>
-                          updatePage({ ...page, title: e.target.value })
+                          updateStoryNode({
+                            ...storyNode,
+                            title: e.target.value,
+                          })
                         }
                       />
                     </label>
                     <label>
-                      Page type
+                      StoryNode type
                       <select
-                        aria-label="Page type"
-                        value={page.pageType}
+                        aria-label="StoryNode type"
+                        value={storyNode.storyNodeType}
                         onChange={(e) =>
-                          setType(e.target.value as StoryPage["pageType"])
+                          setType(
+                            e.target.value as StoryNodeData["storyNodeType"],
+                          )
                         }
                       >
                         {[
@@ -1248,14 +1277,14 @@ export function Studio({
                         ))}
                       </select>
                     </label>
-                    <PageAssist
+                    <StoryNodeAssist
                       api={api}
                       story={draft.story}
                       description={draft.description}
-                      page={page}
+                      storyNode={storyNode}
                       reason={assistReason}
                       onText={(transcript) =>
-                        updatePage({ ...page, transcript })
+                        updateStoryNode({ ...storyNode, transcript })
                       }
                       onChoices={addSuggestedChoices}
                     >
@@ -1265,20 +1294,25 @@ export function Studio({
                           aria-label="Text / transcript"
                           rows={8}
                           maxLength={10000}
-                          value={page.transcript}
+                          value={storyNode.transcript}
                           onChange={(e) =>
-                            updatePage({ ...page, transcript: e.target.value })
+                            updateStoryNode({
+                              ...storyNode,
+                              transcript: e.target.value,
+                            })
                           }
                         />
                       </label>
-                    </PageAssist>
-                    {page.pageType.startsWith("video") && (
+                    </StoryNodeAssist>
+                    {storyNode.storyNodeType.startsWith("video") && (
                       <ClipPicker
                         api={api}
-                        value={page.video}
+                        value={storyNode.video}
                         uploads={uploads}
                         disabled={busy}
-                        onChange={(video) => updatePage({ ...page, video })}
+                        onChange={(video) =>
+                          updateStoryNode({ ...storyNode, video })
+                        }
                         onUploaded={(asset) =>
                           setUploads(
                             (old) =>
@@ -1293,15 +1327,15 @@ export function Studio({
                         }
                       />
                     )}
-                    {page.pageType === "video" && (
+                    {storyNode.storyNodeType === "video" && (
                       <label>
                         After the video ends
                         <select
                           aria-label="After the video ends"
-                          value={page.videoAdvance ?? "auto"}
+                          value={storyNode.videoAdvance ?? "auto"}
                           onChange={(e) =>
-                            updatePage({
-                              ...page,
+                            updateStoryNode({
+                              ...storyNode,
                               videoAdvance: e.target.value as
                                 | "auto"
                                 | "continue",
@@ -1313,11 +1347,11 @@ export function Studio({
                         </select>
                       </label>
                     )}
-                    {page.pageType === "comic" ? (
+                    {storyNode.storyNodeType === "comic" ? (
                       <ComicEditor
                         api={api}
                         draft={draft}
-                        page={page}
+                        storyNode={storyNode}
                         uploads={uploads}
                         busy={busy}
                         assistReason={assistReason}
@@ -1333,12 +1367,12 @@ export function Studio({
                         <ClipPicker
                           kind="image"
                           api={api}
-                          value={page.image}
+                          value={storyNode.image}
                           uploads={uploads}
                           disabled={busy}
                           onChange={(image) => {
-                            const { image: _, ...rest } = page;
-                            updatePage(image ? { ...rest, image } : rest);
+                            const { image: _, ...rest } = storyNode;
+                            updateStoryNode(image ? { ...rest, image } : rest);
                           }}
                           onUploaded={addUpload}
                         />
@@ -1347,41 +1381,42 @@ export function Studio({
                           disabled={busy}
                           onClick={() => setImageDialog(true)}
                         >
-                          ✦ Generate a page image
+                          ✦ Generate a StoryNode image
                         </button>
                       </>
                     )}
-                    {page.sourcePage && (
+                    {storyNode.sourceStoryNode && (
                       <p>
-                        Library revision {page.sourcePage.revision}. Save
-                        content edits to the library before publishing; story
-                        routes stay separate.
+                        Library revision {storyNode.sourceStoryNode.revision}.
+                        Save content edits to the library before publishing;
+                        story routes stay separate.
                       </p>
                     )}
-                    {page.pageType !== "dice" && page.pageType !== "reveal" && (
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={page.kind === "ending"}
-                          onChange={(e) =>
-                            updatePage({
-                              ...page,
-                              kind: e.target.checked ? "ending" : "scene",
-                              choices: e.target.checked ? [] : [choice()],
-                            })
-                          }
-                        />{" "}
-                        End this story here
-                      </label>
-                    )}
+                    {storyNode.storyNodeType !== "dice" &&
+                      storyNode.storyNodeType !== "reveal" && (
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={storyNode.kind === "ending"}
+                            onChange={(e) =>
+                              updateStoryNode({
+                                ...storyNode,
+                                kind: e.target.checked ? "ending" : "scene",
+                                choices: e.target.checked ? [] : [choice()],
+                              })
+                            }
+                          />{" "}
+                          End this story here
+                        </label>
+                      )}
                     <h3>Outputs</h3>
-                    {page.kind === "ending" && (
+                    {storyNode.kind === "ending" && (
                       <p>
                         This closes the story and offers replay or another
                         adventure.
                       </p>
                     )}
-                    {page.choices.map((c, i) => (
+                    {storyNode.choices.map((c, i) => (
                       <div className="studio-output" key={c.id}>
                         <label>
                           Option {i + 1} label
@@ -1395,8 +1430,8 @@ export function Studio({
                         </label>
                         {c.outcome.kind === "direct" ? (
                           targetSelect(
-                            "Next page",
-                            c.outcome.route.targetPageId,
+                            "Next",
+                            c.outcome.route.targetStoryNodeId,
                             (target) =>
                               editChoice(i, {
                                 ...c,
@@ -1406,7 +1441,7 @@ export function Studio({
                                     ...(c.outcome.kind === "direct"
                                       ? c.outcome.route
                                       : route(target)),
-                                    targetPageId: target,
+                                    targetStoryNodeId: target,
                                   },
                                 },
                               }),
@@ -1452,8 +1487,8 @@ export function Studio({
                               />
                             </label>
                             {targetSelect(
-                              "Pass page",
-                              c.outcome.success.targetPageId,
+                              "Pass StoryNode",
+                              c.outcome.success.targetStoryNodeId,
                               (target) =>
                                 c.outcome.kind === "dice" &&
                                 editChoice(i, {
@@ -1465,8 +1500,8 @@ export function Studio({
                                 }),
                             )}
                             {targetSelect(
-                              "Fail page",
-                              c.outcome.failure.targetPageId,
+                              "Fail StoryNode",
+                              c.outcome.failure.targetStoryNodeId,
                               (target) =>
                                 c.outcome.kind === "dice" &&
                                 editChoice(i, {
@@ -1488,8 +1523,8 @@ export function Studio({
                             {c.outcome.results.map((r, j, results) => (
                               <div className="studio-actions" key={r.scoreId}>
                                 {targetSelect(
-                                  `Result ${j + 1} page`,
-                                  r.route.targetPageId,
+                                  `Result ${j + 1} StoryNode`,
+                                  r.route.targetStoryNodeId,
                                   (target) =>
                                     editChoice(i, {
                                       ...c,
@@ -1525,22 +1560,22 @@ export function Studio({
                             <Button
                               disabled={
                                 c.outcome.results.length >= 12 ||
-                                Object.keys(draft.story.pages).length >= 80
+                                Object.keys(draft.story.storyNodes).length >= 80
                               }
                               onClick={() => {
                                 if (c.outcome.kind !== "reveal") return;
                                 const id = `result-${shortId()}`;
                                 change({
                                   ...draft.story,
-                                  pages: {
-                                    ...draft.story.pages,
+                                  storyNodes: {
+                                    ...draft.story.storyNodes,
                                     [id]: ending(
                                       id,
                                       `Result ${c.outcome.results.length + 1}`,
                                       "Describe this result.",
                                     ),
-                                    [page.id]: {
-                                      ...page,
+                                    [storyNode.id]: {
+                                      ...storyNode,
                                       choices: [
                                         {
                                           ...c,
@@ -1581,19 +1616,22 @@ export function Studio({
                                 <option value="">No result</option>
                                 {quizResults.map((r) => (
                                   <option key={r.scoreId} value={r.scoreId}>
-                                    {draft.story.pages[r.route.targetPageId]
-                                      ?.title ?? r.route.targetPageId}
+                                    {draft.story.storyNodes[
+                                      r.route.targetStoryNodeId
+                                    ]?.title ?? r.route.targetStoryNodeId}
                                   </option>
                                 ))}
                               </select>
                             </label>
                           )}
-                        {page.pageType.endsWith("options") && (
+                        {storyNode.storyNodeType.endsWith("options") && (
                           <Button
                             onClick={() =>
-                              updatePage({
-                                ...page,
-                                choices: page.choices.filter((_, j) => j !== i),
+                              updateStoryNode({
+                                ...storyNode,
+                                choices: storyNode.choices.filter(
+                                  (_, j) => j !== i,
+                                ),
                               })
                             }
                           >
@@ -1602,14 +1640,14 @@ export function Studio({
                         )}
                       </div>
                     ))}
-                    {page.kind !== "ending" &&
-                      page.pageType.endsWith("options") && (
+                    {storyNode.kind !== "ending" &&
+                      storyNode.storyNodeType.endsWith("options") && (
                         <Button
-                          disabled={page.choices.length >= 20}
+                          disabled={storyNode.choices.length >= 20}
                           onClick={() =>
-                            updatePage({
-                              ...page,
-                              choices: [...page.choices, choice()],
+                            updateStoryNode({
+                              ...storyNode,
+                              choices: [...storyNode.choices, choice()],
                             })
                           }
                         >
@@ -1626,17 +1664,21 @@ export function Studio({
                       <label>
                         Outputs JSON
                         <textarea
-                          key={`${page.id}-choices-${JSON.stringify(page.choices)}`}
+                          key={`${storyNode.id}-choices-${JSON.stringify(storyNode.choices)}`}
                           aria-label="Outputs JSON"
                           rows={8}
-                          defaultValue={JSON.stringify(page.choices, null, 2)}
+                          defaultValue={JSON.stringify(
+                            storyNode.choices,
+                            null,
+                            2,
+                          )}
                           onBlur={(e) => {
                             try {
                               const choices = z
                                 .array(choiceSchema)
                                 .max(20)
                                 .parse(JSON.parse(e.target.value));
-                              updatePage({ ...page, choices });
+                              updateStoryNode({ ...storyNode, choices });
                             } catch {
                               setNotice(
                                 "Invalid outputs JSON. Your last valid outputs are unchanged.",
@@ -1648,18 +1690,18 @@ export function Studio({
                       <label>
                         Entry effects JSON
                         <textarea
-                          key={`${page.id}-effects`}
+                          key={`${storyNode.id}-effects`}
                           aria-label="Entry effects JSON"
                           rows={4}
                           defaultValue={JSON.stringify(
-                            page.entryEffects,
+                            storyNode.entryEffects,
                             null,
                             2,
                           )}
                           onBlur={(e) => {
                             try {
-                              updatePage({
-                                ...page,
+                              updateStoryNode({
+                                ...storyNode,
                                 entryEffects: z
                                   .array(effectSchema)
                                   .max(20)
@@ -1675,15 +1717,15 @@ export function Studio({
                       </label>
                     </details>
                     <Button
-                      disabled={page.id === draft.story.entryPageId}
+                      disabled={storyNode.id === draft.story.entryStoryNodeId}
                       onClick={() => {
-                        const pages = { ...draft.story.pages };
-                        delete pages[page.id];
-                        change({ ...draft.story, pages });
-                        setSelected(draft.story.entryPageId);
+                        const storyNodes = { ...draft.story.storyNodes };
+                        delete storyNodes[storyNode.id];
+                        change({ ...draft.story, storyNodes });
+                        setSelected(draft.story.entryStoryNodeId);
                       }}
                     >
-                      Delete page
+                      Delete StoryNode
                     </Button>
                   </>
                 )}
@@ -1693,12 +1735,12 @@ export function Studio({
         </aside>
       </div>
 
-      {imageDialog && page && (
-        <PageImageDialog
+      {imageDialog && storyNode && (
+        <StoryNodeImageDialog
           api={api}
           story={draft.story}
           description={draft.description}
-          page={page}
+          storyNode={storyNode}
           assistReason={assistReason}
           onClose={() => setImageDialog(false)}
           onAttach={(asset) => {
@@ -1709,9 +1751,10 @@ export function Studio({
                   items: [asset, ...old.items.filter((a) => a.id !== asset.id)],
                 },
             );
-            const current = draftRef.current?.story.pages[page.id];
-            if (current) updatePage({ ...current, image: assetRef(asset.id) });
-            setNotice("Image generated and placed on this page.");
+            const current = draftRef.current?.story.storyNodes[storyNode.id];
+            if (current)
+              updateStoryNode({ ...current, image: assetRef(asset.id) });
+            setNotice("Image generated and placed on this StoryNode.");
           }}
         />
       )}
@@ -1761,24 +1804,28 @@ export function Studio({
                   saveSpots: [],
                 }}
               >
-                <Page
-                  page={preview.story.pages[preview.save.pageId]}
-                  result={isResultPage(preview.story, preview.save.pageId)}
+                <StoryNode
+                  storyNode={preview.story.storyNodes[preview.save.storyNodeId]}
+                  result={isResultStoryNode(
+                    preview.story,
+                    preview.save.storyNodeId,
+                  )}
                   media={mediaFor(
-                    preview.story.pages[preview.save.pageId].video,
+                    preview.story.storyNodes[preview.save.storyNodeId].video,
                   )}
                   image={
                     uploads?.items.find(
                       (a) =>
                         a.id ===
                         assetIdOf(
-                          preview.story.pages[preview.save.pageId].image,
+                          preview.story.storyNodes[preview.save.storyNodeId]
+                            .image,
                         ),
                     )?.url
                   }
                   panels={(() => {
                     const comic =
-                      preview.story.pages[preview.save.pageId].comic;
+                      preview.story.storyNodes[preview.save.storyNodeId].comic;
                     return comic && panelImages(comic, uploads);
                   })()}
                   disabled={false}
@@ -1819,7 +1866,7 @@ export function Studio({
                       Play preview again
                     </Button>
                   )}
-                </Page>
+                </StoryNode>
               </Story>
             </div>
           </section>

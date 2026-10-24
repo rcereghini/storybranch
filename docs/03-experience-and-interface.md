@@ -12,9 +12,9 @@ Catalogue rows include Featured stories, New adventures, Short sessions, genre r
 
 The first catalogue supports title prefix search and genre, rating, language, and duration filters. Full-text relevance and recommendations are later features, not capabilities assumed from the database. Empty rows collapse; a new account receives a useful editorial selection.
 
-## Story and creator pages
+## Story details and creator profiles
 
-Story detail contains a trailer or poster, synopsis, creator attribution, content warnings, play or resume, community status, and share controls. Creator pages provide a public library containing only published public stories and approved profile details. Private drafts, balances, and personal play history never appear there.
+Story detail contains a trailer or poster, synopsis, creator attribution, content warnings, play or resume, community status, and share controls. Creator profiles provide a public library containing only published public stories and approved profile details. Private drafts, balances, and personal play history never appear there.
 
 Use stable links `/s/{storyId}/{optionalSlug}` and `/u/{publicHandle}`. The ID remains authoritative when titles change. Unlisted stories require a link and stay outside catalogue queries; unlisted does not mean access-controlled. Sharing uses the platform share surface when supported, a copy link fallback, and tested social compose links. Preview metadata must be rendered for crawlers at the canonical public URL. Never rely on client-only metadata for social cards.
 
@@ -34,7 +34,7 @@ Video end reveals or emphasizes choices, but accessibility controls allow users 
 
 ## Creator workspace
 
-Use a desktop graph canvas with an outline alternative, scene inspector, video preview, and validation panel. The original design named Scene, Combat and Ending nodes; Creator Studio now authors the five page types in [Story and Page model](16-story-pages.md), and combat is still deferred. A branch location is a property of a Scene; it is not a separate kind of save state. Creation begins from a small starter graph with an opening, a choice, two routes, and endings.
+Use a desktop graph canvas with an outline alternative, scene inspector, video preview, and validation panel. The original design named Scene, Combat and Ending nodes; Creator Studio now authors the five StoryNode types in [Story and StoryNode model](16-story-nodes.md), and combat is still deferred. A branch location is a property of a Scene; it is not a separate kind of save state. Creation begins from a small starter graph with an opening, a choice, two routes, and endings.
 
 The inspector edits title, transcript/captions, uploaded or generated media, choices, conditions, effects, and checkpoint settings. A condition builder offers stat/key/item fields and operators. A test player can simulate starting stat profiles and keys without editing the real account.
 
@@ -48,7 +48,7 @@ On mobile, support scene list navigation, text/choice edits, media review, gener
 
 My Adventures separates active main stories, side quests, and completed stories. Profile contains account level, shared stats, achievements, and privacy controls. The story log shows timestamped decisions, discovered endings, combat outcomes, and parent/child relationships. Spoilers stay hidden by default on public views.
 
-The community page at a location shows the featured branch, the rest of the list, and Create a side quest when allowed. Placement management shows current ownership, nominated branch, eligibility, and pending trades. Trade review spells out exactly which placement is given and received and that stories and saves stay with their existing owners.
+The community view at a location shows the featured branch, the rest of the list, and Create a side quest when allowed. Placement management shows current ownership, nominated branch, eligibility, and pending trades. Trade review spells out exactly which placement is given and received and that stories and saves stay with their existing owners.
 
 ## Accessibility and interface states
 

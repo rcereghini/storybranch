@@ -1,12 +1,12 @@
 import type { Story } from "../packages/contracts/index";
-import { isResultPage } from "../packages/domain/index";
+import { isResultStoryNode } from "../packages/domain/index";
 
 // Link previews are static: crawlers read meta tags without running the app.
 export type ShareStory = {
   story: Story;
   description: string;
 };
-export type SharePage = { path: string; html: string };
+export type ShareDocument = { path: string; html: string };
 
 const escape = (text: string) =>
   text
@@ -50,20 +50,20 @@ function tags(
   ].join("");
 }
 
-// One page per story (/s/<id>) and per ending (/s/<id>/ending/<pageId>).
-// The ending page also names the ending for the app's "a friend reached" note.
-export function sharePages(
+// One view per story (/s/<id>) and per ending (/s/<id>/ending/<storyNodeId>).
+// The ending view also names the ending for the app's "a friend reached" note.
+export function shareDocuments(
   shell: string,
   site: string,
   stories: ShareStory[],
   images: Set<string>,
-): SharePage[] {
-  // Each page brings its own title and description in place of the shell's.
+): ShareDocument[] {
+  // Each view brings its own title and description in place of the shell's.
   const withTags = (head: string) =>
     shell
       .replace(/<meta\s+name="description"[^>]*>\s*/, "")
       .replace(/<title>[^<]*<\/title>/, head);
-  const pages: SharePage[] = [
+  const documents: ShareDocument[] = [
     {
       path: "",
       html: withTags(
@@ -79,32 +79,32 @@ export function sharePages(
   ];
   for (const { story, description } of stories) {
     const image = ogImage(story.id, images);
-    pages.push({
+    documents.push({
       path: `s/${story.id}`,
       html: withTags(
         tags(site, `s/${story.id}`, story.title, description, image),
       ),
     });
-    for (const page of Object.values(story.pages)) {
-      if (page.kind !== "ending") continue;
-      const path = `s/${story.id}/ending/${page.id}`;
+    for (const document of Object.values(story.storyNodes)) {
+      if (document.kind !== "ending") continue;
+      const path = `s/${story.id}/ending/${document.id}`;
       // A quiz result reads "I got"; the app words its note to match.
-      const result = isResultPage(story, page.id);
-      pages.push({
+      const result = isResultStoryNode(story, document.id);
+      documents.push({
         path,
         html: withTags(
           tags(
             site,
             path,
             result
-              ? `I got “${page.title}” in ${story.title}`
-              : `I reached “${page.title}” in ${story.title}`,
+              ? `I got “${document.title}” in ${story.title}`
+              : `I reached “${document.title}” in ${story.title}`,
             result
               ? "What will you get? Take the quiz free on Storybranch."
               : "Which ending will you find? Play free on Storybranch.",
             image,
             {
-              "storybranch:ending": page.title,
+              "storybranch:ending": document.title,
               ...(result ? { "storybranch:result": "true" } : {}),
             },
           ),
@@ -112,5 +112,5 @@ export function sharePages(
       });
     }
   }
-  return pages;
+  return documents;
 }

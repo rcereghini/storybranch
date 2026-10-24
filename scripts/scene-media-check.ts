@@ -3,22 +3,22 @@ import { launchBrowser, startPlayback } from "./browser";
 const browser = await launchBrowser();
 try {
   for (const width of [1440, 390]) {
-    const page = await browser.newPage({ viewport: { width, height: 900 } });
-    await page.goto("http://127.0.0.1:5173");
-    await page
+    const tab = await browser.newPage({ viewport: { width, height: 900 } });
+    await tab.goto("http://127.0.0.1:5173");
+    await tab
       .getByRole("button", { name: /Sign in/ })
       .first()
       .click();
-    await page.getByText("LOCAL EMULATOR ACCOUNTS").waitFor();
-    await page
+    await tab.getByText("LOCAL EMULATOR ACCOUNTS").waitFor();
+    await tab
       .getByRole("dialog")
       .getByRole("button", { name: "Sign in ↗" })
       .click();
-    await page.getByRole("dialog").waitFor({ state: "hidden" });
-    await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
-    await page.getByRole("button", { name: "Start a new journey" }).click();
-    await startPlayback(page);
-    const element = await page.locator("video").elementHandle();
+    await tab.getByRole("dialog").waitFor({ state: "hidden" });
+    await tab.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
+    await tab.getByRole("button", { name: "Start a new journey" }).click();
+    await startPlayback(tab);
+    const element = await tab.locator("video").elementHandle();
     for (const [node, choice] of [
       ["dock", "Speak to the courier"],
       ["courier", "Follow the lanterns to market"],
@@ -26,7 +26,7 @@ try {
       ["guard", "Surrender the signal"],
       ["failure", ""],
     ]) {
-      await page.waitForFunction(
+      await tab.waitForFunction(
         ({ node, width }) => {
           const v = document.querySelector("video");
           return (
@@ -44,14 +44,14 @@ try {
         await element!.evaluate((v) => v === document.querySelector("video")),
         "Reuse the authorized video element",
       );
-      await page.screenshot({
+      await tab.screenshot({
         path: `test-results/scene-${node}-${width}.png`,
       });
-      await page.getByRole("button", { name: "Skip to choices" }).click();
+      await tab.getByRole("button", { name: "Skip to choices" }).click();
       if (choice)
-        await page.getByRole("button", { name: new RegExp(choice) }).click();
+        await tab.getByRole("button", { name: new RegExp(choice) }).click();
     }
-    await page.close();
+    await tab.close();
   }
   console.log(
     "PASS: five distinct scene sources load and play automatically in landscape and portrait on one video element.",

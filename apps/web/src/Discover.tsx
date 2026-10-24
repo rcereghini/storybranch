@@ -17,7 +17,7 @@ export type CatalogueEntry = {
 };
 
 // The public catalogue: the featured Glass Harbor hero and a searchable
-// story library, and each story's page under /s/.
+// story library, and each story's view under /s/.
 export function Discover({
   path,
   catalogue,
@@ -47,11 +47,11 @@ export function Discover({
 }) {
   const [query, setQuery] = useState("");
   const [genre, setGenre] = useState<GenreId | "all">("all");
-  // /s/<story>[/<slug>] is a story page; /s/<story>/ending/<page> is a shared
-  // ending. The ending's title comes from its static link-preview page.
+  // /s/<story>[/<slug>] is a story view; /s/<story>/ending/<view> is a shared
+  // ending. The ending's title comes from its static link-preview view.
   const [, , detailId, ...rest] = path.split("/");
   const detail = path.startsWith("/s/") && !!detailId;
-  // Creator stories have no preview page, so the title may be unknown.
+  // Creator stories have no preview view, so the title may be unknown.
   const sharedEnding =
     detail && rest[0] === "ending" && rest[1]
       ? (document
@@ -62,7 +62,7 @@ export function Discover({
     'meta[name="storybranch:result"]',
   );
   const detailEntry = catalogue.find((c) => c.id === detailId);
-  // The story page: Glass Harbor has richer house copy; other stories use
+  // The story view: Glass Harbor has richer house copy; other stories use
   // their catalogue entry.
   const story =
     detailId === "glass-harbor"
@@ -75,7 +75,11 @@ export function Discover({
           tagline: "A story that knows which way you turned.",
           description:
             "Climb the rooftops, earn a harbor pass, or follow a stranger into a smaller story. Your stats open routes. Your choices leave a record.",
-          chips: ["Teen · mild peril", "Community paths open", "Full text transcripts"],
+          chips: [
+            "Teen · mild peril",
+            "Community paths open",
+            "Full text transcripts",
+          ],
         }
       : detailEntry
         ? {
@@ -180,12 +184,18 @@ export function Discover({
               />
               <div className="disc-detail-copy">
                 <p className="disc-meta">
-                  {[story.genre, story.duration, story.creator && `By ${story.creator}`]
+                  {[
+                    story.genre,
+                    story.duration,
+                    story.creator && `By ${story.creator}`,
+                  ]
                     .filter(Boolean)
                     .join(" · ") || "An interactive story"}
                 </p>
                 <h1>{story.title}</h1>
-                {story.tagline && <p className="disc-tagline">{story.tagline}</p>}
+                {story.tagline && (
+                  <p className="disc-tagline">{story.tagline}</p>
+                )}
                 <p className="disc-description">{story.description}</p>
                 {story.chips.length > 0 && (
                   <ul className="disc-chips">
@@ -298,7 +308,9 @@ export function Discover({
                     <StoryCover storyId={item.id} title={item.title} />
                     <div className="disc-card-body">
                       <p className="disc-meta">
-                        {[item.genre, item.duration].filter(Boolean).join(" · ")}
+                        {[item.genre, item.duration]
+                          .filter(Boolean)
+                          .join(" · ")}
                         {status && (
                           <span className={`disc-status ${status.className}`}>
                             {status.label}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { Story, StoryPage } from "../../../packages/contracts/index";
+import type { Story, StoryNode } from "../../../packages/contracts/index";
 import type {
   AssistChoice,
   AssistCommand,
@@ -19,12 +19,12 @@ import { ApiError } from "../../../packages/api-client/index";
 type Api = <T>(path: string, body?: unknown) => Promise<T>;
 const placeholderText = "What happens here?";
 
-// Up to three pages leading to this one, nearest first, for continuity.
-function before(story: Story, pageId: string) {
+// Up to three StoryNodes leading to this one, nearest first, for continuity.
+function before(story: Story, storyNodeId: string) {
   const trail: { title: string; text: string }[] = [];
-  let current = pageId;
+  let current = storyNodeId;
   for (let i = 0; i < 3; i++) {
-    const parent = Object.values(story.pages).find(
+    const parent = Object.values(story.storyNodes).find(
       (p) =>
         p.id !== current &&
         connections(p).some((edge) => edge.target === current),
@@ -38,17 +38,17 @@ function before(story: Story, pageId: string) {
 const context = (
   story: Story,
   description: string,
-  page: StoryPage,
+  storyNode: StoryNode,
 ): Omit<AssistCommand, "idempotencyKey" | "action" | "instruction"> => ({
   story: { title: story.title, description },
-  page: {
-    title: page.title,
-    text: page.transcript === placeholderText ? "" : page.transcript,
-    pageType: page.pageType,
-    ending: page.kind === "ending",
-    outputs: page.choices.map((c) => c.label),
+  storyNode: {
+    title: storyNode.title,
+    text: storyNode.transcript === placeholderText ? "" : storyNode.transcript,
+    storyNodeType: storyNode.storyNodeType,
+    ending: storyNode.kind === "ending",
+    outputs: storyNode.choices.map((c) => c.label),
   },
-  before: before(story, page.id),
+  before: before(story, storyNode.id),
 });
 
 const styles = [
@@ -65,13 +65,13 @@ type Pending = {
   label: string;
 };
 
-// AI help for one page's text. Suggestions open over the text field (so the
+// AI help for one StoryNode's text. Suggestions open over the text field (so the
 // panel never shifts) and change nothing until the creator accepts them.
-export function PageAssist({
+export function StoryNodeAssist({
   api,
   story,
   description,
-  page,
+  storyNode,
   reason,
   children,
   onText,
@@ -80,7 +80,7 @@ export function PageAssist({
   api: Api;
   story: Story;
   description: string;
-  page: StoryPage;
+  storyNode: StoryNode;
   // Why AI help is unavailable, or null when it can be used.
   reason: string | null;
   // The text field the suggestions cover.
@@ -101,12 +101,12 @@ export function PageAssist({
       alive.current = false;
     };
   }, []);
-  // A different page closes any open suggestion.
+  // A different StoryNode closes any open suggestion.
   useEffect(() => {
     setAnswer(null);
     setError("");
     setPending(null);
-  }, [page.id]);
+  }, [storyNode.id]);
 
   const run = async (next: Pending) => {
     setPending(next);
@@ -139,7 +139,7 @@ export function PageAssist({
         idempotencyKey: crypto.randomUUID(),
         action,
         ...(instruction ? { instruction } : {}),
-        ...context(story, description, page),
+        ...context(story, description, storyNode),
       },
     });
   const close = () => {
@@ -148,10 +148,13 @@ export function PageAssist({
     setPending(null);
   };
   const hasText =
-    page.transcript.trim() !== "" && page.transcript !== placeholderText;
+    storyNode.transcript.trim() !== "" &&
+    storyNode.transcript !== placeholderText;
   const branchable =
-    page.kind !== "ending" &&
-    ["text", "text-options", "video", "video-options"].includes(page.pageType);
+    storyNode.kind !== "ending" &&
+    ["text", "text-options", "video", "video-options"].includes(
+      storyNode.storyNodeType,
+    );
   const open = busy || !!answer || !!error;
 
   return (
@@ -293,7 +296,7 @@ export function PageAssist({
             </span>
             <button
               className="assist-button"
-              disabled={busy || !branchable || page.choices.length >= 17}
+              disabled={busy || !branchable || storyNode.choices.length >= 17}
               onClick={() => ask("choices", "Thinking of choices")}
             >
               ✦ Suggest choices
@@ -340,29 +343,29 @@ const aspectLabels = {
   "1:1": "Square",
 };
 
-// Generates an image for a page: a prompt drafted from the page (or by AI),
-// then the asset generator. The result is attached to the page and saved to
+// Generates an image for a StoryNode: a prompt drafted from the StoryNode (or by AI),
+// then the asset generator. The result is attached to the StoryNode and saved to
 // the creator's assets. Comics pass their own heading and prompt, plus the
 // cast, whose reference images keep characters consistent.
-export function PageImageDialog({
+export function StoryNodeImageDialog({
   api,
   story,
   description,
-  page,
+  storyNode,
   assistReason,
   onAttach,
   onClose,
-  heading = "Generate a page image",
+  heading = "Generate a StoryNode image",
   initialPrompt,
   initialAspect = "16:9",
   cast = [],
   initialCast = [],
-  placement = "placed on this page",
+  placement = "placed on this StoryNode",
 }: {
   api: Api;
   story: Story;
   description: string;
-  page: StoryPage;
+  storyNode: StoryNode;
   assistReason: string | null;
   onAttach: (asset: ClipAsset) => void;
   onClose: () => void;
@@ -379,10 +382,10 @@ export function PageImageDialog({
     () =>
       initialPrompt ??
       [
-        page.title,
-        page.transcript === placeholderText
+        storyNode.title,
+        storyNode.transcript === placeholderText
           ? ""
-          : page.transcript.slice(0, 600),
+          : storyNode.transcript.slice(0, 600),
         `From the story "${story.title}". Cinematic illustration, no text.`,
       ]
         .filter(Boolean)
@@ -425,7 +428,7 @@ export function PageImageDialog({
       const result = await api<AssistResult>("/assist", {
         idempotencyKey: crypto.randomUUID(),
         action: "image-prompt",
-        ...context(story, description, page),
+        ...context(story, description, storyNode),
       });
       if (alive.current && result.action === "image-prompt") {
         setPrompt(result.prompt);
@@ -480,7 +483,7 @@ export function PageImageDialog({
         className="modal studio-dialog"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="page-image-title"
+        aria-labelledby="story-node-image-title"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -491,7 +494,7 @@ export function PageImageDialog({
         >
           ×
         </button>
-        <h2 id="page-image-title">{heading}</h2>
+        <h2 id="story-node-image-title">{heading}</h2>
         {listing && !listing.enabled && (
           <p className="studio-dialog-off">{listing.reason}</p>
         )}

@@ -22,7 +22,7 @@ Two small market side quests demonstrate independent child saves and return navi
 - The market has a checkpoint marker in its published graph. Checkpoint persistence/restoration, combat, account XP and validated achievements remain M5. The ending milestone is local to the save.
 - One featured fixture is seeded at the market; two branches share that location. There is no exclusive branching right, trading or live placement management.
 - No offline command queue or service worker. A loaded transcript remains readable, and choices are disabled offline. Network failures preserve the request key for an explicit same-request retry in the current screen. Refresh resumes committed server state.
-- Logs and saves are paginated; branch discovery is bounded to the two seeded fixtures (API cap 20). General community pagination belongs to M3. Save cursors capture timestamp plus ID; refresh is needed to see changes newer than the current page.
+- Logs and saves are paginated; branch discovery is bounded to the two seeded fixtures (API cap 20). General community pagination belongs to M3. Save cursors capture timestamp plus ID; refresh is needed to see changes newer than the current batch.
 
 ## Implemented API
 
@@ -42,14 +42,14 @@ Start is restricted to the root sample story. Branch launch checks the source lo
 
 Receipt identity is SHA-256 of actor, command kind and key. Canonical payload hash includes the resource path. A changed payload with the same key returns `IDEMPOTENCY_CONFLICT`; a replay returns the original saved result even after further progress. Receipt, save and event commit in one transaction. Availability and outcomes use pre-transition state; costs and effects commit atomically. Entry-effect IDs prevent loop rewards from repeating.
 
-Errors use `{error:{code,message,correlationId}}`. Invalid schemas return 400, missing identity 401, unauthorized entities 403, missing resources 404, stale or reused commands 409, service failures 503. Stack traces and tokens are not returned. Lists have bounded page sizes. The domain evaluator supports all/any/not, stat/key/item conditions, bounded health/stats/items, key removal and local milestones. No story scripting or randomness exists.
+Errors use `{error:{code,message,correlationId}}`. Invalid schemas return 400, missing identity 401, unauthorized entities 403, missing resources 404, stale or reused commands 409, service failures 503. Stack traces and tokens are not returned. Lists have bounded batch sizes. The domain evaluator supports all/any/not, stat/key/item conditions, bounded health/stats/items, key removal and local milestones. No story scripting or randomness exists.
 
 ## Verification evidence
 
 - TypeScript check and production build passed.
 - 7 foundation/domain checks passed: platform import boundary, malformed/deep conditions, agility 7/8 routes, correct/foreign pass keys, once-only loop reward, independent child state, malformed graphs, composed checks and stale input (some grouped in one test).
 - 8 real-emulator integration tests passed: token/account/ownership denial, durable replay and payload conflict, competing transitions (one commit), saved-edition pinning, both child branches and unchanged parent, injected/locked command rejection, cursor bounds, and client rule enforcement. Expected permission-denied logs are evidence from negative rules assertions.
-- Headless installed Chrome completed sign-in, actual video playback, a locked pass, courier grant, reload/resume, both side quests, return, simultaneous-tab stale state, offline blocking, both endings, log and responsive screenshots. Added coverage loses a response after commit then retries the same key, exercises missing-video transcript fallback/retry, and activates a choice by keyboard. No page exceptions or horizontal overflow at 1440px and 390px.
+- Headless installed Chrome completed sign-in, actual video playback, a locked pass, courier grant, reload/resume, both side quests, return, simultaneous-tab stale state, offline blocking, both endings, log and responsive screenshots. Added coverage loses a response after commit then retries the same key, exercises missing-video transcript fallback/retry, and activates a choice by keyboard. No browser exceptions or horizontal overflow at 1440px and 390px.
 - Emulator export and actual process restart/import passed: all 28 saved states compared byte-equivalent after canonical serialization, with 62 receipts and 7 authentication identities preserved. Reseeding also preserved existing editions and profiles. Browser reload and separate-tab persistence are verified. `scripts/persistence-check.ts capture` and then `scripts/persistence-check.ts` support repeating this check across a restart; do not mutate data between capture/export/compare.
 
 No physical phone, Safari/Firefox, screen reader, hosted routing/function, staging/production Firebase, production backup restore, Storage emulator, live generation, payments or hosted CI run was verified. Storage has deny-all rules and no enabled upload surface. Emulator tests do not prove production IAM, index deployment, rate limits or operational readiness.

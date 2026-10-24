@@ -172,16 +172,16 @@ export type ContinueEntry = {
   saveId: string;
   storyId: string;
   title: string;
-  pageTitle: string;
+  storyNodeTitle: string;
   sideQuest: boolean;
   updatedAt: number;
 };
 export type EndingEntry = {
   saveId: string;
   storyId: string;
-  pageId: string;
+  storyNodeId: string;
   title: string;
-  pageTitle: string;
+  storyNodeTitle: string;
   at: number;
 };
 export type ActivityEntry = {

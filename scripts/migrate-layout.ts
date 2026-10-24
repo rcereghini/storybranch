@@ -1,3 +1,4 @@
+import { legacyStoryStorage } from "../packages/contracts/legacy-story-format";
 import type {
   DocumentData,
   DocumentReference,
@@ -54,7 +55,8 @@ function place(
     "catalogue",
     "branches",
     "placements",
-    "pageLibrary",
+    "storyNodeLibrary",
+    legacyStoryStorage.library,
     "generationJobs",
     "generationQuotas",
   ];

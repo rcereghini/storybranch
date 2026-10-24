@@ -1,10 +1,14 @@
-import type { Transaction } from "firebase-admin/firestore";
+import type { DocumentData, Transaction } from "firebase-admin/firestore";
 import { db } from "./firebase";
 import { GameError, type Story } from "../../packages/contracts/index";
 import type { PublishedClip } from "../../packages/contracts/media";
 import { validateStory } from "../../packages/domain/index";
+import {
+  legacyStoryStorage,
+  readStoryData,
+} from "../../packages/contracts/legacy-story-format";
 
-// A published edition: its story plus the uploaded clips its pages use, keyed
+// A published edition: its story plus the uploaded clips its StoryNodes use, keyed
 // by clip ID. Clips are recorded at publish time so playback never needs the
 // creator's private clip records.
 export async function edition(
@@ -16,17 +20,23 @@ export async function edition(
   const manifest = await tx.get(ref);
   if (!manifest.exists || !manifest.data()!.ready)
     throw new GameError("NOT_FOUND", "Story edition unavailable.");
-  if (!manifest.data()!.entryPageId)
+  const stored = readStoryData<DocumentData>(manifest.data());
+  if (!stored.entryStoryNodeId)
     throw new GameError(
       "NOT_FOUND",
       "This save uses an earlier prototype format. Start a new journey from Discover.",
     );
-  const pages = await tx.get(ref.collection("pages"));
-  const { manifestHash: _, ready: __, clips = {}, ...data } = manifest.data()!;
+  const collection = Object.hasOwn(manifest.data()!, "entryStoryNodeId")
+    ? "storyNodes"
+    : legacyStoryStorage.nodes;
+  const storyNodes = await tx.get(ref.collection(collection));
+  const { manifestHash: _, ready: __, clips = {}, ...data } = stored;
   return {
     story: validateStory({
       ...data,
-      pages: Object.fromEntries(pages.docs.map((n) => [n.id, n.data()])),
+      storyNodes: Object.fromEntries(
+        storyNodes.docs.map((n) => [n.id, readStoryData(n.data())]),
+      ),
     }),
     clips,
   };

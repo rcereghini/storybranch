@@ -1,7 +1,7 @@
-import { chromium, type Page } from "playwright";
-export async function startPlayback(page: Page) {
+import { chromium, type Page as BrowserTab } from "playwright";
+export async function startPlayback(tab: BrowserTab) {
   try {
-    await page.waitForFunction(() => {
+    await tab.waitForFunction(() => {
       const v = document.querySelector("video");
       return (
         (v && !v.paused && v.currentTime > 0) ||
@@ -10,11 +10,11 @@ export async function startPlayback(page: Page) {
         document.querySelector(".scene-player .notice")
       );
     });
-    if (await page.locator(".scene-player .notice").isVisible())
+    if (await tab.locator(".scene-player .notice").isVisible())
       throw new Error("The player reported a media load failure.");
-    if (await page.locator(".scene-start").isVisible())
-      await page.locator(".scene-start").click();
-    await page.waitForFunction(() => {
+    if (await tab.locator(".scene-start").isVisible())
+      await tab.locator(".scene-start").click();
+    await tab.waitForFunction(() => {
       const v = document.querySelector("video");
       return (
         (v && ((!v.paused && v.currentTime > 0) || v.error)) ||
@@ -22,13 +22,13 @@ export async function startPlayback(page: Page) {
       );
     });
     if (
-      await page
+      await tab
         .locator("video")
         .evaluate((v: HTMLVideoElement) => !!v.error || v.paused)
     )
       throw new Error("Video could not start.");
   } catch (cause) {
-    const diagnostics = await page
+    const diagnostics = await tab
       .evaluate(() => {
         const v = document.querySelector("video");
         return {

@@ -3,13 +3,13 @@ import { launchBrowser } from "./browser";
 
 const browser = await launchBrowser();
 try {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.goto("http://127.0.0.1:5173");
-  await page
+  const tab = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await tab.goto("http://127.0.0.1:5173");
+  await tab
     .getByRole("button", { name: "Sign in", exact: true })
     .first()
     .click();
-  const dialog = page.getByRole("dialog");
+  const dialog = tab.getByRole("dialog");
   // Never create test accounts in production.
   await dialog.getByText("LOCAL EMULATOR ACCOUNTS").waitFor();
   await dialog
@@ -22,19 +22,19 @@ try {
   await dialog.getByRole("button", { name: "Create account ↗" }).click();
   await dialog.getByText("Your passwords do not match.").waitFor();
   await dialog.getByLabel("Confirm password").fill("SignupCheck123!");
-  await page.screenshot({ path: "test-results/signup-mobile.png" });
+  await tab.screenshot({ path: "test-results/signup-mobile.png" });
   await dialog.getByRole("button", { name: "Create account ↗" }).click();
   await dialog.waitFor({ state: "hidden" });
-  await page.reload();
-  await page.getByRole("button", { name: "Account menu" }).waitFor();
-  await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
-  await page.getByRole("button", { name: "Start a new journey" }).click();
-  await page.locator("video").waitFor();
-  const saveUrl = page.url();
+  await tab.reload();
+  await tab.getByRole("button", { name: "Account menu" }).waitFor();
+  await tab.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
+  await tab.getByRole("button", { name: "Start a new journey" }).click();
+  await tab.locator("video").waitFor();
+  const saveUrl = tab.url();
   // Sign out lives in the account menu.
-  await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page
+  await tab.getByRole("button", { name: "Account menu" }).click();
+  await tab.getByRole("button", { name: "Sign out" }).click();
+  await tab
     .getByRole("button", { name: "Sign in", exact: true })
     .first()
     .click();
@@ -42,17 +42,17 @@ try {
   await dialog.getByLabel("Password", { exact: true }).fill("SignupCheck123!");
   await dialog.getByRole("button", { name: "Sign in ↗" }).click();
   await dialog.waitFor({ state: "hidden" });
-  await page.goto(saveUrl);
-  await page.locator("video").waitFor();
-  assert.equal(page.url(), saveUrl);
+  await tab.goto(saveUrl);
+  await tab.locator("video").waitFor();
+  assert.equal(tab.url(), saveUrl);
   // Sign out lives in the account menu.
-  await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page
+  await tab.getByRole("button", { name: "Account menu" }).click();
+  await tab.getByRole("button", { name: "Sign out" }).click();
+  await tab
     .getByRole("button", { name: "Sign in", exact: true })
     .first()
     .click();
-  const popupPromise = page.waitForEvent("popup");
+  const popupPromise = tab.waitForEvent("popup");
   await dialog.getByRole("button", { name: "Continue with Google" }).click();
   const popup = await popupPromise;
   await popup.waitForLoadState();

@@ -1,4 +1,4 @@
-/* Copilot drawer: fixed over the page so it never shifts page layout. */
+/* Copilot drawer: fixed over the view so it never shifts view layout. */
 .copilot {
   position: fixed;
   top: 0;

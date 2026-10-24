@@ -1,55 +1,79 @@
 import { it, expect } from "vitest";
 import {
-  arrangePages,
-  connectPage,
+  arrangeStoryNodes,
+  connectStoryNode,
   connections,
 } from "../packages/domain/story-graph";
-import { pageStories } from "../fixtures/page-stories";
+import { storyNodeStories } from "../fixtures/story-node-stories";
 import { draftSchema } from "../packages/contracts/authoring";
 
 it("reconnects an output without losing effects or changing other routes", () => {
   const story = structuredClone(
-    pageStories.find((s) =>
-      Object.values(s.pages).some((p) => p.pageType === "dice"),
+    storyNodeStories.find((s) =>
+      Object.values(s.storyNodes).some((p) => p.storyNodeType === "dice"),
     )!,
   );
-  const page = Object.values(story.pages).find((p) => p.pageType === "dice")!;
-  const edges = connections(page);
-  const before = structuredClone(page.choices[0]);
-  const updated = connectPage(story, page.id, edges[0], edges[1].target);
-  expect(connections(updated.pages[page.id])[0].target).toBe(edges[1].target);
-  expect(updated.pages[page.id].choices[0].outcome).toMatchObject({
+  const storyNode = Object.values(story.storyNodes).find(
+    (p) => p.storyNodeType === "dice",
+  )!;
+  const edges = connections(storyNode);
+  const before = structuredClone(storyNode.choices[0]);
+  const updated = connectStoryNode(
+    story,
+    storyNode.id,
+    edges[0],
+    edges[1].target,
+  );
+  expect(connections(updated.storyNodes[storyNode.id])[0].target).toBe(
+    edges[1].target,
+  );
+  expect(updated.storyNodes[storyNode.id].choices[0].outcome).toMatchObject({
     failure: before.outcome.kind === "dice" ? before.outcome.failure : {},
   });
-  expect(page.choices[0]).toEqual(before);
-  expect(() => connectPage(story, page.id, edges[0], "missing")).toThrow();
+  expect(storyNode.choices[0]).toEqual(before);
+  expect(() =>
+    connectStoryNode(story, storyNode.id, edges[0], "missing"),
+  ).toThrow();
 });
 it("arranges branches and cycles without duplicates or infinite traversal", () => {
-  const story = structuredClone(pageStories[0]);
-  const entry = story.pages[story.entryPageId];
-  const loop = connectPage(story, entry.id, connections(entry)[0], entry.id);
-  const positions = arrangePages(loop);
+  const story = structuredClone(storyNodeStories[0]);
+  const entry = story.storyNodes[story.entryStoryNodeId];
+  const loop = connectStoryNode(
+    story,
+    entry.id,
+    connections(entry)[0],
+    entry.id,
+  );
+  const positions = arrangeStoryNodes(loop);
   expect(Object.keys(positions).sort()).toEqual(
-    Object.keys(story.pages).sort(),
+    Object.keys(story.storyNodes).sort(),
   );
   expect(
     new Set(Object.values(positions).map((p) => `${p.x}:${p.y}`)).size,
-  ).toBe(Object.keys(story.pages).length);
+  ).toBe(Object.keys(story.storyNodes).length);
   expect(positions[entry.id].x).toBe(40);
 });
 it("stores bounded editor positions separately from the published story graph", () => {
-  const story = pageStories[0];
-  const draft = { story, description: "", pagePositions: arrangePages(story) };
-  expect(draftSchema.parse(draft).pagePositions).toEqual(draft.pagePositions);
+  const story = storyNodeStories[0];
+  const draft = {
+    story,
+    description: "",
+    storyNodePositions: arrangeStoryNodes(story),
+  };
+  expect(draftSchema.parse(draft).storyNodePositions).toEqual(
+    draft.storyNodePositions,
+  );
   expect(
     draftSchema.safeParse({
       ...draft,
-      pagePositions: { x: { x: Infinity, y: 0 } },
+      storyNodePositions: { x: { x: Infinity, y: 0 } },
     }).success,
   ).toBe(false);
   expect(
-    draftSchema.safeParse({ ...draft, pagePositions: { x: { x: -1, y: 0 } } })
-      .success,
+    draftSchema.safeParse({
+      ...draft,
+      storyNodePositions: { x: { x: -1, y: 0 } },
+    }).success,
   ).toBe(false);
-  expect(story).not.toHaveProperty("pagePositions");
+  expect(story).not.toHaveProperty("storyNodePositions");
 });

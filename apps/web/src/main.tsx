@@ -1,3 +1,4 @@
+import { storyPreviewPath } from "../../../packages/contracts/legacy-story-format";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
@@ -6,10 +7,10 @@ import { AuthForm } from "./AuthForm";
 import { createApi, ApiError } from "../../../packages/api-client/index";
 import type { Save, Story } from "../../../packages/contracts/index";
 import "./style.css";
-import { Page } from "./Page";
+import { StoryNode } from "./StoryNode";
 import { Studio } from "./Studio";
 import { AssetLibrary } from "./Library";
-import { SharedPage } from "./SharedPage";
+import { SharedStoryNode } from "./SharedStoryNode";
 import { Story as StoryContainer } from "./Story";
 import type { StoryUser } from "../../../packages/contracts/index";
 import { ShareStory } from "./ShareStory";
@@ -41,7 +42,7 @@ type Player = {
   image?: string;
   panels?: Array<string | undefined>;
   save: Save;
-  page: Story["pages"][string];
+  storyNode: Story["storyNodes"][string];
   result?: boolean;
   branches: Branch[];
   featuredId: string | null;
@@ -58,7 +59,7 @@ type Pending = { path: string; body: unknown };
 function App() {
   const [user, setUser] = useState<User | null>(null),
     [authReady, setAuthReady] = useState(false),
-    [path, setPath] = useState(location.pathname),
+    [path, setPath] = useState(storyPreviewPath(location.pathname)),
     [saves, setSaves] = useState<Save[]>([]),
     [saveCursor, setSaveCursor] = useState<string | null>(null),
     [player, setPlayer] = useState<Player | null>(null),
@@ -80,12 +81,13 @@ function App() {
     [loadedKey, setLoadedKey] = useState<string | null>(null),
     [copilotOpen, setCopilotOpen] = useState(false),
     [profile, setProfile] = useState<PlayerProfile | null>(null);
-  // Identifies what the latest refresh() must load: this page for this user.
+  // Identifies what the latest refresh() must load: this StoryNode for this user.
   const loadKey = `${path}|${user?.uid ?? ""}`;
   // Offered only to accounts with the flag, on a deployment with the key.
   const copilotEnabled = !!user && !!profile?.features?.copilot;
   const isAdmin = !!user && !!profile?.features?.admin;
-  const immersive = path.startsWith("/play/") || path.startsWith("/p/");
+  const immersive =
+    path.startsWith("/play/") || path.startsWith("/story-nodes/");
   // Main sections: the desktop header nav and the phone tab bar.
   const tabs: Array<[string, string, IconName]> = user
     ? [
@@ -138,7 +140,7 @@ function App() {
     };
   }, [login]);
   useEffect(() => {
-    const pop = () => setPath(location.pathname);
+    const pop = () => setPath(storyPreviewPath(location.pathname));
     const online = () => setOffline(!navigator.onLine);
     window.addEventListener("popstate", pop);
     window.addEventListener("online", online);
@@ -250,7 +252,7 @@ function App() {
     setPending(null);
     if (!path.startsWith("/play/") || user) void refresh();
   }, [path, user]);
-  // The header shows the player's chosen name and avatar on every page.
+  // The header shows the player's chosen name and avatar on every StoryNode.
   useEffect(() => {
     setProfile(null);
     if (!user) return;
@@ -330,7 +332,7 @@ function App() {
   // Until Firebase restores the session, a signed-in player looks signed out,
   // so start() would open the sign-in dialog instead of starting the story.
   // Overlapping refreshes (StrictMode, then the auth change) each clear busy,
-  // so also wait until the refresh for the current page and user has finished.
+  // so also wait until the refresh for the current StoryNode and user has finished.
   const disabled =
     busy ||
     offline ||
@@ -425,7 +427,7 @@ function App() {
         </div>
       </header>
       <main
-        className={`${playing ? "playback-active" : ""} ${path.startsWith("/play/") || path.startsWith("/p/") ? "immersive-player" : ""}`}
+        className={`${playing ? "playback-active" : ""} ${path.startsWith("/play/") || path.startsWith("/story-nodes/") ? "immersive-player" : ""}`}
         aria-busy={busy}
       >
         <div aria-live="polite" className="app-notices">
@@ -482,8 +484,8 @@ function App() {
             </div>
           )}
         </div>
-        {path.startsWith("/p/") ? (
-          <SharedPage key={path} path={path} />
+        {path.startsWith("/story-nodes/") ? (
+          <SharedStoryNode key={path} path={path} />
         ) : path === "/assets" || path.startsWith("/assets/") ? (
           user ? (
             <AssetLibrary
@@ -555,7 +557,7 @@ function App() {
                       <span> / EDITION {player.save.versionId}</span>
                     </p>
                     <p className="player-series">
-                      Pages shaped by your choices.
+                      StoryNodes shaped by your choices.
                     </p>
                   </div>
                   <div>
@@ -577,14 +579,14 @@ function App() {
                 )}
                 <div className="player-grid">
                   <section>
-                    <Page
+                    <StoryNode
                       transitioning={busy}
                       onPlaybackChange={setPlaying}
                       disabled={disabled}
                       onOutput={(output) =>
                         choose(output.choiceId, output.action)
                       }
-                      page={player.page}
+                      storyNode={player.storyNode}
                       result={player.result}
                       media={player.media}
                       nextMedia={player.nextMedia}
@@ -642,7 +644,7 @@ function App() {
                           </>
                         )}
                       </section>
-                    </Page>
+                    </StoryNode>
                     {player.branches.length > 0 && (
                       <section className="community">
                         <p className="eyebrow">
@@ -758,10 +760,10 @@ function App() {
                       storyId={player.save.storyId}
                       storyTitle={player.story.title}
                       ending={
-                        player.page.kind === "ending"
+                        player.storyNode.kind === "ending"
                           ? {
-                              pageId: player.page.id,
-                              title: player.page.title,
+                              storyNodeId: player.storyNode.id,
+                              title: player.storyNode.title,
                               result: player.result,
                             }
                           : undefined

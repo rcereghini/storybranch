@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { launchBrowser } from "./browser";
 const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.route("**/api/playthroughs", async (route) => {
+  const tab = await browser.newPage();
+  await tab.route("**/api/playthroughs", async (route) => {
     if (route.request().method() === "GET")
       await route.fulfill({
         status: 503,
@@ -18,35 +18,35 @@ try {
       });
     else await route.continue();
   });
-  await page.goto("http://127.0.0.1:5173");
-  await page
+  await tab.goto("http://127.0.0.1:5173");
+  await tab
     .getByRole("button", { name: /Sign in/ })
     .first()
     .click();
-  await page.getByText("LOCAL EMULATOR ACCOUNTS").waitFor();
-  await page
+  await tab.getByText("LOCAL EMULATOR ACCOUNTS").waitFor();
+  await tab
     .getByRole("dialog")
     .getByRole("button", { name: "Sign in ↗" })
     .click();
-  await page.getByRole("button", { name: "Retry saved adventures" }).waitFor();
-  await page.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
-  await page.getByRole("button", { name: "Start a new journey" }).click();
-  await page.locator("video").waitFor();
-  await page.getByRole("button", { name: /Speak to the courier/ }).click();
-  await page
+  await tab.getByRole("button", { name: "Retry saved adventures" }).waitFor();
+  await tab.goto("http://127.0.0.1:5173/s/glass-harbor/the-glass-harbor");
+  await tab.getByRole("button", { name: "Start a new journey" }).click();
+  await tab.locator("video").waitFor();
+  await tab.getByRole("button", { name: /Speak to the courier/ }).click();
+  await tab
     .getByLabel("A favor, remembered scene video", { exact: true })
     .waitFor();
-  if (await page.getByRole("button", { name: "Skip to choices" }).isVisible())
-    await page.getByRole("button", { name: "Skip to choices" }).click();
-  await page
+  if (await tab.getByRole("button", { name: "Skip to choices" }).isVisible())
+    await tab.getByRole("button", { name: "Skip to choices" }).click();
+  await tab
     .getByRole("heading", { name: "A favor, remembered", exact: true })
     .waitFor();
-  assert.equal(await page.getByRole("alert").count(), 0);
-  await page.reload();
-  await page
+  assert.equal(await tab.getByRole("alert").count(), 0);
+  await tab.reload();
+  await tab
     .getByRole("heading", { name: "A favor, remembered", exact: true })
     .waitFor();
-  assert.equal(await page.getByRole("alert").count(), 0);
+  assert.equal(await tab.getByRole("alert").count(), 0);
   console.log(
     "PASS: unavailable save list does not block or misreport persisted choices.",
   );

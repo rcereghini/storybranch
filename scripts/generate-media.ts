@@ -2,10 +2,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import { launchBrowser } from "./browser";
 // Original, silent fixture animation. No remote assets or generation service.
 const browser = await launchBrowser();
-const page = await browser.newPage();
-await page.evaluate("globalThis.__name = (fn) => fn");
+const tab = await browser.newPage();
+await tab.evaluate("globalThis.__name = (fn) => fn");
 const svg = await readFile("apps/web/public/media/harbor.svg", "utf8");
-const bytes = await page.evaluate(async (svg) => {
+const bytes = await tab.evaluate(async (svg) => {
   const canvas = document.createElement("canvas");
   canvas.width = 960;
   canvas.height = 540;

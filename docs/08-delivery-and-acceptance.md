@@ -15,7 +15,7 @@ Build in vertical slices that each demonstrate working user behavior. Milestones
 | M6 Monetized public beta | Selected payment integration, real provider, credit packs, entitlement policies, moderation, spend alerts, recovery | M3/M4/M5; commercial and content gates resolved; staging launch review complete |
 | M7 Native exploration | One native client prototype with auth, deep link, video, choice, and shared save | Stable API; document actual package reuse and native billing needs before store launch |
 
-Status on October 15, 2026: M0 and M1 are done. M2 is partly done: Creator Studio authoring and publishing, Discover with search and genre filters, and story sharing are built; uploads, private staging media, creator library pages (`/u/`) and link previews for Studio-published stories are not. M3 exists only as two seeded side-quest fixtures. M4 to M7 have not started. A player dashboard was added outside the milestone plan ([Player dashboard](18-player-dashboard.md)).
+Status on October 15, 2026: M0 and M1 are done. M2 is partly done: Creator Studio authoring and publishing, Discover with search and genre filters, and story sharing are built; uploads, private staging media, creator library views (`/u/`) and link previews for Studio-published stories are not. M3 exists only as two seeded side-quest fixtures. M4 to M7 have not started. A player dashboard was added outside the milestone plan ([Player dashboard](18-player-dashboard.md)).
 
 Do not implement subscriptions merely because the interface has a Paid badge. Until terms are chosen, development can use explicit test entitlements and mock credits.
 

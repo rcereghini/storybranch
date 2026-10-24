@@ -1,4 +1,4 @@
-/* Discover and story pages. The featured hero sits on dark art in both
+/* Discover and story views. The featured hero sits on dark art in both
    themes, so its text uses fixed light colors; everything else is tokens. */
 .disc {
   max-width: 1240px;
@@ -34,7 +34,12 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgb(11 20 26 / 92%) 0%, rgb(11 20 26 / 70%) 38%, rgb(11 20 26 / 10%) 75%),
+    linear-gradient(
+      90deg,
+      rgb(11 20 26 / 92%) 0%,
+      rgb(11 20 26 / 70%) 38%,
+      rgb(11 20 26 / 10%) 75%
+    ),
     linear-gradient(0deg, rgb(11 20 26 / 55%) 0%, transparent 45%),
     url("/media/harbor.svg") right center / cover;
 }
@@ -223,7 +228,7 @@
   align-self: center;
 }
 
-/* Story page */
+/* Story view */
 .disc-detail {
   display: flex;
   flex-direction: column;
@@ -312,7 +317,12 @@
   }
   .disc-hero-art {
     background:
-      linear-gradient(0deg, rgb(11 20 26 / 96%) 0%, rgb(11 20 26 / 75%) 45%, rgb(11 20 26 / 15%) 80%),
+      linear-gradient(
+        0deg,
+        rgb(11 20 26 / 96%) 0%,
+        rgb(11 20 26 / 75%) 45%,
+        rgb(11 20 26 / 15%) 80%
+      ),
       url("/media/harbor.svg") 70% center / cover;
   }
   .disc-hero-content {

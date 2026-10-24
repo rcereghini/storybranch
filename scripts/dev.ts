@@ -1,3 +1,4 @@
+import { storyApiPath } from "../packages/contracts/legacy-story-format";
 import { existsSync } from "node:fs";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 process.env.VITE_STORYBRANCH_MODE = process.env.STORYBRANCH_MODE ?? "firebase";
@@ -18,7 +19,9 @@ const api = createServer(async (req, res) => {
         bytes >
         (req.url?.startsWith("/api/studio")
           ? 250000
-          : req.url?.startsWith("/api/pages")
+          : storyApiPath(
+                new URL(req.url ?? "/", "http://localhost").pathname,
+              ).startsWith("/api/story-nodes")
             ? 30000
             : req.url?.startsWith("/api/copilot")
               ? 12000
@@ -48,7 +51,11 @@ const api = createServer(async (req, res) => {
     res.writeHead(response.status, Object.fromEntries(response.headers));
     // Pass streamed replies (Copilot) through as they arrive.
     const reader = response.body?.getReader();
-    for (let part = await reader?.read(); part && !part.done; part = await reader!.read())
+    for (
+      let part = await reader?.read();
+      part && !part.done;
+      part = await reader!.read()
+    )
       res.write(part.value);
     res.end();
   } catch {

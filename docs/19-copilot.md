@@ -1,6 +1,6 @@
 # Copilot
 
-Copilot is a chat assistant that works alongside a signed-in user: it explains Storybranch, takes them where they need to go, and (in later phases) co-authors stories and drives image and video generation. It runs on the Claude API with tool use. It is app-shell UI, not a story page type, so it does not appear in the page-type table in `16-story-pages.md`.
+Copilot is a chat assistant that works alongside a signed-in user: it explains Storybranch, takes them where they need to go, and (in later phases) co-authors stories and drives image and video generation. It runs on the Claude API with tool use. It is app-shell UI, not a StoryNode type, so it does not appear in the StoryNode-type table in `16-story-nodes.md`.
 
 ## Principles
 
@@ -8,24 +8,24 @@ Copilot is a chat assistant that works alongside a signed-in user: it explains S
 - **Intent, not effects, for UI.** Navigation is returned to the browser as an action the app performs; the server never drives the UI.
 - **People approve changes.** Anything that edits a draft, publishes, shares or spends money (generation) is proposed, shown to the user, and applied only when they approve it. Read-only tools run freely.
 - **Append-only history.** Each thread stores the full assistant content blocks, never rewritten, so retries and thinking blocks stay valid.
-- **No layout shift.** The panel is a fixed drawer over the page; opening, streaming and errors never move page content.
+- **No layout shift.** The panel is a fixed drawer over the app view; opening, streaming and errors never move underlying content.
 
 ## Phases
 
 | Phase | Scope | Tools | Status |
 |---|---|---|---|
 | 1. Navigate and explain | Read-only help in the dashboard, Discover, Adventures, Studio and Assets | `navigate`, `list_catalogue`, `list_my_adventures`, `list_my_drafts`, `get_draft`, `list_my_assets` | Built |
-| 2. Co-author | Proposes story, page, choice and quiz changes in Studio; the user applies them through Studio's normal save (revision-checked) | adds `propose_draft_change` | In-editor buttons built (Write, Rewrite, Suggest choices; see [Studio AI help](17-creator-studio.md#ai-help)); chat proposals planned |
-| 3. Generate | Writes image and video prompts from story context and reference images; the user approves each job, which runs through `/api/generation` (OpenAI images) and its daily limit | adds `propose_generation` | Page images from Studio built (AI-written prompt, images only); chat proposals and story reference images planned |
+| 2. Co-author | Proposes story, StoryNode, choice and quiz changes in Studio; the user applies them through Studio's normal save (revision-checked) | adds `propose_draft_change` | In-editor buttons built (Write, Rewrite, Suggest choices; see [Studio AI help](17-creator-studio.md#ai-help)); chat proposals planned |
+| 3. Generate | Writes image and video prompts from story context and reference images; the user approves each job, which runs through `/api/generation` (OpenAI images) and its daily limit | adds `propose_generation` | StoryNode images from Studio built (AI-written prompt, images only); chat proposals and story reference images planned |
 
-Copilot is not available during play (`/play/`, `/p/`): it could reveal routes, conditions or endings.
+Copilot is not available during play (`/play/`, `/story-nodes/` and legacy preview URLs): it could reveal routes, conditions or endings.
 
 ## Request contract
 
 `POST /api/copilot/threads/{threadId}` with `{ idempotencyKey, text, context: { path } }` streams newline-delimited JSON events:
 
 - `{ "type": "text", "text": "..." }` — a fragment of the reply.
-- `{ "type": "tool", "name": "..." }` — a tool started (shown as a status line, never in reserved page space).
+- `{ "type": "tool", "name": "..." }` — a tool started (shown as a status line, never in reserved content space).
 - `{ "type": "action", "action": { "kind": "navigate", "path": "/studio" } }` — the server has already checked the path against the allowed routes (`copilotRoute`); the browser performs it with the app's normal navigation, including the unsaved-Studio confirmation.
 - `{ "type": "done" }` or `{ "type": "error", "code": "...", "message": "..." }` — always the last line.
 
@@ -56,4 +56,4 @@ OpenAI `gpt-image-2` is the image generation provider (`services/api/generation.
 
 ## Verification
 
-Phase 1 is covered by `tests/copilot.test.ts` (contracts and allowed routes); an integration test on the emulator with Claude replaced by a scripted fake (access, tool rounds, refused routes, ownership, idempotent replay, append-only history, failure recovery, turn cap and daily quota); and `scripts/copilot-check.ts`, run by CI, which fakes the Copilot API in the browser and checks the drawer, streaming, navigation, retry with the same key, no layout shift, and that play pages never offer it. It was also run end to end against the live API on the emulator. Not covered in CI: real model replies, which vary and cost money.
+Phase 1 is covered by `tests/copilot.test.ts` (contracts and allowed routes); an integration test on the emulator with Claude replaced by a scripted fake (access, tool rounds, refused routes, ownership, idempotent replay, append-only history, failure recovery, turn cap and daily quota); and `scripts/copilot-check.ts`, run by CI, which fakes the Copilot API in the browser and checks the drawer, streaming, navigation, retry with the same key, no layout shift, and that play StoryNodes never offer it. It was also run end to end against the live API on the emulator. Not covered in CI: real model replies, which vary and cost money.

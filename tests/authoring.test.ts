@@ -9,13 +9,24 @@ import {
   storedFeatures,
 } from "../packages/contracts/profile";
 it("grants a feature only when the profile flag is exactly true", () => {
-  const none = { publish: false, generate: false, copilot: false, admin: false };
+  const none = {
+    publish: false,
+    generate: false,
+    copilot: false,
+    admin: false,
+  };
   expect(accountFeatures(undefined)).toEqual(none);
   expect(accountFeatures({})).toEqual(none);
   expect(accountFeatures({ features: "publish" })).toEqual(none);
   expect(
     accountFeatures({
-      features: { publish: "true", generate: 1, copilot: null, admin: "yes", root: true },
+      features: {
+        publish: "true",
+        generate: 1,
+        copilot: null,
+        admin: "yes",
+        root: true,
+      },
     }),
   ).toEqual(none);
   expect(accountFeatures({ features: { publish: true } })).toEqual({
@@ -48,12 +59,12 @@ export const draftStory = (id = "test-story"): Story => ({
   title: "Test story",
   versionId: "draft",
   rulesetVersion: "prototype-1",
-  entryPageId: "opening",
-  pages: {
+  entryStoryNodeId: "opening",
+  storyNodes: {
     opening: {
       id: "opening",
       title: "Opening",
-      pageType: "text",
+      storyNodeType: "text",
       kind: "scene",
       transcript: "A new journey.",
       entryEffects: [],
@@ -65,7 +76,7 @@ export const draftStory = (id = "test-story"): Story => ({
           unavailableDisplay: "locked",
           outcome: {
             kind: "direct",
-            route: { targetPageId: "ending", effects: [] },
+            route: { targetStoryNodeId: "ending", effects: [] },
           },
         },
       ],
@@ -73,7 +84,7 @@ export const draftStory = (id = "test-story"): Story => ({
     ending: {
       id: "ending",
       title: "Ending",
-      pageType: "text",
+      storyNodeType: "text",
       kind: "ending",
       transcript: "Home again.",
       entryEffects: [],
@@ -84,22 +95,25 @@ export const draftStory = (id = "test-story"): Story => ({
 it("publishes a connected graph and rejects missing, unreachable and trapped routes", () => {
   expect(validatePublication(draftStory()).title).toBe("Test story");
   const missing = draftStory();
-  delete missing.pages.ending;
+  delete missing.storyNodes.ending;
   expect(() => validatePublication(missing)).toThrow("Dangling route");
   const unused = draftStory();
-  unused.pages.unused = { ...unused.pages.ending, id: "unused" };
+  unused.storyNodes.unused = { ...unused.storyNodes.ending, id: "unused" };
   expect(() => validatePublication(unused)).toThrow("unreachable");
   const trapped = draftStory();
-  trapped.pages.opening.pageType = "text-options";
-  trapped.pages.opening.choices.push({
-    ...trapped.pages.opening.choices[0],
+  trapped.storyNodes.opening.storyNodeType = "text-options";
+  trapped.storyNodes.opening.choices.push({
+    ...trapped.storyNodes.opening.choices[0],
     id: "loop",
-    outcome: { kind: "direct", route: { targetPageId: "loop", effects: [] } },
+    outcome: {
+      kind: "direct",
+      route: { targetStoryNodeId: "loop", effects: [] },
+    },
   });
-  trapped.pages.loop = {
-    ...trapped.pages.opening,
+  trapped.storyNodes.loop = {
+    ...trapped.storyNodes.opening,
     id: "loop",
-    choices: [trapped.pages.opening.choices[1]],
+    choices: [trapped.storyNodes.opening.choices[1]],
   };
   expect(() => validatePublication(trapped)).toThrow(
     "Add a route to an ending",
@@ -107,7 +121,7 @@ it("publishes a connected graph and rejects missing, unreachable and trapped rou
 });
 it("allows incomplete private drafts while bounding authoring payloads", () => {
   const story = draftStory();
-  delete story.pages.ending;
+  delete story.storyNodes.ending;
   expect(draftSchema.safeParse({ story, description: "" }).success).toBe(true);
   expect(
     draftSchema.safeParse({ story, description: "x".repeat(501) }).success,

@@ -1,10 +1,14 @@
 # Storybranch data and API contracts
 
+For Story changes, [Story data/storage](story-system/data-storage.md), [keys/imports](story-system/keys.md) and the [context documents](story-system/README.md) own the current target design. The old `draftNodes`, `nodes`, `targetNodeId` paths/types below are historical illustrative sketches, not supported APIs or a request to rename the current `storyNodes` format. Use [docs/16](16-story-nodes.md) and the [current-state review](story-system/current-state-review.md) for implemented behavior. Future command families below remain proposals.
+
+Apply [the terminology mapping](story-system/terminology.md#mapping-to-the-current-implementation): StoryNodes and StoryLeaves currently use StoryNode placements, StoryBranches use outcome route bindings, and StoryTrunk has no dedicated persisted field. The existing `branches/{branchId}` community records and `/branches` launch command concern separate side Stories, not every in-story StoryBranch.
+
 The following logical model is a proposed schema, suitable for implementation planning. Collection paths are illustrative but ownership, separation of public and private data, and concurrency guarantees are required. Monetary amounts use integers in explicitly named units. Dates are server timestamps.
 
 ## Persisted entities
 
-Current implementation contract: stories store `entryPageId` and immutable `versions/{versionId}/pages/{pageId}`; saves store `pageId`. Required page inputs, completion events, outputs, user context and branch closure are specified in [Story and Page model](16-story-pages.md). Earlier node terminology below describes the original design, not a compatibility API. The implemented paths group player-owned records under `users/{uid}`; see [Data layout](15-shared-firebase-setup.md#data-layout).
+Current implementation contract: stories store `entryStoryNodeId` and immutable `versions/{versionId}/storyNodes/{storyNodeId}`; saves store `storyNodeId`. Required StoryNode inputs, completion events, outputs, user context and branch closure are specified in [Story and StoryNode model](16-story-nodes.md). Earlier node terminology below describes the original design, not a compatibility API. The implemented paths group player-owned records under `users/{uid}`; see [Data layout](15-shared-firebase-setup.md#data-layout).
 
 | Entity and suggested path | Essential fields | Writer and visibility |
 | --- | --- | --- |
@@ -102,7 +106,7 @@ All commands use a verified Firebase identity token, schema validation, explicit
 | `POST /api/billing/checkout` | server defined pack ID | Hosted checkout reference from the selected payment adapter |
 | `POST /api/webhooks/{provider}` | provider verification data | Durable deduplicated inbox acknowledgement |
 
-Read endpoints or Firestore queries expose catalogue pages, creator libraries, authorized versions, owner saves, community lists, job status, and wallet history. Cursors and maximum page sizes are mandatory. The full API schema will be generated during implementation; this document defines behavioral boundaries.
+Read endpoints or Firestore queries expose catalogue listings, creator libraries, authorized versions, owner saves, community lists, job status, and wallet history. Cursors and maximum batch sizes are mandatory. The full API schema will be generated during implementation; this document defines behavioral boundaries.
 
 Errors use stable codes such as `UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_FAILED`, `STALE_REVISION`, `INSUFFICIENT_CREDITS`, `PLACEMENT_UNAVAILABLE`, `QUOTE_EXPIRED`, and `PROVIDER_UNAVAILABLE`, plus safe human text and a correlation ID. Never expose provider secrets or stack traces.
 

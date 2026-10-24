@@ -1,4 +1,8 @@
 import type { ErrorCode } from "../contracts/index";
+import {
+  storyContractHeader,
+  storyContractVersion,
+} from "../contracts/legacy-story-format";
 export class ApiError extends Error {
   constructor(
     public code: ErrorCode,
@@ -16,6 +20,7 @@ export function createApi(
     const response = await transport(`/api${path}`, {
       method: body ? "POST" : "GET",
       headers: {
+        [storyContractHeader]: storyContractVersion,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         "Content-Type": "application/json",
       },

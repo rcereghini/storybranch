@@ -3,14 +3,14 @@ import { validateStory } from "../packages/domain/index";
 const direct = (
   id: string,
   label: string,
-  targetPageId: string,
+  targetStoryNodeId: string,
   extra: Partial<Choice> = {},
 ): Choice => ({
   id,
   label,
   unavailableDisplay: "locked",
   costs: [],
-  outcome: { kind: "direct", route: { targetPageId, effects: [] } },
+  outcome: { kind: "direct", route: { targetStoryNodeId, effects: [] } },
   ...extra,
 });
 const node = (
@@ -18,13 +18,13 @@ const node = (
   title: string,
   transcript: string,
   choices: Choice[],
-  extra: Partial<Story["pages"][string]> = {},
-): Story["pages"][string] => ({
+  extra: Partial<Story["storyNodes"][string]> = {},
+): Story["storyNodes"][string] => ({
   id,
   title,
   transcript,
   kind: "scene",
-  pageType: choices.length ? "video-options" : "video",
+  storyNodeType: choices.length ? "video-options" : "video",
   video: `/media/glass-harbor-${id}-mock-v1-landscape.mp4`,
   entryEffects: [],
   choices,
@@ -32,11 +32,11 @@ const node = (
 });
 export const glassHarbor = validateStory({
   id: "glass-harbor",
-  versionId: "pages-v1",
+  versionId: "story-nodes-v1",
   rulesetVersion: "prototype-1",
   title: "The Glass Harbor",
-  entryPageId: "dock",
-  pages: {
+  entryStoryNodeId: "dock",
+  storyNodes: {
     dock: node(
       "dock",
       "A signal in the fog",
@@ -89,8 +89,8 @@ export const glassHarbor = validateStory({
           outcome: {
             kind: "check",
             condition: { kind: "stat", stat: "agility", op: "gte", value: 8 },
-            success: { targetPageId: "success", effects: [] },
-            failure: { targetPageId: "guard", effects: [] },
+            success: { targetStoryNodeId: "success", effects: [] },
+            failure: { targetStoryNodeId: "guard", effects: [] },
           },
         }),
         direct("pass", "Take the customs gate", "success", {
@@ -151,11 +151,11 @@ export const glassHarbor = validateStory({
 function side(id: string, title: string, text: string): Story {
   return validateStory({
     id,
-    versionId: "pages-v1",
+    versionId: "story-nodes-v1",
     rulesetVersion: "prototype-1",
     title,
-    entryPageId: "arrival",
-    pages: {
+    entryStoryNodeId: "arrival",
+    storyNodes: {
       arrival: node(
         "arrival",
         title,
@@ -200,18 +200,18 @@ export const branches = [
   {
     id: "bell-diver",
     storyId: "bell-diver",
-    versionId: "pages-v1",
+    versionId: "story-nodes-v1",
     locationId: "harbor-market",
-    sourceVersionId: "pages-v1",
+    sourceVersionId: "story-nodes-v1",
     title: "The Bell Diver",
     author: "Mara Vale",
   },
   {
     id: "paper-moon",
     storyId: "paper-moon",
-    versionId: "pages-v1",
+    versionId: "story-nodes-v1",
     locationId: "harbor-market",
-    sourceVersionId: "pages-v1",
+    sourceVersionId: "story-nodes-v1",
     title: "Paper Moon",
     author: "Ivo North",
   },
@@ -219,7 +219,7 @@ export const branches = [
 export const catalogue = {
   id: "glass-harbor",
   title: "The Glass Harbor",
-  versionId: "pages-v1",
+  versionId: "story-nodes-v1",
   creator: "Storybranch Studio",
   genre: "Mystery",
   duration: "5–10 min",

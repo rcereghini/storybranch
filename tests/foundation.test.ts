@@ -3,11 +3,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { harborMedia, resolveFixtureMedia } from "../fixtures/media";
 import { stories } from "../fixtures/stories";
 import { mediaSchema } from "../packages/contracts/media";
-it("assigns distinct shipped renditions to every fixture node with explicit page types", () => {
+it("assigns distinct shipped renditions to every fixture node with explicit StoryNode types", () => {
   const sources: string[] = [];
   for (const story of stories)
-    for (const node of Object.values(story.pages)) {
-      expect(node.pageType).toMatch(/^video/);
+    for (const node of Object.values(story.storyNodes)) {
+      expect(node.storyNodeType).toMatch(/^video/);
       const media = resolveFixtureMedia(node.video!)!;
       for (const rendition of [media.landscape, media.portrait!]) {
         sources.push(rendition.src);

@@ -9,23 +9,21 @@ try {
     viewport: { width: 390, height: 844 },
   });
   const request = context.request;
-  const page = await context.newPage();
+  const tab = await context.newPage();
   if (process.env.TUNNEL_CONFIRM_IP) {
-    const response = await page.goto(base);
+    const response = await tab.goto(base);
     if (response?.status() === 511) {
-      await page.getByRole("textbox").fill(process.env.TUNNEL_CONFIRM_IP);
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
-      await page
-        .getByText("Private phone preview.", { exact: false })
-        .waitFor();
+      await tab.getByRole("textbox").fill(process.env.TUNNEL_CONFIRM_IP);
+      await tab.getByRole("button", { name: "Continue", exact: true }).click();
+      await tab.getByText("Private phone preview.", { exact: false }).waitFor();
     }
   }
   assert.equal((await request.get(base + "/")).status(), 403);
   assert.equal((await request.get(base + "/api/catalogue")).status(), 403);
   const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(base + "/preview-access?key=" + key);
-  assert.equal(page.url(), base + "/");
+  tab.on("pageerror", (e) => errors.push(e.message));
+  await tab.goto(base + "/preview-access?key=" + key);
+  assert.equal(tab.url(), base + "/");
   for (const path of [
     "/emulator/v1/projects/demo-storybranch-phone/accounts",
     "/identitytoolkit.googleapis.com/v1/accounts:signUp",
@@ -40,35 +38,35 @@ try {
   const range = await request.get(media, { headers: { Range: "bytes=0-127" } });
   assert.equal(range.status(), 206);
   assert.equal((await range.body()).length, 128);
-  await page.getByRole("button", { name: "Sign in", exact: false }).click();
-  await page
+  await tab.getByRole("button", { name: "Sign in", exact: false }).click();
+  await tab
     .getByRole("dialog")
     .getByRole("button", { name: "Sign in ↗", exact: true })
     .click();
-  await page.getByRole("dialog").waitFor({ state: "hidden" });
-  await page.goto(base + "/s/glass-harbor/the-glass-harbor");
-  await page.getByRole("button", { name: /Start a new journey/ }).click();
-  await startPlayback(page);
-  await page.waitForFunction(() => {
+  await tab.getByRole("dialog").waitFor({ state: "hidden" });
+  await tab.goto(base + "/s/glass-harbor/the-glass-harbor");
+  await tab.getByRole("button", { name: /Start a new journey/ }).click();
+  await startPlayback(tab);
+  await tab.waitForFunction(() => {
     const v = document.querySelector("video")!;
     return v.currentTime > 0.1 && !v.paused && !v.muted;
   });
-  await page
+  await tab
     .getByRole("button", { name: "Skip to choices", exact: true })
     .click();
-  await page.getByRole("button", { name: /Speak to the courier/ }).click();
-  await page
+  await tab.getByRole("button", { name: /Speak to the courier/ }).click();
+  await tab
     .getByLabel("A favor, remembered scene video", { exact: true })
     .waitFor();
-  await page.waitForFunction(() => {
+  await tab.waitForFunction(() => {
     const v = document.querySelector("video")!;
     return v.currentTime > 0.1 && !v.paused && !v.muted;
   });
-  await page.reload();
-  await page
+  await tab.reload();
+  await tab
     .getByRole("heading", { name: "A favor, remembered", exact: true })
     .waitFor();
-  await page.screenshot({
+  await tab.screenshot({
     path: "test-results/phone-preview.png",
     fullPage: true,
   });

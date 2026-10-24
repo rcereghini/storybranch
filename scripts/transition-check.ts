@@ -3,60 +3,60 @@ import { launchBrowser, startPlayback } from "./browser";
 const browser = await launchBrowser();
 try {
   for (const width of [1440, 390]) {
-    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    const tab = await browser.newPage({ viewport: { width, height: 900 } });
     let releaseCatalogue!: () => void;
     const catalogueGate = new Promise<void>((resolve) => {
       releaseCatalogue = resolve;
     });
-    await page.route("**/api/catalogue", async (route) => {
+    await tab.route("**/api/catalogue", async (route) => {
       await catalogueGate;
       await route.continue();
     });
-    await page.goto("http://127.0.0.1:5173");
-    await page.locator(".loading-overlay").waitFor();
-    const loadingHero = await page.locator(".hero").boundingBox();
+    await tab.goto("http://127.0.0.1:5173");
+    await tab.locator(".loading-overlay").waitFor();
+    const loadingHero = await tab.locator(".hero").boundingBox();
     assert.equal(
-      await page
+      await tab
         .locator(".loading-overlay")
         .evaluate((el) => getComputedStyle(el).position),
       "fixed",
     );
     releaseCatalogue();
-    await page.locator(".loading-overlay").waitFor({ state: "hidden" });
+    await tab.locator(".loading-overlay").waitFor({ state: "hidden" });
     assert.deepEqual(
-      await page.locator(".hero").boundingBox(),
+      await tab.locator(".hero").boundingBox(),
       loadingHero,
       "Catalogue loading must not shift or resize the hero",
     );
-    await page.unroute("**/api/catalogue");
-    await page
+    await tab.unroute("**/api/catalogue");
+    await tab
       .getByRole("button", { name: /Sign in/ })
       .first()
       .click();
-    await page.getByText("LOCAL EMULATOR ACCOUNTS").waitFor();
-    await page
+    await tab.getByText("LOCAL EMULATOR ACCOUNTS").waitFor();
+    await tab
       .getByRole("dialog")
       .getByRole("button", { name: "Sign in ↗" })
       .click();
-    await page.getByRole("dialog").waitFor({ state: "hidden" });
-    await page.goto("http://127.0.0.1:5173/s/glass-harbor");
-    await page.getByRole("button", { name: "Start a new journey" }).click();
-    await startPlayback(page);
-    await page.waitForFunction(
+    await tab.getByRole("dialog").waitFor({ state: "hidden" });
+    await tab.goto("http://127.0.0.1:5173/s/glass-harbor");
+    await tab.getByRole("button", { name: "Start a new journey" }).click();
+    await startPlayback(tab);
+    await tab.waitForFunction(
       () => document.querySelector("video")!.currentTime > 0.2,
     );
-    await page.getByRole("button", { name: "Skip to choices" }).click();
-    await page.locator(".scene-stage").scrollIntoViewIfNeeded();
-    await page.route("**/choices", async (route) => {
+    await tab.getByRole("button", { name: "Skip to choices" }).click();
+    await tab.locator(".scene-stage").scrollIntoViewIfNeeded();
+    await tab.route("**/choices", async (route) => {
       await new Promise((r) => setTimeout(r, 800));
       await route.continue();
     });
-    await page.route("**/glass-harbor-courier-mock-v1-*.mp4", async (route) => {
+    await tab.route("**/glass-harbor-courier-mock-v1-*.mp4", async (route) => {
       await new Promise((r) => setTimeout(r, 800));
       await route.continue();
     });
-    await page.evaluate("globalThis.__name = (fn) => fn");
-    await page.evaluate(() => {
+    await tab.evaluate("globalThis.__name = (fn) => fn");
+    await tab.evaluate(() => {
       const w = window as any;
       w.samples = [];
       w.sampling = true;
@@ -74,14 +74,14 @@ try {
       }
       requestAnimationFrame(sample);
     });
-    await page.getByRole("button", { name: /Speak to the courier/ }).click();
-    await page.waitForFunction(() => {
+    await tab.getByRole("button", { name: /Speak to the courier/ }).click();
+    await tab.waitForFunction(() => {
       const v = document.querySelector("video")!;
       return (
         v.currentSrc.includes("courier") && v.currentTime > 0.2 && !v.paused
       );
     });
-    const result = await page.evaluate(() => {
+    const result = await tab.evaluate(() => {
       const w = window as any;
       w.sampling = false;
       return {
@@ -98,17 +98,15 @@ try {
       );
     }
     assert(result.samples.every((s: any) => !s.controls));
-    await page.getByRole("button", { name: "Mute", exact: true }).click();
+    await tab.getByRole("button", { name: "Mute", exact: true }).click();
     assert(
-      await page.locator("video").evaluate((v: HTMLVideoElement) => v.muted),
+      await tab.locator("video").evaluate((v: HTMLVideoElement) => v.muted),
     );
-    await page
-      .getByRole("button", { name: "Pause video", exact: true })
-      .click();
+    await tab.getByRole("button", { name: "Pause video", exact: true }).click();
     assert(
-      await page.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+      await tab.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
     );
-    await page.close();
+    await tab.close();
   }
   console.log(
     "PASS: stable video bounds throughout delayed API/media transitions, no native timeline, reused player, custom mute/pause on desktop/mobile.",

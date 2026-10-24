@@ -3,7 +3,7 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { launchBrowser } from "./browser";
 import { glassHarbor, catalogue } from "../fixtures/stories";
-import { pageCatalogue } from "../fixtures/page-stories";
+import { storyNodeCatalogue } from "../fixtures/story-node-stories";
 import {
   coverArt,
   coverPalette,
@@ -18,7 +18,7 @@ const cards = [
     title: glassHarbor.title,
     description: catalogue.description,
   },
-  ...pageCatalogue.map((entry) => ({
+  ...storyNodeCatalogue.map((entry) => ({
     id: entry.id,
     title: entry.title,
     description: entry.description,
@@ -72,12 +72,12 @@ p { font-size: 27px; line-height: 1.4; color: #c8d3cf; max-width: 560px; }
 await mkdir("apps/web/public/og", { recursive: true });
 const browser = await launchBrowser();
 try {
-  const page = await browser.newPage({
+  const tab = await browser.newPage({
     viewport: { width: 1200, height: 630 },
   });
   for (const card of cards) {
-    await page.setContent(html(card, await art(card.id, card.title)));
-    await page.screenshot({ path: `apps/web/public/og/${card.id}.png` });
+    await tab.setContent(html(card, await art(card.id, card.title)));
+    await tab.screenshot({ path: `apps/web/public/og/${card.id}.png` });
     console.log(`og/${card.id}.png`);
   }
 } finally {

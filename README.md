@@ -2,6 +2,8 @@
 
 Storybranch is a working name for a video based interactive storytelling platform. Players discover and play adventures, creators build video story graphs, and the community adds side quests without replacing the original adventure.
 
+For Story-related work, start with the [Story system documentation](docs/story-system/README.md) and [canonical terminology](docs/story-system/terminology.md): Story, StoryTrunk, connected StoryNodes, their StoryBranches, and StoryLeaves. The documentation covers node types, Story/Player/User contexts, keys, storage, AI boundaries and flow charts. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [documentation workflow](docs/development-workflow.md) before planning or editing. The [October 23 review](docs/story-system/current-state-review.md) records the latest pull and verification limits. Target design is explicitly distinguished from current implementation.
+
 This repository contains a working M0 foundation and M1 local playable prototype, plus the product specifications. React/TypeScript now defaults to Firebase Authentication and Firestore project `storybranch-f77a3` locally and in production. Production runs on Vercel at https://www.storybranch.com. Server credentials are required for that mode; explicit emulator mode remains credential-free. See [shared Firebase setup](docs/15-shared-firebase-setup.md). Implementation and verification notes: [M0/M1 delivery record](docs/12-local-prototype.md).
 
 The player now uses a landscape overlay on larger screens and an authored portrait rendition at ≤700px. Opening a story attempts audible playback automatically. If the browser requires a gesture, a large centered **Start story with sound** button appears. Saved choices reuse the same video element. Loading announcements do not move the video; the last frame covers clip loading, and custom controls replace the native timeline. Story controls fade during playback; pause, completion or **Skip to choices** restores them. If the browser blocks autoplay, **Play scene** provides a manual fallback. **Share this adventure** offers public story-link sharing/copying and a downloadable portrait MP4 teaser. Shared links use the address they were copied from, so production links point at https://www.storybranch.com. See [responsive video and sharing](docs/13-responsive-video-and-sharing.md) for the research, behavior and limits.
@@ -10,9 +12,9 @@ The player now uses a landscape overlay on larger screens and an authored portra
 
 Signed-in players land on their **Dashboard**: profile with display name and avatar, shared stats, progress across stories, endings found and where they left off. The catalogue lives under **Discover** (`/discover`). See [Player dashboard and profile](docs/18-player-dashboard.md).
 
-**Create** opens the new Creator Studio: private drafts, all six page types, a personality-quiz template, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Video pages can use sample clips or uploaded MP4/WebM clips stored in Firebase Storage. Hosted publishing needs the account's `publish` feature (`pnpm features grant <email> publish`, see [Account access](docs/15-shared-firebase-setup.md#account-access)); emulator accounts can publish immediately.
+**Create** opens the new Creator Studio: private drafts, all seven StoryNode types, personality-quiz and comic templates, output routing, playable preview and immutable publication to Discover. See [Creator Studio setup and limits](docs/17-creator-studio.md). Video StoryNodes can use sample clips or uploaded MP4/WebM clips stored in Firebase Storage. Hosted publishing needs the account's `publish` feature (`pnpm features grant <email> publish`, see [Account access](docs/15-shared-firebase-setup.md#account-access)); emulator accounts can publish immediately.
 
-The player now supports six explicit page types and three additional stories: **The Clockwork Door**, **The Storm Signal** and the personality quiz **What Kind of Explorer Are You?**. See [Story and Page model](docs/16-story-pages.md). Reseed to publish the new `pages-v1` editions. Pre-page prototype saves require a new journey; accounts are unchanged.
+The player now supports seven explicit StoryNode types, including Comic, and sample stories such as **The Clockwork Door**, **The Storm Signal** and the personality quiz **What Kind of Explorer Are You?**. See [Story and StoryNode model](docs/16-story-nodes.md). Reseed to publish the sample `story-nodes-v1` editions. Pre-StoryNode prototype saves require a new journey; accounts are unchanged.
 
 Follow [shared Firebase setup](docs/15-shared-firebase-setup.md) to install server credentials in ignored `.secrets/` and `.env.local`, then run `pnpm seed:firebase` and `pnpm dev`. Use a real Firebase Email/Password account; local and hosted saves share the same namespaced data.
 
@@ -82,10 +84,14 @@ If `pnpm` is not on PATH, run `corepack enable`; `package.json` pins pnpm 11.25.
 
 ## Start here
 
-Read [Product requirements](docs/01-product-requirements.md), [Game and community rules](docs/02-game-and-community-rules.md), and [Decisions and open questions](docs/10-decisions-and-open-questions.md) first. For implementation, also read the architecture, data contracts, and the relevant acceptance criteria.
+Read [CONTRIBUTING](CONTRIBUTING.md) and follow the [documentation reading map](docs/development-workflow.md). For Story work, the [Story system index](docs/story-system/README.md) is the architectural entry point; it links the current implementation contract and topic-specific target documents. [Product requirements](docs/01-product-requirements.md), [Game and community rules](docs/02-game-and-community-rules.md), and [Decisions and open questions](docs/10-decisions-and-open-questions.md) supply broader product context. Read the relevant acceptance criteria before implementation.
 
 | Document | Purpose |
 | --- | --- |
+| [Story terminology](docs/story-system/terminology.md) | Canonical graph vocabulary, connectivity, and mappings to existing code names |
+| [Story system](docs/story-system/README.md) | Canonical target architecture, StoryNode types, contexts, keys, storage, AI and example flows |
+| [Contribution and documentation workflow](CONTRIBUTING.md) | Required reading, scoped guides and review before committing |
+| [Current-state review](docs/story-system/current-state-review.md) | Latest pull, inspected architecture, target gaps and actual verification limits |
 | [Product requirements](docs/01-product-requirements.md) | Vision, confirmed requirements, scope, and success measures |
 | [Game and community rules](docs/02-game-and-community-rules.md) | Stats, keys, progression, combat, side quests, featured placements, and trades |
 | [Experience and interface](docs/03-experience-and-interface.md) | Screens, navigation, player flow, authoring, accessibility, and visual direction |
@@ -101,7 +107,7 @@ Read [Product requirements](docs/01-product-requirements.md), [Game and communit
 | [Responsive video and sharing](docs/13-responsive-video-and-sharing.md) | Landscape/portrait player, teaser video and share links |
 | [Phone playback preview](docs/14-phone-playback-preview.md) | Private HTTPS tunnel for testing on a real phone |
 | [Shared Firebase setup](docs/15-shared-firebase-setup.md) | Live Firebase project, credentials and Vercel hosting |
-| [Story and Page model](docs/16-story-pages.md) | Current page-type contract; read before changing stories, pages or routing |
+| [Story and StoryNode model](docs/16-story-nodes.md) | Current StoryNode-type contract; read before changing stories, StoryNodes or routing |
 | [Creator Studio](docs/17-creator-studio.md) | Drafts, preview, publishing and publishing access |
 | [Player dashboard](docs/18-player-dashboard.md) | Dashboard home, profile customization and progress summary |
 | [Copilot](docs/19-copilot.md) | In-app chat assistant: phases, contract, limits and the video model test |
@@ -112,7 +118,7 @@ Read [Product requirements](docs/01-product-requirements.md), [Game and communit
 
 The user's latest instruction takes precedence. Confirmed requirements describe requested behavior. Proposed defaults are design recommendations that may be used for prototypes but are not approved commercial policies. Unresolved decisions must remain visible; do not silently turn them into production promises.
 
-The decision register owns decision status. The game rules own gameplay semantics, the data contracts own persistence and command semantics, and the delivery document owns release acceptance. If a change crosses those boundaries, update the affected documents together.
+The product decision register owns product/commercial status. For Story architecture, follow [document authority and ownership](docs/story-system/README.md#authority-and-status) and the [Story decision register](docs/story-system/decisions.md); earlier node-only schemas are historical. The delivery document owns milestone acceptance. If a change crosses boundaries, update the affected owning documents together.
 
 Begin future prompts with the context block in the prompt pack and name one delivery milestone. Do not ask an implementation agent to build the entire product in one pass. No cloud resources, billing accounts, or external publishing have been configured by this documentation work.
 

@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
-import { sharePages } from "../scripts/share-pages";
+import { shareDocuments } from "../scripts/share-documents";
 import { glassHarbor } from "../fixtures/stories";
-import { pageStories } from "../fixtures/page-stories";
+import { storyNodeStories } from "../fixtures/story-node-stories";
 
 const shell = `<html><head><meta
       name="description"
@@ -9,19 +9,19 @@ const shell = `<html><head><meta
     /><title>Storybranch · Choose your way</title></head><body></body></html>`;
 const site = "https://www.storybranch.com";
 
-it("writes a preview page per story and per ending with absolute tags", () => {
-  const pages = sharePages(
+it("writes a preview document per story and per ending with absolute tags", () => {
+  const storyNodes = shareDocuments(
     shell,
     site,
-    [glassHarbor, ...pageStories].map((story) => ({
+    [glassHarbor, ...storyNodeStories].map((story) => ({
       story,
       description: `${story.title} description`,
     })),
     new Set(["glass-harbor", "default"]),
   );
-  const byPath = new Map(pages.map((p) => [p.path, p.html]));
-  const endings = [glassHarbor, ...pageStories].flatMap((s) =>
-    Object.values(s.pages)
+  const byPath = new Map(storyNodes.map((p) => [p.path, p.html]));
+  const endings = [glassHarbor, ...storyNodeStories].flatMap((s) =>
+    Object.values(s.storyNodes)
       .filter((p) => p.kind === "ending")
       .map((p) => `s/${s.id}/ending/${p.id}`),
   );
@@ -47,7 +47,7 @@ it("writes a preview page per story and per ending with absolute tags", () => {
 });
 
 it("escapes story text inside meta attributes", () => {
-  const [, page] = sharePages(
+  const [, storyNode] = shareDocuments(
     shell,
     site,
     [
@@ -62,8 +62,8 @@ it("escapes story text inside meta attributes", () => {
     ],
     new Set(),
   );
-  expect(page.html).toContain(
+  expect(storyNode.html).toContain(
     "A &quot;quoted&quot; &lt;b&gt;title&lt;/b&gt; &amp; co",
   );
-  expect(page.html).not.toContain("<b>title</b>");
+  expect(storyNode.html).not.toContain("<b>title</b>");
 });

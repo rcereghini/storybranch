@@ -2,7 +2,7 @@ import type {
   Choice,
   Comic,
   Story as StoryData,
-  StoryPage,
+  StoryNode,
 } from "../../../packages/contracts/index";
 import type {
   CastMember,
@@ -15,8 +15,11 @@ import type {
 import { maxReferences } from "../../../packages/contracts/generation";
 import { sceneMedia } from "../../../fixtures/media";
 
-// Building blocks for Studio's story edits: new pages, choices, quiz scoring.
-export const route = (targetPageId: string) => ({ targetPageId, effects: [] });
+// Building blocks for Studio's story edits: new StoryNodes, choices, quiz scoring.
+export const route = (targetStoryNodeId: string) => ({
+  targetStoryNodeId,
+  effects: [],
+});
 export const choice = (target = "ending"): Choice => ({
   id: crypto.randomUUID(),
   label: "Continue",
@@ -24,12 +27,12 @@ export const choice = (target = "ending"): Choice => ({
   costs: [],
   outcome: { kind: "direct", route: route(target) },
 });
-export const makePage = (id: string): StoryPage => ({
+export const makeStoryNode = (id: string): StoryNode => ({
   id,
-  title: "New page",
+  title: "New StoryNode",
   transcript: "What happens here?",
   kind: "scene",
-  pageType: "text",
+  storyNodeType: "text",
   entryEffects: [],
   choices: [choice()],
 });
@@ -39,17 +42,20 @@ export const ending = (
   id: string,
   title: string,
   transcript: string,
-): StoryPage => ({
-  ...makePage(id),
+): StoryNode => ({
+  ...makeStoryNode(id),
   title,
   transcript,
   kind: "ending",
   choices: [],
 });
 export type Results = Extract<Choice["outcome"], { kind: "reveal" }>["results"];
-export const result = (storyId: string, pageId: string): Results[number] => ({
-  scoreId: `${storyId}:${pageId}`,
-  route: route(pageId),
+export const result = (
+  storyId: string,
+  storyNodeId: string,
+): Results[number] => ({
+  scoreId: `${storyId}:${storyNodeId}`,
+  route: route(storyNodeId),
 });
 export const revealChoice = (results: Results): Choice => ({
   ...choice(),
@@ -87,20 +93,20 @@ export const countToward = (c: Choice, scoreId?: string): Choice =>
         },
       };
 // A starter quiz: two questions whose answers each add a point toward one of
-// three results, then a reveal page that shows the winning result.
+// three results, then a reveal StoryNode that shows the winning result.
 export function quizTemplate(id: string): StoryData {
   const results = ["result-a", "result-b", "result-c"];
   const names = ["The Explorer", "The Builder", "The Dreamer"];
   const question = (
-    pageId: string,
+    storyNodeId: string,
     title: string,
     labels: string[],
     target: string,
-  ): StoryPage => ({
-    ...makePage(pageId),
+  ): StoryNode => ({
+    ...makeStoryNode(storyNodeId),
     title,
     transcript: "Pick the answer that fits you best.",
-    pageType: "text-options",
+    storyNodeType: "text-options",
     choices: labels.map((label, i) =>
       countToward({ ...choice(target), label }, `${id}:${results[i]}`),
     ),
@@ -110,10 +116,10 @@ export function quizTemplate(id: string): StoryData {
     versionId: "draft",
     rulesetVersion: "prototype-1",
     title: "Untitled quiz",
-    entryPageId: "opening",
-    pages: {
+    entryStoryNodeId: "opening",
+    storyNodes: {
       opening: {
-        ...makePage("opening"),
+        ...makeStoryNode("opening"),
         title: "Opening",
         transcript: "Answer a few questions to find out which one you are.",
         choices: [{ ...choice("question-1"), label: "Start the quiz" }],
@@ -131,10 +137,10 @@ export function quizTemplate(id: string): StoryData {
         "reveal",
       ),
       reveal: {
-        ...makePage("reveal"),
+        ...makeStoryNode("reveal"),
         title: "Your answers are in",
         transcript: "Ready to see your result?",
-        pageType: "reveal",
+        storyNodeType: "reveal",
         choices: [revealChoice(results.map((r) => result(id, r)))],
       },
       ...Object.fromEntries(
@@ -156,11 +162,11 @@ export function blankStory(id: string): StoryData {
     versionId: "draft",
     rulesetVersion: "prototype-1",
     title: "Untitled story",
-    entryPageId: "opening",
-    pages: {
-      opening: { ...makePage("opening"), title: "Opening" },
+    entryStoryNodeId: "opening",
+    storyNodes: {
+      opening: { ...makeStoryNode("opening"), title: "Opening" },
       ending: {
-        ...makePage("ending"),
+        ...makeStoryNode("ending"),
         title: "The end",
         kind: "ending",
         choices: [],
@@ -180,7 +186,7 @@ export const newComic = (): Comic => ({
   layout: "grid",
   panels: [comicPanel(), comicPanel(), comicPanel(), comicPanel()],
 });
-// A comic story is one comic page that ends the story, so the player offers
+// A comic story is one comic StoryNode that ends the story, so the player offers
 // replay and sharing as soon as it is read.
 export function comicTemplate(id: string): StoryData {
   return {
@@ -188,13 +194,13 @@ export function comicTemplate(id: string): StoryData {
     versionId: "draft",
     rulesetVersion: "prototype-1",
     title: "Untitled comic",
-    entryPageId: "comic",
-    pages: {
+    entryStoryNodeId: "comic",
+    storyNodes: {
       comic: {
-        ...makePage("comic"),
+        ...makeStoryNode("comic"),
         title: "Untitled comic",
         transcript: "",
-        pageType: "comic",
+        storyNodeType: "comic",
         kind: "ending",
         choices: [],
         comic: newComic(),
@@ -281,12 +287,12 @@ export const comicStyles = [
 // name) and the style. A blank title or listing description is filled in.
 export function applyComicScript(
   draft: DraftRecord,
-  pageId: string,
+  storyNodeId: string,
   script: ComicScript,
   brief: Pick<ComicBrief, "layout" | "style">,
 ): DraftRecord {
-  const page = draft.story.pages[pageId];
-  if (!page?.comic) return draft;
+  const storyNode = draft.story.storyNodes[storyNodeId];
+  if (!storyNode?.comic) return draft;
   const previous = draft.comic?.cast ?? [];
   const cast = script.cast.map((c) => {
     const same = previous.find(
@@ -305,11 +311,11 @@ export function applyComicScript(
     story: {
       ...draft.story,
       title: untitled(draft.story.title) ? script.title : draft.story.title,
-      pages: {
-        ...draft.story.pages,
-        [pageId]: {
-          ...page,
-          title: untitled(page.title) ? script.title : page.title,
+      storyNodes: {
+        ...draft.story.storyNodes,
+        [storyNodeId]: {
+          ...storyNode,
+          title: untitled(storyNode.title) ? script.title : storyNode.title,
           comic: {
             layout: brief.layout,
             panels: script.panels.map((p) => ({ ...comicPanel(), ...p })),
@@ -322,8 +328,8 @@ export function applyComicScript(
 
 // What drawing a comic takes: a sheet for each named character without a
 // reference image, then each panel without an image.
-export function drawPlan(draft: DraftRecord, pageId: string) {
-  const comic = draft.story.pages[pageId]?.comic;
+export function drawPlan(draft: DraftRecord, storyNodeId: string) {
+  const comic = draft.story.storyNodes[storyNodeId]?.comic;
   return {
     cast: (draft.comic?.cast ?? []).filter((c) => !c.image && c.name.trim()),
     panels: (comic?.panels ?? []).filter((p) => !p.image),

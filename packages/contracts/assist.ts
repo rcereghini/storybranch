@@ -66,7 +66,7 @@ export const comicBriefSchema = z
   );
 export type ComicBrief = z.infer<typeof comicBriefSchema>;
 
-const pageContext = z
+const storyNodeContext = z
   .object({
     title: z.string().max(160),
     text: z.string().max(10000),
@@ -85,9 +85,9 @@ export const assistCommandSchema = z
         description: z.string().max(500),
       })
       .strict(),
-    page: pageContext
+    storyNode: storyNodeContext
       .extend({
-        pageType: z.enum([
+        storyNodeType: z.enum([
           "text",
           "text-options",
           "video",
@@ -97,12 +97,12 @@ export const assistCommandSchema = z
           "comic",
         ]),
         ending: z.boolean(),
-        // Labels of the page's existing outputs, for continuity.
+        // Labels of the StoryNode's existing outputs, for continuity.
         outputs: z.array(z.string().max(160)).max(20),
       })
       .strict(),
-    // Up to three pages that lead here, nearest first.
-    before: z.array(pageContext).max(3),
+    // Up to three StoryNodes that lead here, nearest first.
+    before: z.array(storyNodeContext).max(3),
     comic: comicBriefSchema.optional(),
   })
   .strict()

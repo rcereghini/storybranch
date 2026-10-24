@@ -25,7 +25,7 @@ it("routes agility 7 to capture and agility 8 to success", () => {
   for (const agility of [7, 8]) {
     let s = start(glassHarbor, "test", "user", { ...baseStats, agility }, 0);
     s = transition(glassHarbor, s, "market", 0, 1).save;
-    expect(transition(glassHarbor, s, "escape", 1, 2).save.pageId).toBe(
+    expect(transition(glassHarbor, s, "escape", 1, 2).save.storyNodeId).toBe(
       agility === 8 ? "success" : "guard",
     );
   }
@@ -57,13 +57,13 @@ it("isolates child inventory, keys, health and stat snapshots", () => {
 });
 it("rejects dangling routes and foreign effects", () => {
   const s = structuredClone(glassHarbor);
-  s.pages.dock.choices[0].outcome = {
+  s.storyNodes.dock.choices[0].outcome = {
     kind: "direct",
-    route: { targetPageId: "missing", effects: [] },
+    route: { targetStoryNodeId: "missing", effects: [] },
   };
   expect(() => validateStory(s)).toThrow("Dangling");
   const foreign = structuredClone(glassHarbor);
-  foreign.pages.dock.entryEffects = [
+  foreign.storyNodes.dock.entryEffects = [
     { id: "bad", kind: "key", keyId: "other:pass", present: true },
   ];
   expect(() => validateStory(foreign)).toThrow("Foreign");
@@ -97,32 +97,32 @@ it("evaluates composed conditions and rejects stale state without mutation", () 
   );
   expect(s.revision).toBe(0);
 });
-import { pageStories } from "../fixtures/page-stories";
-it("routes trusted dice outcomes deterministically and retains results for later pages", () => {
-  const story = pageStories[1];
+import { storyNodeStories } from "../fixtures/story-node-stories";
+it("routes trusted dice outcomes deterministically and retains results for later StoryNodes", () => {
+  const story = storyNodeStories[1];
   const initial = start(story, "dice-save", "player", baseStats, 0);
   const atRoll = transition(story, initial, "roll", 0, 1).save;
   const passRoll = transition(story, atRoll, "roll", 1, 2, () => 10, "roll");
-  expect(passRoll.save.pageId).toBe("roll");
+  expect(passRoll.save.storyNodeId).toBe("roll");
   expect(() =>
     transition(story, passRoll.save, "roll", 2, 3, () => 20, "roll"),
   ).toThrow();
   const passed = transition(story, passRoll.save, "roll", 2, 3);
   const failRoll = transition(story, atRoll, "roll", 1, 2, () => 9, "roll");
   const failed = transition(story, failRoll.save, "roll", 2, 3);
-  expect(passed.save.pageId).toBe("signal");
-  expect(failed.save.pageId).toBe("shelter");
+  expect(passed.save.storyNodeId).toBe("signal");
+  expect(failed.save.storyNodeId).toBe("shelter");
   expect(passed.save.lastRoll).toMatchObject({ value: 10, passed: true });
   expect(passed.save.keys).toContain("storm-signal:restored");
   expect(
     evaluate(
-      { kind: "roll", pageId: "roll", op: "gte", value: 10 },
+      { kind: "roll", storyNodeId: "roll", op: "gte", value: 10 },
       passed.save,
     ),
   ).toBe(true);
   expect(
     evaluate(
-      { kind: "roll", pageId: "other", op: "gte", value: 10 },
+      { kind: "roll", storyNodeId: "other", op: "gte", value: 10 },
       passed.save,
     ),
   ).toBe(false);
@@ -132,11 +132,11 @@ it("routes trusted dice outcomes deterministically and retains results for later
     transition(story, atRoll, "roll", 1, 2, () => 21, "roll"),
   ).toThrow();
 });
-it("enforces explicit page types and one-output linear pages", () => {
-  const story = structuredClone(pageStories[0]);
-  story.pages.letter.choices.push(story.pages.hall.choices[0]);
-  expect(() => validateStory(story)).toThrow("Linear page");
-  const missing = structuredClone(pageStories[0]) as any;
-  delete missing.pages.letter.pageType;
+it("enforces explicit StoryNode types and one-output linear StoryNodes", () => {
+  const story = structuredClone(storyNodeStories[0]);
+  story.storyNodes.letter.choices.push(story.storyNodes.hall.choices[0]);
+  expect(() => validateStory(story)).toThrow("Linear StoryNode");
+  const missing = structuredClone(storyNodeStories[0]) as any;
+  delete missing.storyNodes.letter.storyNodeType;
   expect(() => validateStory(missing)).toThrow();
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { StoryPage } from "../../../packages/contracts/index";
+import type { StoryNode } from "../../../packages/contracts/index";
 import { comicLimits } from "../../../packages/contracts/index";
 import type { DraftRecord } from "../../../packages/contracts/authoring";
 import type {
@@ -34,10 +34,10 @@ const revisions = [
   ["Shorter captions", "make the captions shorter and punchier"],
   ["More absurd", "make it more absurd"],
 ] as const;
-const shapeOf = (page: StoryPage): Shape =>
-  page.comic?.layout === "scroll"
+const shapeOf = (storyNode: StoryNode): Shape =>
+  storyNode.comic?.layout === "scroll"
     ? "scroll"
-    : page.comic?.panels.length === 9
+    : storyNode.comic?.panels.length === 9
       ? "grid-9"
       : "grid-4";
 
@@ -51,7 +51,7 @@ const shapeOf = (page: StoryPage): Shape =>
 export function ComicCompanion({
   api,
   draft,
-  page,
+  storyNode,
   uploads,
   assistReason,
   onEdit,
@@ -59,7 +59,7 @@ export function ComicCompanion({
 }: {
   api: Api;
   draft: DraftRecord;
-  page: StoryPage;
+  storyNode: StoryNode;
   uploads: UploadListing | null;
   assistReason: string | null;
   onEdit: Edit;
@@ -68,7 +68,9 @@ export function ComicCompanion({
   const storyId = draft.story.id;
   const drawing = useDrawing();
   const mine =
-    drawing?.storyId === storyId && drawing.pageId === page.id ? drawing : null;
+    drawing?.storyId === storyId && drawing.storyNodeId === storyNode.id
+      ? drawing
+      : null;
   const [step, setStep] = useState<"brief" | "script" | "draw">(() =>
     mine ? "draw" : "brief",
   );
@@ -84,9 +86,9 @@ export function ComicCompanion({
       ? draft.comic.style
       : "",
   );
-  const [shape, setShape] = useState<Shape>(() => shapeOf(page));
+  const [shape, setShape] = useState<Shape>(() => shapeOf(storyNode));
   const [stripCount, setStripCount] = useState(() =>
-    page.comic?.layout === "scroll" ? page.comic.panels.length : 6,
+    storyNode.comic?.layout === "scroll" ? storyNode.comic.panels.length : 6,
   );
   const [script, setScript] = useState<ComicScript | null>(null);
   const [change, setChange] = useState("");
@@ -122,7 +124,7 @@ export function ComicCompanion({
     layout: shape === "scroll" ? "scroll" : "grid",
     panelCount: shape === "grid-4" ? 4 : shape === "grid-9" ? 9 : stripCount,
   });
-  const hasArt = !!page.comic?.panels.some((p) => p.image);
+  const hasArt = !!storyNode.comic?.panels.some((p) => p.image);
 
   const write = async (revision?: string) => {
     setBusy(true);
@@ -131,11 +133,11 @@ export function ComicCompanion({
       action: "comic-script",
       ...(revision ? { instruction: revision } : {}),
       story: { title: draft.story.title, description: draft.description },
-      page: {
-        title: page.title,
+      storyNode: {
+        title: storyNode.title,
         text: "",
-        pageType: "comic",
-        ending: page.kind === "ending",
+        storyNodeType: "comic",
+        ending: storyNode.kind === "ending",
         outputs: [],
       },
       before: [],
@@ -175,7 +177,7 @@ export function ComicCompanion({
     onEdit((d) => {
       applied =
         d.story.id === storyId
-          ? applyComicScript(d, page.id, script, brief())
+          ? applyComicScript(d, storyNode.id, script, brief())
           : d;
       return applied;
     });
@@ -186,7 +188,12 @@ export function ComicCompanion({
     askToNotify();
     const current = applyScript();
     if (!current) return;
-    startDrawing(api, current, page.id, script?.title || current.story.title);
+    startDrawing(
+      api,
+      current,
+      storyNode.id,
+      script?.title || current.story.title,
+    );
     onClose();
   };
 
