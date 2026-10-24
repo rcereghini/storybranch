@@ -181,6 +181,7 @@
    replaces its text without moving anything. */
 .admin-usage {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 .admin-usage .admin-stat {
@@ -274,6 +275,8 @@
 /* Emails: template list, editor beside a live preview, history and log. */
 .admin-emails {
   display: grid;
+  /* Like .admin: the log table must not widen the panels. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
 }
 .email-list {
