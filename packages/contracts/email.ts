@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { id } from "./index";
 
 // System emails. Admins (and AI) edit only this structured content; the
 // branded layout around it is fixed (packages/email), so no edit can break
@@ -116,9 +117,11 @@ export const emailTemplates: Record<EmailTemplateId, EmailTemplateDefinition> =
 // Each email sent, for the admin log. Entries expire after 90 days.
 export type EmailLogEntry = {
   id: string;
-  template: EmailTemplateId | "test";
-  // 0 is the built-in default content.
+  template: EmailTemplateId;
+  // 0 is the built-in default content; -1 is unsaved content in a test.
   version: number;
+  // An admin's test send, to their own address.
+  test: boolean;
   to: string;
   uid: string | null;
   status: "sent" | "failed" | "skipped";
@@ -130,3 +133,85 @@ export type EmailLogEntry = {
 export const passwordResetCommandSchema = z
   .object({ email: z.string().trim().email().max(254) })
   .strict();
+
+// Admin editing. A template has one draft; publishing turns it into the next
+// numbered version, which never changes. Restoring copies a version (or the
+// built-in default, version 0) into the draft.
+const keyed = { idempotencyKey: id };
+export const adminEmailCommandSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      ...keyed,
+      action: z.literal("save"),
+      expectedRevision: z.number().int().min(0),
+      content: emailContentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...keyed,
+      action: z.literal("publish"),
+      expectedRevision: z.number().int().min(0),
+    })
+    .strict(),
+  z
+    .object({
+      ...keyed,
+      action: z.literal("restore"),
+      expectedRevision: z.number().int().min(0),
+      version: z.number().int().min(0),
+    })
+    .strict(),
+  z
+    .object({
+      ...keyed,
+      action: z.literal("discard"),
+      expectedRevision: z.number().int().min(0),
+    })
+    .strict(),
+  // Sends the given (possibly unsaved) content to the admin's own address.
+  z
+    .object({
+      ...keyed,
+      action: z.literal("test"),
+      content: emailContentSchema,
+    })
+    .strict(),
+  // Returns a suggestion; nothing is saved.
+  z
+    .object({
+      ...keyed,
+      action: z.literal("rewrite"),
+      content: emailContentSchema,
+      instruction: z.string().trim().min(3).max(500),
+    })
+    .strict(),
+]);
+export type AdminEmailCommand = z.infer<typeof adminEmailCommandSchema>;
+
+export type AdminEmailVersion = {
+  version: number;
+  content: EmailContent;
+  publishedAt: number;
+  publishedBy: string | null;
+};
+export type AdminEmailTemplate = Omit<EmailTemplateDefinition, "defaults"> & {
+  defaults: EmailContent;
+  // What is sent today: the latest version, or the default (0).
+  published: { version: number; content: EmailContent };
+  // Unpublished changes, if any.
+  draft: EmailContent | null;
+  // Bumped by every save, publish, restore or discard.
+  revision: number;
+  versions: AdminEmailVersion[];
+};
+export type AdminEmails = {
+  templates: AdminEmailTemplate[];
+  aiAvailable: boolean;
+  senderConfigured: boolean;
+};
+// The button target in previews and tests: a code that never works.
+export const sampleEmailLink = (siteUrl: string, id: EmailTemplateId) =>
+  id === "welcome"
+    ? `${siteUrl}/discover`
+    : `${siteUrl}/account/action?mode=${id === "password-reset" ? "resetPassword" : "verifyEmail"}&oobCode=example`;

@@ -93,6 +93,7 @@ async function log(entry: {
   uid: string | null;
   status: "sent" | "failed" | "skipped";
   detail: string | null;
+  test: boolean;
 }) {
   const at = Date.now();
   await db
@@ -105,24 +106,32 @@ async function log(entry: {
     });
 }
 
+export const senderConfigured = () => sender() !== null;
+
 // Renders and sends one system email and records it. Never throws: the
-// account action that triggered it has already happened.
+// account action that triggered it has already happened. An admin test
+// passes its own (possibly unsaved) content.
 export async function sendSystemEmail({
   template,
   to,
   uid,
   name,
   link,
+  test,
 }: {
   template: EmailTemplateId;
   to: string;
   uid: string | null;
   name: string | null;
   link: string;
-}) {
+  test?: { content: EmailContent };
+}): Promise<"sent" | "failed" | "skipped"> {
   let version = 0;
+  const entry = { template, to, uid, test: !!test };
   try {
-    const current = await templateContent(template);
+    const current = test
+      ? { version: -1, content: test.content }
+      : await templateContent(template);
     version = current.version;
     const email = renderEmail({
       content: current.content,
@@ -130,33 +139,32 @@ export async function sendSystemEmail({
       link,
       siteUrl: siteUrl(),
     });
+    if (test) email.subject = `[Test] ${email.subject}`;
     const send = sender();
     if (!send) {
       await log({
-        template,
+        ...entry,
         version,
-        to,
-        uid,
         status: "skipped",
         detail:
           config.mode === "emulator"
             ? "Emails are not sent locally."
             : "SendGrid is not configured.",
       });
-      return;
+      return "skipped";
     }
-    await send({ to, ...email, category: template });
-    await log({ template, version, to, uid, status: "sent", detail: null });
+    await send({ to, ...email, category: test ? "test" : template });
+    await log({ ...entry, version, status: "sent", detail: null });
+    return "sent";
   } catch (error) {
     console.error("System email failed", template, error);
     await log({
-      template,
+      ...entry,
       version,
-      to,
-      uid,
       status: "failed",
       detail: error instanceof Error ? error.message.slice(0, 300) : "Failed.",
     }).catch(() => {});
+    return "failed";
   }
 }
 
@@ -201,16 +209,16 @@ const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
 // Fixed-window limit per key per hour, so the form can't be used to flood an
 // inbox or probe for accounts.
-async function limit(key: string, max: number) {
+export async function limit(
+  key: string,
+  max: number,
+  message = "Too many reset requests. Please try again in an hour.",
+) {
   const hour = Math.floor(Date.now() / 3600000);
   const ref = db.doc(`emailLimits/${digest(key)}-${hour}`);
   await db.runTransaction(async (tx) => {
     const count = (await tx.get(ref)).data()?.count ?? 0;
-    if (count >= max)
-      throw new GameError(
-        "VALIDATION_FAILED",
-        "Too many reset requests. Please try again in an hour.",
-      );
+    if (count >= max) throw new GameError("VALIDATION_FAILED", message);
     tx.set(ref, {
       count: count + 1,
       expireAt: Timestamp.fromMillis((hour + 2) * 3600000),

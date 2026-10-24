@@ -18,6 +18,8 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getBytes, ref, uploadBytes } from "firebase/storage";
 import { auth, bucket, db } from "../services/api/firebase";
 import { setEmailSender, type EmailMessage } from "../services/api/email";
+import { setEmailModel } from "../services/api/email-ai";
+import { emailTemplates, type AdminEmails } from "../packages/contracts/email";
 import { handle } from "../services/api/handler";
 import { setCopilotModel, type CopilotModel } from "../services/api/copilot";
 import { setAssistModel, type AssistModel } from "../services/api/assist";
@@ -1837,6 +1839,213 @@ it("gates publishing, uploads and StoryNode sharing on the account's publish fla
   }
 });
 
+it("lets admins draft, test, rewrite, publish and restore system emails", async () => {
+  const sent: EmailMessage[] = [];
+  setEmailSender(async (message) => {
+    sent.push(message);
+  });
+  const rewrites: string[] = [];
+  let aiReply: unknown = null;
+  setEmailModel(async (request) => {
+    rewrites.push(request.user);
+    return aiReply;
+  });
+  const list = async () =>
+    ((await call("/admin/emails")).data as AdminEmails).templates.find(
+      (t) => t.id === "password-reset",
+    )!;
+  const command = (body: object, who = "player") =>
+    call(
+      "/admin/emails/password-reset",
+      { idempotencyKey: randomUUID(), ...body },
+      who,
+    );
+  const defaults = emailTemplates["password-reset"].defaults;
+  try {
+    // Members can't see or change emails.
+    expect((await call("/admin/emails", undefined, "progressed")).status).toBe(
+      403,
+    );
+    expect(
+      (await command({ action: "discard", expectedRevision: 0 }, "progressed"))
+        .status,
+    ).toBe(403);
+
+    const start = await list();
+    expect(start.published).toEqual({ version: 0, content: defaults });
+    expect(start.draft).toBeNull();
+
+    // Drafts are validated and revision-checked.
+    const edited = {
+      ...defaults,
+      subject: "Choose a new Storybranch password",
+    };
+    expect(
+      (
+        await command({
+          action: "save",
+          expectedRevision: start.revision,
+          content: { ...edited, heading: "Hi {{email}}" },
+        })
+      ).status,
+    ).toBe(400);
+    const saved = await command({
+      action: "save",
+      expectedRevision: start.revision,
+      content: edited,
+    });
+    expect(saved.status).toBe(200);
+    expect(
+      (
+        await command({
+          action: "save",
+          expectedRevision: start.revision,
+          content: edited,
+        })
+      ).status,
+    ).toBe(409);
+    const drafted = await list();
+    expect(drafted.draft).toEqual(edited);
+    // A draft is not sent: resets still use what was published.
+    const reset = () =>
+      handle(
+        new Request("http://localhost/api/account/password-reset", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Forwarded-For": randomUUID(),
+          },
+          body: JSON.stringify({ email: "player@storybranch.test" }),
+        }),
+      );
+    await reset();
+    expect(sent.at(-1)!.subject).toBe(defaults.subject);
+
+    // A test send goes to the admin, marked as a test, with unsaved content.
+    const test = await command({
+      action: "test",
+      content: { ...edited, subject: "Unsaved idea" },
+    });
+    expect(test.data).toEqual({
+      status: "sent",
+      to: "player@storybranch.test",
+    });
+    expect(sent.at(-1)).toMatchObject({
+      to: "player@storybranch.test",
+      subject: "[Test] Unsaved idea",
+    });
+
+    // AI rewrites come back as content and are checked; nothing is saved.
+    aiReply = { ...edited, heading: "A fresh start, {{name}}" };
+    const rewrite = await command({
+      action: "rewrite",
+      content: edited,
+      instruction: "Make it warmer",
+    });
+    expect(rewrite.data.content.heading).toBe("A fresh start, {{name}}");
+    expect(rewrites.at(-1)).toContain("<request>Make it warmer</request>");
+    expect(rewrites.at(-1)).toContain("Password reset");
+    aiReply = { ...edited, heading: "Hi {{email}}" };
+    expect(
+      (
+        await command({
+          action: "rewrite",
+          content: edited,
+          instruction: "Use their email",
+        })
+      ).data.error.message,
+    ).toMatch(/placeholders we don't support \(email\)/);
+    expect((await list()).draft).toEqual(edited);
+
+    // Publishing makes the draft version 1, which resets now use.
+    const published = await command({
+      action: "publish",
+      expectedRevision: drafted.revision,
+    });
+    expect(published.data.version).toBe(1);
+    const live = await list();
+    expect(live.published).toEqual({ version: 1, content: edited });
+    expect(live.draft).toBeNull();
+    expect(live.versions.map((v) => v.version)).toEqual([1]);
+    expect(live.versions[0].publishedBy).toBe("player@storybranch.test");
+    await reset();
+    expect(sent.at(-1)!.subject).toBe(edited.subject);
+    expect(
+      (await command({ action: "publish", expectedRevision: live.revision }))
+        .status,
+    ).toBe(400);
+
+    // Restoring the default fills the draft; publishing it makes version 2.
+    await command({
+      action: "restore",
+      expectedRevision: live.revision,
+      version: 0,
+    });
+    const restored = await list();
+    expect(restored.draft).toEqual(defaults);
+    expect(restored.published.version).toBe(1);
+    await command({ action: "publish", expectedRevision: restored.revision });
+    const again = await list();
+    expect(again.published).toEqual({ version: 2, content: defaults });
+    expect(again.versions.map((v) => v.version)).toEqual([2, 1]);
+    // Version 1 is kept as it was.
+    expect(again.versions[1].content).toEqual(edited);
+
+    // Discarding clears a draft without touching the published version.
+    await command({
+      action: "restore",
+      expectedRevision: again.revision,
+      version: 1,
+    });
+    const withDraft = await list();
+    await command({ action: "discard", expectedRevision: withDraft.revision });
+    const discarded = await list();
+    expect(discarded.draft).toBeNull();
+    expect(discarded.published.version).toBe(2);
+    expect(
+      (
+        await command({
+          action: "restore",
+          expectedRevision: discarded.revision,
+          version: 9,
+        })
+      ).status,
+    ).toBe(404);
+
+    // Every change is audited, and the log lists sends with their version.
+    const audit = (await call("/admin/audit")).data.items as Array<{
+      action: string;
+      target: string;
+      change: { action: string };
+    }>;
+    const actions = audit
+      .filter((e) => e.action === "email" && e.target === "password-reset")
+      .map((e) => e.change.action);
+    for (const action of ["save", "test", "publish", "restore", "discard"])
+      expect(actions).toContain(action);
+    const log = (await call("/admin/email-log")).data.items as Array<{
+      template: string;
+      version: number;
+      test: boolean;
+      to: string;
+    }>;
+    expect(log).toContainEqual(
+      expect.objectContaining({
+        template: "password-reset",
+        version: 1,
+        test: false,
+        to: "player@storybranch.test",
+      }),
+    );
+    expect(log).toContainEqual(
+      expect.objectContaining({ test: true, version: -1 }),
+    );
+  } finally {
+    setEmailSender(null);
+    setEmailModel(null);
+    await db.recursiveDelete(db.doc("emailTemplates/password-reset"));
+  }
+});
 it("sends password resets without revealing accounts, and limits requests", async () => {
   const sent: EmailMessage[] = [];
   setEmailSender(async (message) => {

@@ -123,7 +123,52 @@ try {
   await tab.waitForTimeout(300);
   await tab.screenshot({ path: "test-results/admin-usage.png" });
 
+  // Emails: edit with a live preview, save a draft, publish, see history.
+  await sections.getByRole("button", { name: "Emails" }).click();
+  await tab.getByRole("tab", { name: /Password reset/ }).click();
+  const editor = tab.getByRole("region", { name: "Edit Password reset" });
+  const subject = editor.getByLabel("Subject");
+  await subject.fill("Pick a new Storybranch password");
+  const frame = tab.getByTitle("Password reset preview");
+  await tab.waitForFunction(() =>
+    document
+      .querySelector('iframe[title="Password reset preview"]')
+      ?.getAttribute("srcdoc")
+      ?.includes("Pick a new Storybranch password"),
+  );
+  // A placeholder we don't support is caught before saving.
+  await editor.getByLabel("Heading").fill("Hi {{email}}");
+  await editor.getByText(/Heading: Only these placeholders/).waitFor();
+  assert.equal(
+    await editor.getByRole("button", { name: "Save draft" }).isDisabled(),
+    true,
+  );
+  await editor.getByLabel("Heading").fill("Reset your password, {{name}}");
+  await editor.getByRole("button", { name: "Save draft" }).click();
+  await tab.getByText("Draft saved.", { exact: false }).waitFor();
+  await tab
+    .getByRole("tab", { name: /Password reset/ })
+    .getByText("Unpublished changes")
+    .waitFor();
+  const publish = editor.getByRole("button", { name: "Publish" });
+  await publish.click();
+  await editor.getByRole("button", { name: "Confirm publish" }).click();
+  await tab.getByText("Published version 1.").waitFor();
+  await tab.getByText(/Version 1 · being sent/).waitFor();
+  // CI has no Anthropic key, so the AI box explains itself.
+  await editor.getByText("AI writing help isn't connected here.").waitFor();
+  await tab.getByRole("button", { name: "Phone" }).click();
+  assert.equal(await frame.isVisible(), true);
+  await tab.waitForTimeout(300);
+  await tab.screenshot({
+    path: "test-results/admin-emails.png",
+    fullPage: true,
+  });
+
   await tab.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await overflow(), false, "Horizontal overflow on Emails at 390");
+  await sections.getByRole("button", { name: "Usage & spend" }).click();
+  await tab.locator(".admin-bar").first().waitFor();
   assert.equal(await overflow(), false, "Horizontal overflow on Usage at 390");
   await sections.getByRole("button", { name: "Users" }).click();
   await tab.getByRole("table").waitFor();

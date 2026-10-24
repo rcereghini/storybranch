@@ -34,9 +34,10 @@ Firebase generates each verification and reset code (`generateEmailVerificationL
 
 ## Records
 
-- `emailLog/{id}`: template, template version (0 = built-in default), recipient address and uid, status (`sent`, `failed`, `skipped`), a short failure reason and time. Never the link. Deleted 90 days later by a TTL policy on `expireAt`.
+- `emailLog/{id}`: template, template version (0 = built-in default, -1 = unsaved test content), whether it was an admin test, recipient address and uid, status (`sent`, `failed`, `skipped`), a short failure reason and time. Never the link. Deleted 90 days later by a TTL policy on `expireAt`.
 - `emailLimits/{hash}-{hour}`: request counts, deleted by TTL after the hour.
-- `emailTemplates/{id}`: published content and version, written by the admin editor (next phase). Until then every email uses the built-in default.
+- `emailTemplates/{id}`: the draft, a revision number bumped by every change, and the published version and content. Without a published version an email uses its built-in default (version 0).
+- `emailTemplates/{id}/versions/{n}`: every published version, written once and never changed.
 
 The TTL policies are in `firebase/firestore.indexes.json`; deploy them with the Firestore rules (see `15-shared-firebase-setup.md`).
 
@@ -44,6 +45,14 @@ The TTL policies are in `firebase/firestore.indexes.json`; deploy them with the 
 
 Unit tests (`tests/email.test.ts`) cover the built-in content, the placeholder rule, escaping, the name fallback, the plain-text version and refusing non-web links. Integration tests on the emulator cover the reset reply for known and unknown accounts, the reset link pointing at our page, the per-address and per-IP limits, the log (without the link) and skipped local sends, plus the confirmation email for a new password account, the welcome for an account without a password, and that neither repeats. `scripts/email-check.ts`, run in CI, drives "Forgot password?" in the sign-in dialog and the account page: the code leaves the address bar, mismatched passwords are caught, the new password signs in, a used link explains itself, and the page fits a 390 px screen. No email is sent through SendGrid in tests.
 
-## Next
+## Editing in the admin dashboard
 
-The admin Emails tab: edit and preview each template, send a test, rewrite with AI, publish versions and read the email log.
+The Emails tab in `/admin` lists each email with what is being sent (the default or a version number) and whether it has unpublished changes.
+
+- **Edit** the subject, preview text, heading, paragraphs (one to six), button label and small print. Problems such as an unsupported placeholder show in place before saving.
+- **Preview** renders with the same `renderEmail` that sends real email, at desktop or phone width, for a reader named Robin. Button links in previews and tests use a code that never works.
+- **Rewrite with AI** sends the current fields, the email's purpose and the admin's request to Claude (`services/api/email-ai.ts`) with a brand-voice guide: warm, clear and confident, plain words, no hype, keep every fact and security note, invent nothing, only `{{name}}`, no links in text. The reply has exactly the email's fields and is checked against the same rules; it replaces the editor's fields as unsaved changes, with an undo. It is recorded in AI usage as writing help.
+- **Save draft** stores the edit without sending it. **Send test to me** sends the editor's current content, saved or not, to the admin's own address with "[Test]" in the subject (20 per admin per hour). **Publish** (a second click confirms) turns the draft into the next version, sent from then on. **Restore to draft** copies any earlier version, or the built-in default, into the draft; it is published like any other change. **Discard draft** drops unpublished changes.
+- **Email log** lists the latest 100 sends with version, recipient, status and reason.
+
+Saves, publishes, restores and discards are idempotent by key, revision-checked (a stale tab gets a reload message) and audited with the actor in the same transaction; test sends are audited too. Admin routes: `GET /api/admin/emails`, `POST /api/admin/emails/{id}` with an `action` of `save`, `publish`, `restore`, `discard`, `test` or `rewrite` (`adminEmailCommandSchema` in `packages/contracts/email.ts`), and `GET /api/admin/email-log`.
