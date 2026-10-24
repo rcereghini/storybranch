@@ -1,5 +1,7 @@
 # Storybranch technical architecture
 
+For current Story work, read [the Story system index](story-system/README.md), [target architecture](story-system/architecture.md) and [current-state review](story-system/current-state-review.md). They own the detailed StoryNode/context design and distinguish implemented services from production targets below. This document retains the broader platform design; illustrative structures are not an inventory of deployed services.
+
 Use a TypeScript domain layer shared by a responsive React web client and future native clients. Firebase provides identity and persisted data. Vercel hosts the web application and short request handlers. Expensive media work uses durable job records and asynchronous workers.
 
 All choices below are proposed implementation defaults except the user selected React, TypeScript, Firebase, and Vercel stack. Pin supported dependency versions when implementation begins.
@@ -8,7 +10,7 @@ Hosting moved from Netlify to Vercel on October 15, 2026 (C02 in the [decision r
 
 ## Application structure
 
-The current player uses `Story` context and a shared `Page` parent for text, text/options, video, video/options and dice. The portable graph is `Story.pages`; see [Story and Page model](16-story-pages.md) for contracts, state ownership and prototype format changes.
+The current player uses `Story` context and a shared `Page` parent for text, text/options, video, video/options, dice, reveal and comic. The portable graph is `Story.pages`; see [Story and Page model](16-story-pages.md) for current contracts and prototype format changes, and [the context architecture](story-system/architecture.md#logical-contexts-and-react-composition) for target ownership.
 
 ```text
 apps/web                  React web routes and interface

@@ -11,6 +11,13 @@ docs/01-product-requirements.md, docs/02-game-and-community-rules.md, and
 docs/10-decisions-and-open-questions.md before making changes. Then read the
 architecture, contracts, and acceptance criteria relevant to this task.
 
+Before planning, read root and applicable scoped AGENTS.md files,
+CONTRIBUTING.md and docs/development-workflow.md. For Story work, start with
+docs/story-system/README.md and docs/16-story-pages.md, then follow the task's
+reading set. Cite relevant rules and distinguish target design from current
+support. Do not restore historical node-only formats from older examples.
+Complete the documentation-impact review before committing.
+
 Preserve these invariants: published story versions are immutable; saved runs
 pin their versions; side quests have independent saves; shared account stats
 are distinct from local story state; a location permits multiple community

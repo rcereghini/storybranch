@@ -1,5 +1,7 @@
 # Storybranch data and API contracts
 
+For Story changes, [Story data/storage](story-system/data-storage.md), [keys/imports](story-system/keys.md) and the [context documents](story-system/README.md) own the current target design. The old `draftNodes`, `nodes`, `targetNodeId` paths/types below are historical illustrative sketches, not supported APIs or a request to rename the current `pages` format. Use [docs/16](16-story-pages.md) and the [current-state review](story-system/current-state-review.md) for implemented behavior. Future command families below remain proposals.
+
 The following logical model is a proposed schema, suitable for implementation planning. Collection paths are illustrative but ownership, separation of public and private data, and concurrency guarantees are required. Monetary amounts use integers in explicitly named units. Dates are server timestamps.
 
 ## Persisted entities

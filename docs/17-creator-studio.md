@@ -1,5 +1,7 @@
 # Creator Studio alpha
 
+This document describes current Studio behavior. Future authoring changes must also read [StoryNodes](story-system/story-nodes.md), [type contracts](story-system/page-types.md) and [AI authoring](story-system/ai-authoring.md). The target starts a new Story genuinely blank and makes templates explicit; today's automatic starter pages below remain a documented implementation gap. No editor behavior changes in this documentation update.
+
 Open **Create** in the main navigation (or `/studio`) and sign in. The Studio page lists your drafts; **New story**, **New quiz**, **New comic** or a draft opens the editor, which fills the window below the app header (the footer and phone tab bar step aside, and **←** returns to the drafts after saving). Each new story starts with an opening and an ending. An ending closes the story and uses the existing replay/recommendation shell.
 
 ## Editor layout

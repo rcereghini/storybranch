@@ -1,5 +1,7 @@
 # Story and Page model
 
+Status: current implementation contract and enduring Story/Page invariants. For the target StoryNode system, read [the Story system index](story-system/README.md) and [decisions](story-system/decisions.md) before planning changes. StoryNode means a graph placement; StoryPage is its presentation inside the existing shared `Page`/`Story` lifecycle. This terminology does not restore the removed node-only wire format. Current and target behavior are distinguished in [the October 23 review](story-system/current-state-review.md).
+
 ## Required contract for every page type
 
 This is a requirement for all current and future types, including RPG turn-based battles. A page type is a child renderer of `Page`, never a parallel player architecture. It must declare **Input → Page type → Completion event → Output(s)**. A page must lead onward or deliberately close its branch; an unexplained dead end is invalid.
@@ -13,6 +15,18 @@ This is a requirement for all current and future types, including RPG turn-based
 | `text, results[score → resultPage] → Reveal` | Reveal button click | Two to twelve results; the server follows the result with the highest score, a tie going to the first listed |
 | `nextPage, comic{layout, panels[image, caption, alt]} → Comic` | Next button click (in a scrolling strip it follows the last panel and is never locked behind scrolling) | One: Next page; zero at an ending |
 | Future battle configuration → RPG turn-based battle | Server-validated battle completion, then the type's documented confirmation event | Declared outcomes such as Win/Loss, using the same routing lifecycle |
+
+The target catalogue below declares future contracts before implementation. Its field descriptions are typed design requirements, not fields accepted by the current schema. See [the complete type catalogue](story-system/page-types.md) for config/input/result distinctions, authority, bounds and recovery requirements.
+
+| Target type / status | Typed input and configuration | Completion trigger | Output destinations |
+| --- | --- | --- | --- |
+| GraphicNovel — deferred | Ordered bounded spreads/panels, reading direction, bookmark; optional declared choice slots | Explicit Finish or chosen output; internal page turns remain on the node | One `next`, or named choice outputs, each bound to a node |
+| Form — deferred | Versioned allowlisted field schemas, typed defaults and optional private response draft | Server-validated Submit; optional explicit Cancel | `submitted` and enabled `cancelled` outputs to authored nodes; invalid input stays on the form |
+| TurnBasedBattle — deferred | Versioned encounter/actors/actions; party/resources snapshot; enum initiative/pre-emptive mode and registered bounded buffs | Server persists turns and terminal result; explicit Continue follows it | `win`, `loss`, configured `escape`; turn-limit disposition resolves to an authored outcome/node |
+| Advertisement — deferred | Labeled placement, provider/mode/fallback config; verified eligibility/consent projection | Verified provider completion if rewarded; otherwise explicit continue/skip; bounded unavailable handling | `completed`, `skipped`, `unavailable` to authored nodes; only verified completion can grant an approved reward |
+| StoryLeaf — conceptual endpoint, currently `kind: ending` | Ending presentation/summary and story-or-branch completion intent | Committed entry closes the current run once | No authored in-story output; shared replay, parent-return and discovery exits |
+
+ComicStrip currently maps to `comic` with `layout: "scroll"`; Comic grid uses `layout: "grid"`. Text/Video options remain explicit variants. The target typed input/output registry, result bindings, visit state, empty-draft flow and cross-story imports are not implemented by this documentation update. Every new implementation must update this table and its detailed target contract together.
 
 Concrete storage mapping: `text` is `transcript`, `videoUrl` is `video` (a shipped `/media/...` clip or `asset:<assetId>` for an uploaded clip), and `nextPage` is the one direct choice's `route.targetPageId`. Options are `choices` with conditions and routes. Dice range is 1–`sides`; `target` defines passing values, and `success.targetPageId`/`failure.targetPageId` are Pass/Fail. A reveal's results are its one choice's `outcome.results`, each a namespaced `scoreId` and a route. These aliases describe authoring intent, not duplicate persisted fields.
 
@@ -78,7 +92,7 @@ A result page is any ending a reveal can lead to (`isResultPage` in the domain).
 
 ## Mock stories
 
-Creators can now author these same six types through [Creator Studio](17-creator-studio.md). Private preview uses the shared Story/Page renderers and a disposable engine state; published play remains server-authoritative. Publication freezes a new edition without changing the input/output contracts below.
+Creators can now author all seven current types through [Creator Studio](17-creator-studio.md). Private preview uses the shared Story/Page renderers and a disposable engine state; published play remains server-authoritative. Publication freezes a new edition without changing the input/output contracts below.
 
 - **The Clockwork Door:** linear text → key/stat-gated text options → linear video → text ending. Includes an alternate early ending.
 - **The Storm Signal:** video options → d20 check → pass/fail destinations; a saved success key unlocks the rescue route.
