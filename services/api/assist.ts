@@ -215,6 +215,7 @@ export async function assist(
   uid: string,
   segments: string[],
   features: Features,
+  limits: AppSettings["limits"],
 ): Promise<AssistResult> {
   if (request.method !== "POST" || segments.length !== 2)
     throw new GameError("NOT_FOUND", "Route not found.");
@@ -224,8 +225,7 @@ export async function assist(
   const command = assistCommandSchema.parse(await request.json());
   const fingerprint = digest(JSON.stringify(legacyStoryData(command)));
   const receipt = db.doc(paths.receipt(uid, "assist", command.idempotencyKey));
-  const day = Math.floor(Date.now() / 86400000);
-  const quota = db.doc(`copilotQuotas/${digest(uid)}-${day}`);
+  const quota = db.doc(paths.aiQuota(uid));
   const started = await db.runTransaction(async (tx) => {
     const [previous, used] = await Promise.all([
       tx.get(receipt),
@@ -246,10 +246,10 @@ export async function assist(
           "Still writing that suggestion.",
         );
     }
-    if ((used.data()?.count ?? 0) >= settings.limits.aiRequestsPerDay)
+    if ((used.data()?.count ?? 0) >= limits.aiRequestsPerDay)
       throw new GameError(
         "VALIDATION_FAILED",
-        `Daily AI limit reached (${settings.limits.aiRequestsPerDay} requests). Try again tomorrow.`,
+        `Daily AI limit reached (${limits.aiRequestsPerDay} requests). Try again tomorrow.`,
       );
     tx.set(receipt, {
       actor: uid,

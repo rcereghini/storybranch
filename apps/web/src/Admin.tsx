@@ -4,13 +4,10 @@ import type {
   AdminAuditEntry,
   AdminOverview,
   AdminStory,
-  AdminUser,
 } from "../../../packages/contracts/admin";
-import {
-  featureIds,
-  type FeatureId,
-  type Features,
-} from "../../../packages/contracts/profile";
+import type { FeatureId, Features } from "../../../packages/contracts/profile";
+import type { AccountLimits } from "../../../packages/contracts/settings";
+import { AdminUsers, featureLabels } from "./AdminUsers";
 import { AdminUsage, usd } from "./AdminUsage";
 import { AdminEmails } from "./AdminEmails";
 import { AdminSettings, settingLabel, settingValue } from "./AdminSettings";
@@ -35,20 +32,13 @@ const tabs: Array<[Tab, string]> = [
   ["settings", "Settings"],
   ["activity", "Activity"],
 ];
-const featureLabels: Record<FeatureId, string> = {
-  publish: "Publish",
-  generate: "Generate",
-  copilot: "Copilot",
-  admin: "Admin",
-};
-const when = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString() : "—";
-
 function describe(entry: AdminAuditEntry) {
   const change = entry.change as {
     features?: Partial<Features>;
     status?: string;
     hidden?: boolean;
+    limits?: AccountLimits;
+    resetToday?: Array<"ai" | "images">;
   };
   if (entry.action === "settings") {
     const { changes = [] } = entry.change as {
@@ -81,6 +71,14 @@ function describe(entry: AdminAuditEntry) {
     ...(change.status
       ? [change.status === "disabled" ? "disabled the account" : "re-enabled the account"]
       : []),
+    ...(change.limits
+      ? [
+          `set daily limits to ${change.limits.aiRequestsPerDay ?? "default"} AI requests and ${change.limits.imagesPerDay ?? "default"} images`,
+        ]
+      : []),
+    ...(change.resetToday ?? []).map(
+      (kind) => `reset today's ${kind === "ai" ? "AI requests" : "images"}`,
+    ),
   ];
   return `${parts.join(", ")} for ${entry.target}`;
 }
@@ -96,20 +94,15 @@ export function Admin({
 }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [overview, setOverview] = useState<AdminOverview | null>(null);
-  const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [stories, setStories] = useState<AdminStory[] | null>(null);
   const [audit, setAudit] = useState<AdminAuditEntry[] | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
 
   const load = async (which: Tab) => {
     try {
       if (which === "overview")
         setOverview(await api<AdminOverview>("/admin/overview"));
-      if (which === "users")
-        setUsers((await api<{ items: AdminUser[] }>("/admin/users")).items);
       if (which === "stories")
         setStories((await api<{ items: AdminStory[] }>("/admin/stories")).items);
       if (which === "activity")
@@ -125,7 +118,6 @@ export function Admin({
   const change = async (key: string, run: () => Promise<void>) => {
     setBusy(key);
     setNotice("");
-    setConfirming(null);
     try {
       await run();
       setAudit(null);
@@ -135,17 +127,6 @@ export function Admin({
       setBusy(null);
     }
   };
-  const updateUser = (user: AdminUser, body: { features?: Partial<Features>; status?: "active" | "disabled" }) =>
-    change(`user-${user.uid}`, async () => {
-      const result = await api<Pick<AdminUser, "uid" | "status" | "features">>(
-        `/admin/users/${user.uid}`,
-        { idempotencyKey: crypto.randomUUID(), ...body },
-      );
-      setUsers((current) =>
-        current?.map((u) => (u.uid === result.uid ? { ...u, ...result } : u)) ?? null,
-      );
-      setOverview(null);
-    });
   const setHidden = (story: AdminStory, hidden: boolean) =>
     change(`story-${story.id}`, async () => {
       await api(`/admin/stories/${story.id}`, {
@@ -158,11 +139,6 @@ export function Admin({
       setOverview(null);
     });
 
-  const shown = (users ?? []).filter((u) =>
-    `${u.email ?? ""} ${u.displayName} ${u.uid}`
-      .toLowerCase()
-      .includes(search.trim().toLowerCase()),
-  );
 
   return (
     <div className="hub admin">
@@ -221,120 +197,16 @@ export function Admin({
       {tab === "usage" && <AdminUsage api={api} onError={setNotice} />}
 
       {tab === "users" && (
-        <section className="panel">
-          <div className="row-head">
-            <h2 className="panel-title">Users</h2>
-            <input
-              className="admin-search"
-              type="search"
-              placeholder="Search email, name or ID"
-              aria-label="Search users"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          {users ? (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Account</th>
-                    <th>Status</th>
-                    <th>Last sign-in</th>
-                    <th>Features</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((user) => {
-                    const self = user.uid === uid;
-                    const key = `user-${user.uid}`;
-                    const noProfile = user.status === "no-profile";
-                    return (
-                      <tr key={user.uid}>
-                        <td>
-                          <strong>{user.displayName}</strong>
-                          <span className="admin-sub">{user.email ?? "No email"}</span>
-                          <code className="admin-sub">{user.uid}</code>
-                        </td>
-                        <td>
-                          <span className={`admin-badge admin-${user.status}`}>
-                            {noProfile ? "Never opened the app" : user.status}
-                          </span>
-                        </td>
-                        <td>{when(user.lastSignIn)}</td>
-                        <td>
-                          <div className="admin-flags">
-                            {featureIds.map((feature) => {
-                              const implied = feature !== "admin" && user.features.admin;
-                              const on = user.features[feature] || implied;
-                              const lockout = self && feature === "admin";
-                              const confirmKey = `${key}-admin`;
-                              return (
-                                <label
-                                  key={feature}
-                                  className="admin-flag"
-                                  title={
-                                    implied
-                                      ? "Included with admin"
-                                      : lockout
-                                        ? "You can't remove your own admin access"
-                                        : undefined
-                                  }
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={on}
-                                    disabled={noProfile || implied || lockout || busy === key}
-                                    onChange={(e) => {
-                                      // Removing admin takes a second click.
-                                      if (feature === "admin" && !e.target.checked && confirming !== confirmKey) {
-                                        setConfirming(confirmKey);
-                                        setNotice(`Click Admin again to remove ${user.email ?? user.uid}'s admin access.`);
-                                        return;
-                                      }
-                                      void updateUser(user, { features: { [feature]: e.target.checked } });
-                                    }}
-                                  />
-                                  {featureLabels[feature]}
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </td>
-                        <td>
-                          {!noProfile && !self && (
-                            <button
-                              className="admin-action"
-                              disabled={busy === key}
-                              onClick={() => {
-                                const next = user.status === "active" ? "disabled" : "active";
-                                if (next === "disabled" && confirming !== `${key}-disable`) {
-                                  setConfirming(`${key}-disable`);
-                                  return;
-                                }
-                                void updateUser(user, { status: next });
-                              }}
-                            >
-                              {user.status === "active"
-                                ? confirming === `${key}-disable`
-                                  ? "Confirm disable"
-                                  : "Disable"
-                                : "Enable"}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {!shown.length && <p className="admin-empty">No accounts match.</p>}
-            </div>
-          ) : (
-            <div className="admin-placeholder" aria-hidden="true" />
-          )}
-        </section>
+        <AdminUsers
+          api={api}
+          uid={uid}
+          onNotice={setNotice}
+          onChanged={() => {
+            setOverview(null);
+            setAudit(null);
+          }}
+          describe={describe}
+        />
       )}
 
       {tab === "stories" && (

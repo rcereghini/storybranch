@@ -19,6 +19,7 @@ import {
 import { ensurePlayerProfile } from "./player-profile";
 import { passwordReset, sendAccountEmail } from "./email";
 import { appSettings } from "./settings";
+import { effectiveLimits } from "../../packages/contracts/settings";
 import { accountFeatures } from "../../packages/contracts/profile";
 import { newAccountFeatures } from "./access";
 import { authoring } from "./authoring";
@@ -198,6 +199,8 @@ async function handleCanonical(request: Request): Promise<Response> {
       );
     // Gated features read the account's flags from the profile just loaded.
     const features = accountFeatures(profile.data());
+    // Daily limits: the person's own, else the defaults in Settings.
+    const limits = effectiveLimits(profile.data(), await appSettings());
     if (segments[1] === "studio")
       return json(
         await authoring(request, uid, segments, cursor, limit, features),
@@ -205,14 +208,14 @@ async function handleCanonical(request: Request): Promise<Response> {
     if (segments[1] === "uploads")
       return json(await uploads(request, uid, segments, features));
     if (segments[1] === "generation")
-      return json(await generation(request, uid, segments, features));
+      return json(await generation(request, uid, segments, features, limits));
     if (segments[1] === "assist")
-      return json(await assist(request, uid, segments, features));
+      return json(await assist(request, uid, segments, features, limits));
     if (segments[1] === "admin")
       return json(await admin(request, uid, segments, features));
     // Streams its reply, so it builds its own response.
     if (segments[1] === "copilot")
-      return await copilot(request, uid, segments, features);
+      return await copilot(request, uid, segments, features, limits);
     if (segments[1] === "story-nodes")
       return json(
         await storyNodeLibrary(request, uid, segments, cursor, limit, features),

@@ -19,7 +19,7 @@ The account must have signed up; if it has never opened the app, the command cre
 |---|---|---|
 | Overview | Users, admins, disabled accounts, published and hidden stories, drafts, playthroughs, AI requests and estimated AI spend over 30 days | Nothing |
 | Usage & spend | For the last 7, 30 or 90 UTC days: estimated spend, AI requests, images and refusals; requests per day; totals per feature (Copilot, writing help, images); the 20 heaviest users | Nothing |
-| Users | Every sign-up with email, display name, status, last sign-in and stored feature flags (search by email, name or ID) | Turn features on or off; disable or re-enable an account |
+| Users | Sign-ups, newest sign-in first, 50 at a time: search by email, name or ID and filter by status or access, all on the server. Each opens a detail page: email and whether it's confirmed, sign-in methods, joined and last sign-in, access, daily limits and today's usage, published stories, drafts, playthroughs, 30-day AI usage and spend, recent emails and the admin changes made to it | Turn features on or off; disable or re-enable; set the account's own daily limits; reset today's usage |
 | Stories | Published stories with creator, current edition and Discover status | Hide a story from Discover or show it again |
 | Emails | Each system email with what is being sent, a live preview, version history and the email log | Edit, rewrite with AI, send a test to yourself, save a draft, publish, restore an earlier version or the default (see `22-system-emails.md`) |
 | Settings | App-wide settings and who last changed them | Daily limits, AI switches, new-account access and the prices behind spend estimates (below) |
@@ -28,7 +28,8 @@ The account must have signed up; if it has never opened the app, the command cre
 ## Rules
 
 - **No self-lockout.** An admin cannot remove their own admin flag or disable their own account; another admin has to. So the API can never remove the last admin. (`pnpm features revoke` can, deliberately.)
-- **Disabling** sets the profile `status` to `disabled`; the API refuses the account on its next request. Nothing is deleted, and enabling restores it.
+- **Disabling** sets the profile `status` to `disabled`, revokes the account's sessions and blocks Firebase sign-in, so it is signed out everywhere at once (live tokens are checked for revocation) and can't sign in or request a password reset. Enabling unblocks sign-in; they then sign in again. Nothing is deleted.
+- **Own limits** are stored on the profile (`limits`, `accountLimitsSchema` in `packages/contracts/settings.ts`); a blank value uses the default in Settings, and 0 stops new requests. **Reset today** deletes that day's count for AI requests or images.
 - **Hiding a story** sets `hidden` on its `catalogue/{storyId}` entry: it leaves Discover, new playthroughs are refused, and dashboards stop recommending it. Players who already started keep their saves, which stay pinned to their edition, and still see it on their dashboard. Republishing keeps the flag. Immutable editions are never changed or deleted.
 - **Every change** is idempotent by key (a retry returns the first result) and written to `adminAudit/{id}` with the actor's uid and email, in the same transaction as the change.
 
@@ -39,8 +40,9 @@ All routes need the `admin` feature.
 | Route | Purpose |
 |---|---|
 | `GET /api/admin/overview` | Counts for the Overview |
-| `GET /api/admin/users` | Accounts (Firebase Auth joined with profiles) |
-| `POST /api/admin/users/{uid}` | `{ idempotencyKey, features?: { [feature]: boolean }, status?: "active" \| "disabled" }` |
+| `GET /api/admin/users?q=&status=&feature=&cursor=` | One page of 50 accounts matching the search and filters, with the total (`AdminUsersPage`). Firebase Auth can't search, so the server reads the first 10,000 sign-ups and their profiles, keeps them for 30 seconds, and searches those; a larger app needs the email copied onto profiles for indexed search |
+| `GET /api/admin/users/{uid}` | One account's detail page (`AdminUserDetail`) |
+| `POST /api/admin/users/{uid}` | `{ idempotencyKey, features?: { [feature]: boolean }, status?: "active" | "disabled", limits?: { aiRequestsPerDay, imagesPerDay }, resetToday?: ["ai" | "images"] }` |
 | `GET /api/admin/stories` | Catalogue entries with creator and hidden flag |
 | `POST /api/admin/stories/{storyId}` | `{ idempotencyKey, hidden }` |
 | `GET /api/admin/audit` | Latest 100 audit entries |
@@ -73,7 +75,7 @@ Estimated spend (`packages/domain/usage.ts`) multiplies the totals by the prices
 
 ## Verification
 
-Unit tests cover admin implying every feature and hidden stories on the dashboard. An emulator integration test covers member refusal on every route, feature changes, retries and key conflicts, the self-lockout rules, disabling and re-enabling, hiding (Discover, new starts refused, existing saves still play, dashboard kept but not recommended) and the audit log. Another records Claude usage (including a fallback step at its own model) and image outcomes for a new user and checks the report, the overview totals, the period validation and member refusal; unit tests cover the estimates and UTC day ranges. `scripts/admin-check.ts`, run in CI, drives the admin view as the local admin: navigation, overview, a feature toggle, locked self controls, hide and show, activity, the Usage tab (one bar per day, the period switch, a hover readout that leaves the chart in place), no horizontal overflow at 1024 and 390 px, and a member seeing neither the nav item nor the admin view.
+Unit tests cover admin implying every feature and hidden stories on the dashboard. An emulator integration test covers member refusal on every route, feature changes, retries and key conflicts, the self-lockout rules, disabling and re-enabling, hiding (Discover, new starts refused, existing saves still play, dashboard kept but not recommended) and the audit log. Another records Claude usage (including a fallback step at its own model) and image outcomes for a new user and checks the report, the overview totals, the period validation and member refusal; unit tests cover the estimates and UTC day ranges. `scripts/admin-check.ts`, run in CI, drives the admin view as the local admin: navigation, overview, a feature toggle, locked self controls, hide and show, activity, the Usage tab (one bar per day, the period switch, a hover readout that leaves the chart in place), no horizontal overflow at 1024 and 390 px, and a member seeing neither the nav item nor the admin view. A users test covers server search, status and access filters, page size, the detail page, own limits (invalid values refused; 0 stops Copilot), resetting today's count, and disabling (sessions revoked, sign-in blocked, listed as disabled) and enabling; the browser check also searches, filters, opens a member's page, sets and clears an own limit, and checks a phone-width layout.
 
 ## Site analytics
 

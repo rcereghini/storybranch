@@ -2,9 +2,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appSettingsSchema,
   defaultAppSettings,
+  effectiveLimits,
   settingsChanges,
+  storedAccountLimits,
   type AppSettings,
 } from "../packages/contracts/settings";
+import { adminUserCommandSchema } from "../packages/contracts/admin";
 import { allFeatures, memberFeatures } from "../packages/contracts/profile";
 import {
   newAccountFeatures,
@@ -116,5 +119,49 @@ describe("Feature switches", () => {
         with_((s) => (s.newAccounts.copilot = true)),
       ),
     ).toEqual({ publish: false, generate: false, copilot: true, admin: false });
+  });
+});
+
+describe("Account limits", () => {
+  it("uses an account's own limit where set, else the Settings default", () => {
+    const settings = with_((s) => (s.limits.imagesPerDay = 30));
+    expect(effectiveLimits(undefined, settings)).toEqual({
+      aiRequestsPerDay: 100,
+      imagesPerDay: 30,
+    });
+    expect(
+      effectiveLimits(
+        { limits: { aiRequestsPerDay: 0, imagesPerDay: null } },
+        settings,
+      ),
+    ).toEqual({ aiRequestsPerDay: 0, imagesPerDay: 30 });
+    // A broken stored value is ignored rather than trusted.
+    expect(storedAccountLimits({ limits: { aiRequestsPerDay: -5 } })).toEqual({
+      aiRequestsPerDay: null,
+      imagesPerDay: null,
+    });
+  });
+
+  it("accepts admin user changes only with something to change", () => {
+    const key = "key-12345678";
+    for (const ok of [
+      { limits: { aiRequestsPerDay: 5, imagesPerDay: null } },
+      { resetToday: ["ai", "images"] },
+      { status: "disabled" },
+    ])
+      expect(
+        adminUserCommandSchema.safeParse({ idempotencyKey: key, ...ok })
+          .success,
+      ).toBe(true);
+    for (const bad of [
+      {},
+      { limits: { aiRequestsPerDay: 5 } },
+      { resetToday: [] },
+      { resetToday: ["everything"] },
+    ])
+      expect(
+        adminUserCommandSchema.safeParse({ idempotencyKey: key, ...bad })
+          .success,
+      ).toBe(false);
   });
 });

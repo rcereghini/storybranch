@@ -30,6 +30,15 @@ export const clipFile = clip;
 export const copilotThread = (uid: string, threadId: string) =>
   `users/${uid}/copilot/${threadId}`;
 
+// Today's request counts for the daily limits, per UTC day. Copilot and
+// Studio writing help share the AI count.
+export const utcDay = (now = Date.now()) => Math.floor(now / 86400000);
+const hashed = (uid: string) => createHash("sha256").update(uid).digest("hex");
+export const aiQuota = (uid: string, day = utcDay()) =>
+  `copilotQuotas/${hashed(uid)}-${day}`;
+export const imageQuota = (uid: string, day = utcDay()) =>
+  `generationQuotas/${hashed(uid)}-${day}`;
+
 // Receipts only answer retries of the same command, so a TTL policy on the
 // receipts collection group deletes them after expireAt.
 const RECEIPT_DAYS = 30;

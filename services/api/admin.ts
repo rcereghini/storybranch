@@ -4,6 +4,7 @@ import { GameError } from "../../packages/contracts/index";
 import {
   adminStoryCommandSchema,
   adminUserCommandSchema,
+  adminUsersQuerySchema,
   type AdminAuditEntry,
   type AdminOverview,
   type AdminStory,
@@ -34,6 +35,8 @@ import {
   settingsChanges,
 } from "../../packages/contracts/settings";
 import { emailCommand, emailLog, listEmails } from "./admin-emails";
+import { clearUsersCache, listUsers, userDetail } from "./admin-users";
+import { storedAccountLimits } from "../../packages/contracts/settings";
 
 // Admin routes: everything here is reached only by accounts whose features
 // include admin; the handler passes the effective flags in.
@@ -109,41 +112,14 @@ export async function admin(
     return usageReport(days);
   }
 
-  if (request.method === "GET" && area === "users" && !target) {
-    const [users, profiles] = await Promise.all([
-      allAuthUsers(),
-      db.collection("users").get(),
-    ]);
-    const byUid = new Map(profiles.docs.map((d) => [d.id, d.data()]));
-    const list: AdminUser[] = users.map((u) => {
-      const profile = byUid.get(u.uid);
-      return {
-        uid: u.uid,
-        email: u.email ?? null,
-        displayName:
-          (typeof profile?.displayName === "string" && profile.displayName) ||
-          u.displayName ||
-          "Player",
-        status: !profile
-          ? "no-profile"
-          : profile.status === "active"
-            ? "active"
-            : "disabled",
-        features: storedFeatures(profile),
-        createdAt: u.metadata.creationTime
-          ? new Date(u.metadata.creationTime).toISOString()
-          : null,
-        lastSignIn: u.metadata.lastSignInTime
-          ? new Date(u.metadata.lastSignInTime).toISOString()
-          : null,
-      };
-    });
-    return {
-      items: list.sort((a, b) =>
-        (b.lastSignIn ?? "").localeCompare(a.lastSignIn ?? ""),
+  if (request.method === "GET" && area === "users" && !target)
+    return listUsers(
+      adminUsersQuerySchema.parse(
+        Object.fromEntries(new URL(request.url).searchParams),
       ),
-    };
-  }
+    );
+  if (request.method === "GET" && area === "users" && target)
+    return userDetail(target);
 
   if (request.method === "GET" && area === "stories" && !target) {
     const catalogue = await db
@@ -261,36 +237,60 @@ export async function admin(
           "You cannot disable your own account.",
         );
     }
-    return run(uid, actorEmail, command.idempotencyKey, command, async (tx) => {
-      const snapshot = await tx.get(ref);
-      if (!snapshot.exists)
-        throw new GameError(
-          "NOT_FOUND",
-          "This account has no profile yet. It is created on first sign-in.",
-        );
-      const change: Record<string, unknown> = {};
-      for (const [feature, on] of Object.entries(command.features ?? {}))
-        change[`features.${feature}`] = on;
-      if (command.status) change.status = command.status;
-      tx.update(ref, change);
-      const before = snapshot.data()!;
-      const status = command.status ?? before.status;
-      const merged = {
-        features: { ...(before.features ?? {}), ...(command.features ?? {}) },
-      };
-      return {
-        audit: {
-          action: "user",
-          target,
-          change: { ...command, idempotencyKey: undefined },
-        },
-        result: {
-          uid: target,
-          status: status === "active" ? "active" : "disabled",
-          features: storedFeatures(merged),
-        },
-      };
-    });
+    const result = await run(
+      uid,
+      actorEmail,
+      command.idempotencyKey,
+      command,
+      async (tx) => {
+        const snapshot = await tx.get(ref);
+        if (!snapshot.exists)
+          throw new GameError(
+            "NOT_FOUND",
+            "This account has no profile yet. It is created on first sign-in.",
+          );
+        const change: Record<string, unknown> = {};
+        for (const [feature, on] of Object.entries(command.features ?? {}))
+          change[`features.${feature}`] = on;
+        if (command.status) change.status = command.status;
+        if (command.limits) change.limits = command.limits;
+        if (Object.keys(change).length) tx.update(ref, change);
+        for (const kind of command.resetToday ?? [])
+          tx.delete(
+            db.doc(
+              kind === "ai" ? paths.aiQuota(target) : paths.imageQuota(target),
+            ),
+          );
+        const before = snapshot.data()!;
+        const status = command.status ?? before.status;
+        const merged = {
+          features: { ...(before.features ?? {}), ...(command.features ?? {}) },
+          limits: command.limits ?? before.limits,
+        };
+        return {
+          audit: {
+            action: "user",
+            target,
+            change: { ...command, idempotencyKey: undefined },
+          },
+          result: {
+            uid: target,
+            status: status === "active" ? "active" : "disabled",
+            features: storedFeatures(merged),
+            limits: storedAccountLimits(merged),
+          },
+        };
+      },
+    );
+    clearUsersCache();
+    // Disabling also signs them out everywhere at once (tokens are checked for
+    // revocation) and blocks signing in until an admin enables them again.
+    if (command.status === "disabled") {
+      await auth.revokeRefreshTokens(target);
+      await auth.updateUser(target, { disabled: true });
+    } else if (command.status === "active")
+      await auth.updateUser(target, { disabled: false });
+    return result;
   }
 
   if (area === "stories") {
