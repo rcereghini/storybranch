@@ -168,7 +168,27 @@ try {
   });
 
   await tab.setViewportSize({ width: 390, height: 844 });
-  assert.equal(await overflow(), false, "Horizontal overflow on Emails at 390");
+  // On failure, name the elements that stick out past the screen.
+  const wide = await tab.evaluate(() =>
+    [...document.querySelectorAll(".admin *")]
+      .filter((e) => e.getBoundingClientRect().right > innerWidth + 1)
+      .filter(
+        (e) =>
+          ![...e.children].some(
+            (c) => c.getBoundingClientRect().right > innerWidth + 1,
+          ),
+      )
+      .slice(0, 8)
+      .map(
+        (e) =>
+          `${e.tagName.toLowerCase()}.${e.className} (${Math.round(e.getBoundingClientRect().right)}px)`,
+      ),
+  );
+  assert.equal(
+    await overflow(),
+    false,
+    `Horizontal overflow on Emails at 390: ${wide.join(", ")}`,
+  );
   await sections.getByRole("button", { name: "Usage & spend" }).click();
   await tab.locator(".admin-bar").first().waitFor();
   assert.equal(await overflow(), false, "Horizontal overflow on Usage at 390");
