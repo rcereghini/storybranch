@@ -113,7 +113,11 @@ export function AccountAction({
   return (
     <div className="account-action">
       {/* The card keeps its place while the link is checked. */}
-      <section className="modal" aria-busy={state.kind === "checking"}>
+      <section
+        className="modal"
+        aria-busy={state.kind === "checking"}
+        aria-live="polite"
+      >
         {state.kind === "checking" ? (
           <div className="account-action-placeholder" aria-hidden="true" />
         ) : state.kind === "reset" ? (
@@ -166,7 +170,7 @@ export function AccountAction({
         ) : (
           <>
             <p className="eyebrow">ACCOUNT</p>
-            <h1 role={state.kind === "invalid" ? "alert" : undefined}>
+            <h1>
               {state.kind === "done" ? state.title : "This link didn't work."}
             </h1>
             <p>{state.text}</p>
