@@ -312,7 +312,7 @@ export function AdminOverview({
                         </a>
                       </td>
                       <td>{story.players}</td>
-                      <td>
+                      <td className="cc-completion">
                         <span className="cc-meter">
                           <span
                             style={{

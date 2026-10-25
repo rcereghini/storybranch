@@ -937,6 +937,9 @@
   color: var(--muted);
   font-size: 12px;
 }
+.cc-completion {
+  white-space: nowrap;
+}
 .cc-meter {
   display: inline-block;
   width: 80px;
