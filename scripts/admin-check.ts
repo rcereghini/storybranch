@@ -70,7 +70,11 @@ try {
   await tab.getByText("Last 7 days, compared with the 7 before.").waitFor();
   await tab.getByRole("button", { name: "30 days" }).click();
   await tab.getByText("Last 30 days, compared with the 30 before.").waitFor();
-  assert.equal(await overflow(), false, "Horizontal overflow on Admin at 1024");
+  assert.equal(
+    await overflow(),
+    false,
+    `Horizontal overflow on Admin at 1024: ${await overflowing()}`,
+  );
   await tab.waitForTimeout(300);
   await tab.screenshot({
     path: "test-results/admin-overview.png",
