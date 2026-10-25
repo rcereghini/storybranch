@@ -754,3 +754,225 @@
     border-left: 0;
   }
 }
+
+/* Overview command center. Like .admin, minmax(0, 1fr) keeps a wide table
+   from widening the whole Overview past the screen. */
+.cc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+.cc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cc-title {
+  margin: 0;
+  font: 700 26px/1.2 var(--font-display);
+}
+.cc-summary {
+  margin: 4px 0 0;
+  color: var(--text-body);
+}
+.cc-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cc-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 12px;
+}
+/* min-width 0: a sparkline's default 300px width must not widen a tile. */
+.cc-tile {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+  padding: 16px;
+}
+.cc-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cc-value {
+  font: 700 28px/1.15 var(--font-display);
+}
+.cc-tile-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-height: 1.4em;
+}
+.cc-delta {
+  font-size: 13px;
+  font-weight: 600;
+}
+.cc-vs {
+  color: var(--muted);
+  font-weight: 400;
+}
+.cc-delta-up {
+  color: var(--success);
+}
+.cc-delta-down {
+  color: var(--warning);
+}
+.cc-delta-neutral {
+  color: var(--text-body);
+}
+.cc-spark {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  margin-top: 4px;
+}
+.cc-spark polyline {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+.cc-wide {
+  flex: 2 1 520px;
+  min-width: 0;
+}
+.cc-narrow {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.cc-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.cc-card-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.cc-card-head a {
+  font-size: 13px;
+}
+.cc-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cc-attention {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.cc-attention-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.cc-sev {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.cc-sev-critical {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.cc-sev-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.cc-sev-info {
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+}
+.cc-service {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+}
+.cc-service .cc-muted {
+  text-align: right;
+}
+.cc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.cc-dot-ok {
+  background: var(--success);
+}
+.cc-dot-warning {
+  background: var(--warning);
+}
+.cc-dot-off {
+  border: 2px solid var(--muted);
+  box-sizing: border-box;
+}
+.cc-footnote {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.cc-completion {
+  white-space: nowrap;
+}
+.cc-meter {
+  display: inline-block;
+  width: 80px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  vertical-align: middle;
+  overflow: hidden;
+}
+.cc-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+.cc-feed {
+  display: grid;
+  gap: 2px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.cc-glance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  font-size: 13px;
+}
+.cc-glance strong {
+  color: var(--text);
+}

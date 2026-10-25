@@ -27,6 +27,7 @@ import type {
 } from "../packages/contracts/admin";
 import { aiQuota, imageQuota } from "../services/api/paths";
 import type { SiteAnalytics } from "../packages/contracts/analytics";
+import type { CommandCenter } from "../packages/contracts/command";
 import type {
   AdminAuditPage,
   AdminStoryDetail,
@@ -2166,6 +2167,62 @@ it("resends confirmation, weighs high-quality images, and sorts users", async ()
     clearSettingsCache();
     if (openai === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = openai;
+  }
+});
+it("sums up the period, what needs attention and how services are set up", async () => {
+  expect(
+    (await call("/admin/command?days=30", undefined, "progressed")).status,
+  ).toBe(403);
+  expect((await call("/admin/command?days=8")).status).toBe(400);
+  const failed = `failed-${randomUUID()}`;
+  const job = `stuck-${randomUUID()}`;
+  await db.doc(`emailLog/${failed}`).set({
+    template: "password-reset",
+    version: 0,
+    test: false,
+    to: "someone@storybranch.test",
+    uid: null,
+    status: "failed",
+    detail: "SendGrid returned 403.",
+    at: Date.now(),
+  });
+  // A job still "submitting" long after the time limit counts as uncertain.
+  await db.doc(`generationJobs/${job}`).set({
+    ownerUid: "player",
+    status: "submitting",
+    createdAt: Date.now() - 3600000,
+  });
+  try {
+    const cc = (await call("/admin/command?days=30&path=admin%2Fcommand"))
+      .data as CommandCenter;
+    expect(cc.days).toBe(30);
+    expect(cc.metrics.signups.daily).toHaveLength(30);
+    expect(cc.metrics.activePlayers.previous).toBeNull();
+    expect(cc.metrics.activePlayers.accounts).toBeGreaterThanOrEqual(2);
+    const ids = cc.attention.map((a) => a.id);
+    expect(ids).toContain("failed-emails");
+    expect(ids).toContain("uncertain-images");
+    // Missing keys are expected locally, so they aren't flagged here.
+    expect(ids.some((id) => id.startsWith("missing-"))).toBe(false);
+    expect(cc.attention.find((a) => a.id === "failed-emails")!.detail).toBe(
+      "password-reset: SendGrid returned 403.",
+    );
+    expect(cc.services.map((s) => s.id)).toEqual([
+      "firebase",
+      "anthropic",
+      "openai",
+      "sendgrid",
+      "vercel",
+    ]);
+    expect(cc.services[0]).toMatchObject({
+      state: "ok",
+      detail: "Local emulators",
+    });
+    expect(cc.activity.length).toBeLessThanOrEqual(8);
+    expect(cc.topStories.length).toBeLessThanOrEqual(5);
+  } finally {
+    await db.doc(`emailLog/${failed}`).delete();
+    await db.doc(`generationJobs/${job}`).delete();
   }
 });
 it("applies admin settings to AI switches, daily limits and price estimates", async () => {

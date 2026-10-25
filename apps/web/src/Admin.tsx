@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import type { createApi } from "../../../packages/api-client/index";
 import type {
   AdminAuditEntry,
-  AdminOverview,
+  AdminOverview as Totals,
 } from "../../../packages/contracts/admin";
 import type { FeatureId, Features } from "../../../packages/contracts/profile";
 import type { AccountLimits } from "../../../packages/contracts/settings";
 import { AdminUsers, featureLabels } from "./AdminUsers";
-import { AdminUsage, usd } from "./AdminUsage";
+import { AdminUsage } from "./AdminUsage";
+import { AdminOverview } from "./AdminOverview";
 import { AdminAnalytics } from "./AdminAnalytics";
 import { AdminEmails } from "./AdminEmails";
 import { AdminSettings, settingLabel, settingValue } from "./AdminSettings";
@@ -199,7 +200,7 @@ export function Admin({
   navigate: (path: string) => void;
 }) {
   const { section, id } = route(path);
-  const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [overview, setOverview] = useState<Totals | null>(null);
   // Notifications float over the page and clear themselves, so nothing shifts.
   const [toasts, setToasts] = useState<Array<{ id: number; message: string }>>(
     [],
@@ -215,7 +216,7 @@ export function Admin({
   }, []);
   useEffect(() => {
     if (section === "overview")
-      api<AdminOverview>("/admin/overview")
+      api<Totals>("/admin/overview")
         .then(setOverview)
         .catch((error) => notify((error as Error).message));
   }, [section]);
@@ -306,34 +307,15 @@ export function Admin({
             </section>
           )}
 
-          {section === "overview" &&
-            (overview ? (
-              <div className="admin-stats">
-                {(
-                  [
-                    ["Users", overview.users],
-                    ["Admins", overview.admins],
-                    ["Disabled accounts", overview.disabledUsers],
-                    ["Published stories", overview.publishedStories],
-                    ["Hidden stories", overview.hiddenStories],
-                    ["Drafts", overview.drafts],
-                    ["Playthroughs", overview.playthroughs],
-                    ["AI requests, 30 days", overview.aiRequests30d],
-                    [
-                      "Estimated AI spend, 30 days",
-                      usd(overview.aiEstimatedUsd30d),
-                    ],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div key={label} className="panel admin-stat">
-                    <span>{label}</span>
-                    <strong>{value}</strong>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="admin-placeholder" aria-hidden="true" />
-            ))}
+          {section === "overview" && (
+            <AdminOverview
+              api={api}
+              totals={overview}
+              navigate={navigate}
+              onError={notify}
+              describe={describe}
+            />
+          )}
 
           {section === "usage" && <AdminUsage api={api} onError={notify} />}
 
