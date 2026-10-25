@@ -1,6 +1,7 @@
 import type { PlayerRun as Save } from "../../../packages/contracts/player";
 import type { CatalogueEntry } from "./Discover";
 import { StoryCover } from "./StoryCover";
+import type { ReactNode } from "react";
 
 // docs/03: My Adventures separates active main stories, side quests and
 // completed stories.
@@ -15,6 +16,7 @@ export function Adventures({
   onResume,
   onSignIn,
   onDiscover,
+  children,
 }: {
   signedIn: boolean;
   // False until the first save-list load for this player finishes.
@@ -27,6 +29,7 @@ export function Adventures({
   onResume: (saveId: string) => void;
   onSignIn: () => void;
   onDiscover: () => void;
+  children?: ReactNode;
 }) {
   const titleOf = (s: Save) =>
     catalogue.find((c) => c.id === s.storyId)?.title ??
@@ -130,6 +133,7 @@ export function Adventures({
           Load more adventures
         </button>
       )}
+      {signedIn && children}
     </section>
   );
 }

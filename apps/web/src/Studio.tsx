@@ -29,6 +29,7 @@ import { resolveFixtureMedia } from "../../../fixtures/media";
 import { Story } from "./Story";
 import { StoryNode } from "./StoryNode";
 import { StoryLeafEditor } from "./StoryLeafEditor";
+import { AchievementSubmission } from "./Achievements";
 import { ClipPicker } from "./ClipPicker";
 import { StoryNodeLibrary } from "./Library";
 import { StoryGraph } from "./StoryGraph";
@@ -1508,6 +1509,17 @@ export function Studio({
                         onChange={updateStoryNode}
                       />
                     )}
+                    {storyNode.kind === "ending" &&
+                      draft.publishedVersionId && (
+                        <AchievementSubmission
+                          key={`${draft.story.id}-${draft.publishedVersionId}-${storyNode.id}`}
+                          api={api}
+                          storyId={draft.story.id}
+                          versionId={draft.publishedVersionId}
+                          storyNodeId={storyNode.id}
+                          notify={setNotice}
+                        />
+                      )}
                     {storyNode.kind === "ending" && (
                       <p>
                         This closes the story and offers replay or another

@@ -14,6 +14,7 @@ import { AdminEmails } from "./AdminEmails";
 import { AdminSettings, settingLabel, settingValue } from "./AdminSettings";
 import { AdminStories } from "./AdminStories";
 import { AdminActivity } from "./AdminActivity";
+import { AdminAchievements } from "./Achievements";
 import {
   emailTemplates,
   type EmailTemplateId,
@@ -30,7 +31,9 @@ export type AdminSection =
   | "stories"
   | "emails"
   | "settings"
-  | "activity";
+  | "activity"
+  | "achievements";
+// Account achievements share the admin audit and authorization boundary.
 // Sidebar icons: 24px stroke paths.
 const icons: Record<AdminSection, string[]> = {
   overview: ["M3 3h7v9H3z", "M14 3h7v5h-7z", "M14 12h7v9h-7z", "M3 16h7v5H3z"],
@@ -44,6 +47,7 @@ const icons: Record<AdminSection, string[]> = {
     "M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4z",
     "M9 20a4 4 0 0 1 0-8h10",
   ],
+  achievements: ["M12 3 15 9 22 10 17 15 18 22 12 18 6 22 7 15 2 10 9 9Z"],
   emails: ["M3 5h18v14H3z", "m3.5 6.5 8.5 6.5 8.5-6.5"],
   usage: [
     "M12 3v18",
@@ -71,6 +75,7 @@ const groups: Array<{
     items: [
       ["stories", "Stories"],
       ["emails", "Emails"],
+      ["achievements", "Achievements"],
     ],
   },
   {
@@ -129,6 +134,8 @@ function describe(entry: AdminAuditEntry) {
     limits?: AccountLimits;
     resetToday?: Array<"ai" | "images">;
   };
+  if (entry.action === "achievement")
+    return `achievement: ${entry.change.from} → ${entry.change.to}: ${entry.change.reason}`;
   if (entry.action === "settings") {
     const { changes = [] } = entry.change as {
       changes?: Array<{ path: string; before: unknown; after: unknown }>;
@@ -319,6 +326,9 @@ export function Admin({
 
           {section === "usage" && <AdminUsage api={api} onError={notify} />}
 
+          {section === "achievements" && (
+            <AdminAchievements api={api} notify={notify} />
+          )}
           {section === "analytics" && (
             <AdminAnalytics api={api} onError={notify} />
           )}

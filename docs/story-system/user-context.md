@@ -15,7 +15,7 @@ Status: target design. Decisions S04, S06, S09. Read [keys](keys.md) for entitle
 | Wallet, billing and private audit | Dedicated service | No raw billing records or mutable balances in a story's context |
 | Creator/admin feature flags | Account access policy | Relevant UI capabilities, never self-granting rights |
 
-The current `StoryUser` is a small projection with identity, stats, achievements and save spots. It is not the full UserContext and must not become a raw Firebase user. Current `publish`, `generate` and `copilot` feature flags are administrative capabilities, not proof of a paid subscription. Account achievement progression and generalized entitlements remain future work.
+The current `StoryUser` is a small projection with identity, stats, achievements and save spots. It is not the full UserContext and must not become a raw Firebase user. Current `publish`, `generate` and `copilot` feature flags are administrative capabilities, not proof of a paid subscription. Approved account achievements use the private claim registry described below; generalized entitlements remain future work.
 
 ## Authorization flow
 
@@ -33,6 +33,8 @@ flowchart LR
 The client projection helps presentation but cannot authorize commands. Each service validates actor identity, ownership and current required permissions. Cross-user reads, claim IDs and save references are checked independently; possessing an ID is not permission.
 
 ## Global progress and key boundaries
+
+Approved account achievements are now stored as private durable claims, listed through `/api/achievements` and displayed in My adventures. Their grant authority is the separate [approval registry](keys.md#approved-account-achievements). Existing profile achievement strings are not claim evidence and are not populated from this registry; claims do not flow automatically into every Story's user projection. Only the current completion's achievement outcome is shown in that run. Cross-Story imports, public display consent and commercial rights remain deferred.
 
 A story can award its namespaced local key through a validated effect. An approved export can create a persistent account fact, such as completion of a canonical chapter. A creator cannot grant platform XP, premium access, another creator's achievement, currency or a subscription merely by defining a key with that name.
 

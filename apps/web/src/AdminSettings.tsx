@@ -53,7 +53,19 @@ export function AdminSettings({
     setForm(result.settings);
   };
   useEffect(() => {
-    load().catch((error) => onNotice((error as Error).message));
+    let cancelled = false;
+    api<AdminSettingsData>("/admin/settings")
+      .then((result) => {
+        if (cancelled) return;
+        setData(result);
+        setForm(result.settings);
+      })
+      .catch((error) => {
+        if (!cancelled) onNotice((error as Error).message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
   if (!data || !form)
     return <div className="admin-placeholder" aria-hidden="true" />;

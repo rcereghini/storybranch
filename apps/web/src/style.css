@@ -561,6 +561,15 @@ hr {
 .story-leaf-summary p {
   white-space: pre-line;
 }
+.achievement-reviews {
+  overflow-wrap: anywhere;
+}
+.achievement-reviews article {
+  margin-top: 16px;
+}
+.achievement-reviews details p {
+  white-space: pre-line;
+}
 .story-leaf-summary ul {
   padding-left: 24px;
 }

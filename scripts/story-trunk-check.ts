@@ -190,8 +190,48 @@ try {
     await tab
       .getByText(/Published edition-\d+\. Your story is now in Discover\./)
       .waitFor();
+    const achievementTitle = `Verified rescuer ${width} ${Date.now()}`;
+    await tab.getByText("Status: Not submitted", { exact: true }).waitFor();
     await tab
-      .getByRole("button", { name: "Play published story", exact: true })
+      .getByLabel("Achievement title", { exact: true })
+      .fill(achievementTitle);
+    await tab
+      .getByLabel("Achievement description", { exact: true })
+      .fill("Reached the approved ending.");
+    const submitted = tab.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/achievement-submissions") &&
+        r.request().method() === "POST",
+    );
+    await tab
+      .getByRole("button", { name: "Submit for approval", exact: true })
+      .click();
+    const submission = await (await submitted).json();
+    await tab.getByText("Status: pending", { exact: true }).waitFor();
+    await tab.goto("http://127.0.0.1:5173/admin/achievements");
+    const review = tab.locator("article").filter({
+      has: tab.getByRole("heading", { name: achievementTitle, exact: true }),
+    });
+    await review
+      .getByLabel(`Review reason for ${achievementTitle}`)
+      .fill("Verified the published StoryLeaf and its eligibility.");
+    await review.getByRole("button", { name: "Approve", exact: true }).click();
+    await review.getByText("Status: approved", { exact: true }).waitFor();
+    await review
+      .getByText("Published ending: Safe ending", { exact: true })
+      .click();
+    await review.getByText("What happens here?", { exact: true }).waitFor();
+    assert(
+      await tab.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+    await tab.screenshot({
+      path: `test-results/achievement-review-${width}.png`,
+    });
+    await tab.goto(`http://127.0.0.1:5173/s/${submission.storyId}`);
+    await tab
+      .getByRole("button", { name: "Start a new journey", exact: true })
       .click();
     await tab.getByRole("heading", { name: "Choose a path" }).waitFor();
     assert.equal(
@@ -211,6 +251,9 @@ try {
     await tab
       .getByText("Old invitation — Already held", { exact: true })
       .waitFor();
+    await tab
+      .getByText(`Account achievement: ${achievementTitle}`, { exact: true })
+      .waitFor();
     for (const theme of ["light", "dark"]) {
       await tab.evaluate(
         (t) => (document.documentElement.dataset.theme = t),
@@ -228,6 +271,42 @@ try {
         path: `test-results/story-leaf-${width}-${theme}.png`,
       });
     }
+    await tab.getByRole("button", { name: /Begin another journey/ }).click();
+    await tab.getByRole("heading", { name: "Choose a path" }).waitFor();
+    await tab.getByRole("button", { name: /Finish/ }).click();
+    await tab
+      .getByRole("region", { name: "StoryLeaf completion" })
+      .getByText(/Already earned/)
+      .waitFor();
+    await tab.goto("http://127.0.0.1:5173/adventures");
+    await tab
+      .getByRole("region", { name: "My account achievements" })
+      .getByText(achievementTitle, { exact: true })
+      .waitFor();
+    await tab
+      .getByRole("region", { name: "My account achievements" })
+      .scrollIntoViewIfNeeded();
+    assert(
+      await tab.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+    await tab.screenshot({
+      path: `test-results/achievement-account-${width}.png`,
+    });
+    await tab.goto("http://127.0.0.1:5173/admin/achievements");
+    await review
+      .getByLabel(`Review reason for ${achievementTitle}`)
+      .fill("Revocation flow verification.");
+    await review.getByRole("button", { name: "Revoke", exact: true }).click();
+    await review.getByText("Status: revoked", { exact: true }).waitFor();
+    await tab.goto("http://127.0.0.1:5173/adventures");
+    await tab
+      .getByRole("region", { name: "My account achievements" })
+      .getByRole("listitem")
+      .filter({ hasText: achievementTitle })
+      .getByText(/Revoked/)
+      .waitFor();
     assert.deepEqual(errors, []);
     await tab.close();
   }

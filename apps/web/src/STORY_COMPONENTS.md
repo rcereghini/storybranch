@@ -11,7 +11,7 @@ Follow [the canonical terminology](../../../docs/story-system/terminology.md): S
 | StoryNode lifecycle and rendering | `StoryNode.tsx`, `ScenePlayer.tsx`, `ComicStrip.tsx`, `DiceRoll.tsx`, `d20-scene.ts`, `d20-geometry.ts`, `SharedStoryNode.tsx`, `StoryLeafSummary.tsx`, player CSS | [StoryNode rendering](../../../docs/story-system/node-rendering.md), [type contracts](../../../docs/story-system/node-types.md) |
 | Authoring and reusable content | `Studio.tsx`, `studio-model.ts`, `StoryGraph.tsx`, `StoryOutline.tsx`, `ComicEditor.tsx`, `Library.tsx`, `StoryLeafEditor.tsx` | [StoryNodes](../../../docs/story-system/story-nodes.md), [Creator Studio](../../../docs/17-creator-studio.md) |
 | AI and media authoring | `StudioAssist.tsx`, `ComicCompanion.tsx`, `comic-drawing.ts`, asset tools | [AI boundaries](../../../docs/story-system/ai-authoring.md), [data/storage](../../../docs/story-system/data-storage.md) |
-| Progress and access | `Adventures.tsx`, `Dashboard.tsx`, profile/auth adapters | [PlayerContext](../../../docs/story-system/player-context.md), [UserContext](../../../docs/story-system/user-context.md), [keys](../../../docs/story-system/keys.md) |
+| Progress and access | `Adventures.tsx`, `Dashboard.tsx`, `Achievements.tsx`, profile/auth adapters | [PlayerContext](../../../docs/story-system/player-context.md), [UserContext](../../../docs/story-system/user-context.md), [keys](../../../docs/story-system/keys.md) |
 
 Names are navigation aids, not an exhaustive allowlist. A new renderer, hook, selector or nested component must follow the contract for its responsibility. UI previews are disposable and use the same `Story`/`StoryNode` lifecycle; only the server commits real progress.
 

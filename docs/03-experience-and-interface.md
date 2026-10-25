@@ -4,6 +4,8 @@ The interface should feel like a cinematic game library with a readable RPG laye
 
 ## Navigation and catalogue
 
+My adventures also lists the signed-in user's verified account achievements, 50 at a time, with retained revoked history. These are private approved completion claims, distinct from Story-local keys and legacy profile achievement strings. See [achievement approval and claims](story-system/keys.md#approved-account-achievements).
+
 Desktop navigation: Discover, My Adventures, Create, and Profile, with search and credit balance nearby. On mobile, use a four destination bottom navigation and place detailed account controls in Profile. The authenticated landing route is Discover. Returning players see a Continue playing row near the top of the catalogue.
 
 October 14, 2026 implementation: signed-in players land on a dashboard (continue playing, progress, recommendations, endings) and the catalogue moved to Discover. Navigation is Dashboard, Discover, My adventures and Create; profile editing lives on the dashboard. This is proposal P16 in the [decision register](10-decisions-and-open-questions.md) and awaits confirmation because it changes C07. See [Player dashboard](18-player-dashboard.md).

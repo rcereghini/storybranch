@@ -218,6 +218,10 @@ export const completionSchema = z
     storyNodeId: id,
     revision: z.number().int().nonnegative(),
     at: z.number().finite(),
+    accountAchievement: z
+      .object({ id, title: z.string().max(80), newlyGranted: z.boolean() })
+      .strict()
+      .optional(),
     summary: z.string().max(1000),
     rewards: z
       .array(leafRewardSchema.extend({ newlyGranted: z.boolean() }))
