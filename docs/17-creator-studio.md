@@ -10,6 +10,8 @@ Open **Create** in the main navigation (or `/studio`) and sign in. The Studio St
 
 ## Editor layout
 
+**Story invitations** in StoryTrunk manages a live new-journey gate after the draft has first been saved. It can be enabled before publication; publishing preserves it. Once published, creators issue codes with 1–1000 slots and 1–30 days to redeem, manually copy the returned code, list usage and disable codes. Codes are not shown again in lists, though retrying the same creation command returns the same code while its receipt exists. Changing this policy is immediate and separate from publishing narrative editions. Redeemed entry keys are permanent; existing journeys and shared media remain accessible. This is beta participation control, not subscription or confidential media protection. Recipients redeem from Story details while signed in.
+
 StoryTrunk also configures **Persistent Story keys**: stable key names, reward labels and required completed journeys (1–999). These persist per player across runs of this Story. Options can select a **Persistent key required**, hiding that option until the next run after the key is earned. The selector replaces that option's condition; compound/negative checks remain available through advanced JSON. Publication validates declared keys and requires a safe unconditional exit. Preview starts with no persistent keys and never awards them. New editions apply definition changes; existing runs retain their starting snapshot. This does not configure invitations, paid keys or subscriptions.
 
 - **Top bar:** the story title (edit it in place), the save status, Undo/Redo, **Save draft**, **Preview**, **Play published story** (once published) and **Publish edition**.

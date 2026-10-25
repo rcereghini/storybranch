@@ -59,6 +59,12 @@ try {
       .getByLabel("Persistent key 1 completions", { exact: true })
       .fill("1");
     await save();
+    await tab
+      .getByRole("button", { name: "Require invitation to start", exact: true })
+      .click();
+    await tab
+      .getByText("New journeys: Invitation required", { exact: true })
+      .waitFor();
     await tab.reload();
     await tab.getByRole("button", { name: new RegExp(title) }).click();
     await tab.getByText("Your Story is blank.", { exact: false }).waitFor();
@@ -354,11 +360,95 @@ try {
       .filter({ hasText: achievementTitle })
       .getByText(/Revoked/)
       .waitFor();
+    await tab.goto("http://127.0.0.1:5173/studio");
+    await tab.getByRole("button", { name: new RegExp(title) }).click();
+    await pane("StoryTrunk");
+    await tab
+      .getByRole("button", { name: "Create invitation code", exact: true })
+      .click();
+    const invitationCode = tab.getByLabel("New invitation code", {
+      exact: true,
+    });
+    await invitationCode.waitFor();
+    await tab
+      .getByText("Saving invitations…", { exact: true })
+      .waitFor({ state: "hidden" });
+    const code = await invitationCode.inputValue();
+    assert.match(code, /^[a-f0-9]{48}$/);
+    await invitationCode.scrollIntoViewIfNeeded();
+    await tab.screenshot({
+      path: `test-results/invitation-creator-${width}.png`,
+    });
+    const guest = await browser.newPage({ viewport: { width, height: 950 } });
+    guest.on("pageerror", (e) => errors.push(e.message));
+    await guest.goto(`http://127.0.0.1:5173/s/${submission.storyId}`);
+    await guest
+      .getByRole("button", { name: "Sign in to redeem", exact: true })
+      .click();
+    await guest
+      .getByRole("dialog")
+      .getByLabel("Email", { exact: true })
+      .fill("progressed@storybranch.test");
+    await guest
+      .getByRole("dialog")
+      .getByRole("button", { name: "Sign in ↗", exact: true })
+      .click();
+    await guest.getByRole("dialog").waitFor({ state: "hidden" });
+    await guest
+      .getByText("An invitation is required to start a new journey.", {
+        exact: true,
+      })
+      .waitFor();
+    await guest
+      .getByRole("button", { name: "Start a new journey", exact: true })
+      .click();
+    await guest.getByText(/This Story needs an invitation/).waitFor();
+    await guest.getByLabel("Invitation code", { exact: true }).fill(code);
+    await guest
+      .getByRole("button", { name: "Redeem invitation", exact: true })
+      .click();
+    await guest
+      .getByText(
+        "Your permanent entry key is saved. You can start this Story.",
+        { exact: true },
+      )
+      .waitFor();
+    for (const theme of ["light", "dark"]) {
+      await guest.evaluate(
+        (t) => (document.documentElement.dataset.theme = t),
+        theme,
+      );
+      await guest
+        .getByRole("region", { name: "Story entry key" })
+        .scrollIntoViewIfNeeded();
+      assert(
+        await guest.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await guest.screenshot({
+        path: `test-results/invitation-player-${width}-${theme}.png`,
+      });
+    }
+    await guest.reload();
+    await guest
+      .getByText(
+        "Your permanent entry key is saved. You can start this Story.",
+        { exact: true },
+      )
+      .waitFor();
+    await guest
+      .getByRole("button", { name: "Start a new journey", exact: true })
+      .click();
+    await guest.getByRole("heading", { name: "Choose a path" }).waitFor();
+    await guest.getByRole("button", { name: /Finish/ }).click();
+    await guest.getByRole("heading", { name: "Safe ending" }).waitFor();
+    await guest.close();
     assert.deepEqual(errors, []);
     await tab.close();
   }
   console.log(
-    "PASS: StoryTrunk save/reload, persistent-key authoring, hidden branch unlock on replay, achievement approval/revocation, and safe publication/completion at desktop/mobile in both themes.",
+    "PASS: StoryTrunk, persistent keys, achievements, pre-publication invitation policy, code issuance, recipient redemption/reload and safe player completion at desktop/mobile in both themes.",
   );
 } finally {
   await browser.close();

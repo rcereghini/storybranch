@@ -33,6 +33,7 @@ import { Dashboard } from "./Dashboard";
 import { Discover, type CatalogueEntry } from "./Discover";
 import { Adventures } from "./Adventures";
 import { AccountAchievements } from "./Achievements";
+import { StoryEntryKey } from "./StoryInvitations";
 import { Avatar } from "./avatars";
 import { AccountMenu } from "./AccountMenu";
 import { Icon, Logo, type IconName } from "./icons";
@@ -873,6 +874,16 @@ function App() {
         ) : (
           <Discover
             path={path}
+            entryControls={(storyId) => (
+              <StoryEntryKey
+                key={`${user?.uid ?? "guest"}-${storyId}`}
+                api={api}
+                storyId={storyId}
+                signedIn={!!user}
+                onSignIn={() => setLogin(true)}
+                notify={setError}
+              />
+            )}
             catalogue={catalogueItems}
             saves={saves}
             resume={resume}

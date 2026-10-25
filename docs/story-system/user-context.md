@@ -34,6 +34,8 @@ The client projection helps presentation but cannot authorize commands. Each ser
 
 ## Global progress and key boundaries
 
+S18 invitation entry keys are private account grants under `storyEntryKeys`, scoped to starting exactly one Story. They are permanent after redemption; code deadlines and disabled status affect future redemptions only. The account receives only a minimal `invitationRequired/hasKey/canStart` projection through `/api/story-entry/{storyId}`. These keys do not enter generic StoryBranch conditions, authorize paid access or appear in another Story's user projection. See [the invitation contract](keys.md#invitation-entry-contract).
+
 UserContext also owns per-player, per-Story progress across runs: completion counts and permanent narrative key grants. This is private to the account and the named Story, not shared StoryContext state or a platform achievement. The server resolves declared keys at run start and keeps the snapshot out of ordinary player payloads; only authorized branch results and newly earned completion labels are disclosed. See S17 in [keys](keys.md#shared-key-model-s17).
 
 Approved account achievements are now stored as private durable claims, listed through `/api/achievements` and displayed in My adventures. Their grant authority is the separate [approval registry](keys.md#approved-account-achievements). Existing profile achievement strings are not claim evidence and are not populated from this registry; claims do not flow automatically into every Story's user projection. Only the current completion's achievement outcome is shown in that run. Cross-Story imports, public display consent and commercial rights remain deferred.

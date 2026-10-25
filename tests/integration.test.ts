@@ -56,6 +56,183 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("issues invitation entry keys with atomic limits, private records, retries and permanent redeemed access", async () => {
+  const storyId = `invite-${randomUUID()}`;
+  const story = starterStory(storyId);
+  expect(
+    (
+      await call(`/studio/${storyId}`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        draft: { story, description: "Invite test" },
+      })
+    ).status,
+  ).toBe(200);
+  const published = await call(`/studio/${storyId}/publish`, {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    policyVersion: "creator-alpha-1",
+  });
+  expect(published.status).toBe(200);
+  const begin = (who = "progressed") =>
+    call(
+      "/playthroughs",
+      {
+        idempotencyKey: randomUUID(),
+        payload: { storyId, versionId: published.data.publishedVersionId },
+      },
+      who,
+    );
+  const existingRun = (await begin()).data.save;
+  const policy = {
+    action: "policy",
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    invitationRequired: true,
+  };
+  const closed = await call(`/story-invitations/${storyId}`, policy);
+  expect(closed.status).toBe(200);
+  expect((await call(`/story-invitations/${storyId}`, policy)).data).toEqual(
+    closed.data,
+  );
+  expect(
+    (
+      await call(`/story-invitations/${storyId}`, {
+        ...policy,
+        idempotencyKey: randomUUID(),
+      })
+    ).status,
+  ).toBe(409);
+  expect(
+    (await call(`/story-invitations/${storyId}`, undefined, "progressed"))
+      .status,
+  ).toBe(403);
+  expect(
+    (
+      await call(
+        `/story-invitations/${storyId}`,
+        { ...policy, expectedRevision: 1 },
+        "progressed",
+      )
+    ).status,
+  ).toBe(403);
+  expect((await begin()).status).toBe(403);
+  expect((await begin("player")).status).toBe(200);
+  expect(
+    (await call(`/playthroughs/${existingRun.id}`, undefined, "progressed"))
+      .status,
+  ).toBe(200);
+  expect(
+    (
+      await call(
+        `/playthroughs/${existingRun.id}/choices`,
+        choice(existingRun, story.storyNodes.opening.choices[0].id),
+        "progressed",
+      )
+    ).status,
+  ).toBe(200);
+  const create = () =>
+    call(`/story-invitations/${storyId}`, {
+      action: "create",
+      idempotencyKey: randomUUID(),
+      maxClaims: 1,
+      days: 7,
+    });
+  const redeem = (code: string, who = "progressed", key = randomUUID()) =>
+    call(`/story-entry/${storyId}`, { idempotencyKey: key, code }, who);
+  const disabled = (await create()).data;
+  expect(
+    (
+      await call(`/story-invitations/${storyId}`, {
+        action: "disable",
+        idempotencyKey: randomUUID(),
+        invitationId: disabled.invitation.id,
+        expectedRevision: 1,
+      })
+    ).status,
+  ).toBe(200);
+  expect((await redeem(disabled.code)).status).toBe(403);
+  const expired = (await create()).data;
+  await db
+    .doc(`stories/${storyId}/invitations/${expired.invitation.id}`)
+    .update({ expiresAt: Date.now() - 1 });
+  expect((await redeem(expired.code)).status).toBe(403);
+  const createCommand = {
+    action: "create",
+    idempotencyKey: randomUUID(),
+    maxClaims: 1,
+    days: 7,
+  };
+  const issued = (await call(`/story-invitations/${storyId}`, createCommand))
+    .data;
+  expect(
+    (await call(`/story-invitations/${storyId}`, createCommand)).data,
+  ).toEqual(issued);
+  expect(
+    JSON.stringify((await call(`/story-invitations/${storyId}`)).data),
+  ).not.toContain(issued.code);
+  expect(
+    (
+      await call(
+        "/story-entry/glass-harbor",
+        { idempotencyKey: randomUUID(), code: issued.code },
+        "progressed",
+      )
+    ).status,
+  ).toBe(403);
+  const raced = await Promise.all([
+    redeem(issued.code, "player"),
+    redeem(issued.code),
+  ]);
+  expect(raced.map((r) => r.status).sort()).toEqual([200, 403]);
+  const inviteRef = db.doc(
+    `stories/${storyId}/invitations/${issued.invitation.id}`,
+  );
+  expect((await inviteRef.get()).data()!.claims).toBe(1);
+  const next = (await create()).data;
+  const commandKey = randomUUID();
+  const claimed = await redeem(next.code, "progressed", commandKey);
+  expect(claimed.status).toBe(200);
+  expect((await redeem(next.code, "progressed", commandKey)).data).toEqual(
+    claimed.data,
+  );
+  await db.doc(receipt("progressed", "invitation", commandKey)).delete();
+  expect(
+    (await redeem(next.code, "progressed", commandKey)).data.alreadyGranted,
+  ).toBe(true);
+  expect(
+    (await call(`/story-entry/${storyId}`, undefined, "progressed")).data,
+  ).toEqual({ invitationRequired: true, hasKey: true, canStart: true });
+  // Disabling all codes does not revoke the permanent account grant.
+  for (const item of (await call(`/story-invitations/${storyId}`)).data.items) {
+    if (!item.disabled)
+      expect(
+        (
+          await call(`/story-invitations/${storyId}`, {
+            action: "disable",
+            idempotencyKey: randomUUID(),
+            invitationId: item.id,
+            expectedRevision: item.revision,
+          })
+        ).status,
+      ).toBe(200);
+  }
+  expect((await begin()).status).toBe(200);
+  const grantPath = `users/progressed/storyEntryKeys/${storyId}`;
+  const own = rules.authenticatedContext("progressed").firestore();
+  await assertFails(getDoc(doc(own, grantPath)));
+  await assertFails(setDoc(doc(own, grantPath), { granted: true }));
+  await assertFails(getDoc(doc(own, inviteRef.path)));
+  expect(
+    (
+      await call(
+        `/story-entry/${storyId}`,
+        { idempotencyKey: randomUUID(), code: next.code, issuerUid: "player" },
+        "progressed",
+      )
+    ).status,
+  ).toBe(400);
+});
 it("counts distinct completions and snapshots persistent Story keys without exposing or trusting them", async () => {
   const storyId = `progress-${randomUUID()}`;
   const story = starterStory(storyId);
@@ -1500,6 +1677,26 @@ it("allows both branches, isolates child changes and returns current parent", as
     await call(`/playthroughs/${parent.id}/choices`, choice(parent, "market"))
   ).data.save;
   const before = (await db.doc(saveOf(parent.id)).get()).data();
+  const branch = (await db.doc("branches/bell-diver").get()).data()!;
+  const childRoot = db.doc(`stories/${branch.storyId}`);
+  const originalChild = (await childRoot.get()).data()!;
+  await childRoot.update({
+    entryPolicy: { version: 1, revision: 1, invitationRequired: true },
+    creatorUid: "other-creator",
+  });
+  try {
+    expect(
+      (
+        await call(`/playthroughs/${parent.id}/branches`, {
+          idempotencyKey: randomUUID(),
+          expectedRevision: parent.revision,
+          payload: { branchId: "bell-diver" },
+        })
+      ).status,
+    ).toBe(403);
+  } finally {
+    await childRoot.set(originalChild);
+  }
   for (const branchId of ["bell-diver", "paper-moon"]) {
     const r = await call(`/playthroughs/${parent.id}/branches`, {
       idempotencyKey: randomUUID(),

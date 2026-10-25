@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { PlayerRun as Save } from "../../../packages/contracts/player";
 import { genreLabels, genreOf } from "../../../packages/domain/dashboard";
 import type { GenreId } from "../../../packages/contracts/profile";
@@ -31,6 +31,7 @@ export function Discover({
   onStart,
   onResume,
   onNavigate,
+  entryControls,
 }: {
   path: string;
   catalogue: CatalogueEntry[];
@@ -44,6 +45,7 @@ export function Discover({
   onStart: (storyId?: string) => void;
   onResume: (saveId: string) => void;
   onNavigate: (path: string) => void;
+  entryControls?: (storyId: string) => ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [genre, setGenre] = useState<GenreId | "all">("all");
@@ -231,6 +233,7 @@ export function Discover({
                     Browse all stories
                   </button>
                 </div>
+                {entryControls?.(story.id)}
               </div>
             </div>
           ) : catalogueReady ? (
