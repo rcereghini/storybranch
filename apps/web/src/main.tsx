@@ -1,3 +1,4 @@
+import { transitionTiming } from "./transition-timing";
 import {
   PlayerSession,
   type PendingCommand as Pending,
@@ -66,6 +67,7 @@ function App() {
       new PlayerSession(
         playerApi,
         () => (auth.currentUser?.uid ?? "") + "|" + location.pathname,
+        transitionTiming,
       ),
   );
   const { view: player, pending } = useSyncExternalStore(

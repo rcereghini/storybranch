@@ -2,8 +2,20 @@ import assert from "node:assert/strict";
 import { launchBrowser, startPlayback } from "./browser";
 const browser = await launchBrowser();
 try {
-  for (const width of [1440, 390]) {
+  for (const [width, fallback] of [
+    [1440, false],
+    [390, false],
+    [390, true],
+  ] as const) {
     const tab = await browser.newPage({ viewport: { width, height: 900 } });
+    if (fallback)
+      await tab.addInitScript(() => {
+        Object.defineProperty(
+          HTMLVideoElement.prototype,
+          "requestVideoFrameCallback",
+          { value: undefined, configurable: true },
+        );
+      });
     let releaseCatalogue!: () => void;
     const catalogueGate = new Promise<void>((resolve) => {
       releaseCatalogue = resolve;
@@ -93,6 +105,10 @@ try {
       return {
         samples: w.samples,
         reused: w.originalVideo === document.querySelector("video"),
+        timing: window
+          .storybranchTransitionTimings()
+          .filter((s) => s.operation === "command")
+          .at(-1),
       };
     });
     assert.equal(
@@ -110,6 +126,28 @@ try {
         (Date.now() - transitionStarted) +
         "ms",
     );
+    assert(result.timing);
+    assert.equal(
+      result.timing.outcome,
+      fallback ? "playing-fallback" : "video-frame",
+    );
+    assert(
+      result.timing.requestMs! >= 750,
+      "Injected command delay belongs to request timing",
+    );
+    assert(
+      result.timing.presentationMs! >= 750,
+      "Injected media delay belongs to presentation timing",
+    );
+    assert(
+      Math.abs(
+        result.timing.totalMs -
+          result.timing.requestMs! -
+          result.timing.presentationMs!,
+      ) <= 1,
+    );
+    assert(!JSON.stringify(result.timing).includes("glass-harbor"));
+    console.log("Transition phase timings:", result.timing);
     assert(result.reused);
     for (const field of ["top", "height"]) {
       const values = result.samples.map((s: any) => s[field]);

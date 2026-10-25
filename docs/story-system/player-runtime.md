@@ -22,7 +22,7 @@ Anything sent to the browser is inspectable. Speculative media is a disclosure d
 
 ## Verification and compatibility
 
-Preserve the existing client representation through explicit format negotiation while the new runtime uses a versioned rendering projection. Old receipts remain replayable without reexecuting actions or rewriting editions. Verification covers response projection, same-key retry, stale/concurrent actions, pending dice, account/navigation races, cache isolation/eviction/expiry and desktop/mobile frame retention. The browser transition check counts requests and records click-to-playing time; production API/decoder timing instrumentation remains future work. No production latency promise follows from local timing alone.
+Preserve the existing client representation through explicit format negotiation while the new runtime uses a versioned rendering projection. Old receipts remain replayable without reexecuting actions or rewriting editions. Verification covers response projection, same-key retry, stale/concurrent actions, pending dice, account/navigation races, cache isolation/eviction/expiry and desktop/mobile frame retention. The browser transition check counts requests and records click-to-playing time; the local request/presentation diagnostics below provide the next layer; centralized production aggregation remains future work. No production latency promise follows from local timing alone.
 
 ## Implementation map
 
@@ -60,3 +60,30 @@ Reading set: root/scoped AGENTS, CONTRIBUTING, documentation workflow, current S
 - Studio follow-up: the browser fixture now supplies the server-derived `writingHelp` capability instead of assuming the Copilot feature alone enables Studio writing. The complete desktop/mobile Studio suite passed: create/autosave/reload, shared preview, publication and authoritative play, Storage clips, AI suggestion accept/discard/undo and image generation. TypeScript passed after this fixture-only correction. Read the AI-authoring boundary, Creator Studio AI help and Copilot access contract for this follow-up; production capability logic is unchanged.
 - Verification limits: hosted authentication, real-device Safari and production latency remain unverified.
 - Reviewer: self-review against the above contracts; independent review pending. Commit and push authorized by the user; no deployment or migration performed.
+
+## Transition diagnostics
+
+Browser-local diagnostics now provide bounded transition measurements: request start through parsed response (including token acquisition/network/server/JSON), then response through presentation readiness. Video uses the first submitted video frame where supported, with a separately labeled playing-event fallback. Reading content uses two animation frames as a paint opportunity, not a guarantee that images have downloaded. Autoplay blocks, media errors, stale requests, cancellation and timeout are separate outcomes. Diagnostics must never alter progress, retries, media control or layout. Samples contain durations and categories only, never run/account IDs, commands, text, URLs or routes, and are not transmitted to analytics. Navigation and hidden tabs cancel measurements.
+
+
+Inspect a deployed build locally in browser DevTools after playing:
+
+```js
+console.table(window.storybranchTransitionTimings());
+```
+
+The buffer retains the last 50 completed attempts in memory and resets on reload. It does not send telemetry or use persistent browser storage. Entries include a local attempt counter, load/command category, StoryNode type, outcome and three millisecond durations:
+
+| Field | Meaning |
+| --- | --- |
+| requestMs | Start of the accepted session operation through the parsed response; includes token acquisition, network, server work and JSON parsing. Null when no response was accepted. |
+| presentationMs | Accepted response through presentation readiness or a labeled non-success outcome. Includes React work and media preparation, not only network download. |
+| totalMs | Whole attempt through its recorded outcome. Rounded durations may differ by 1 ms when summed. |
+
+Use successful command outcomes for transition comparisons. `video-frame` means the browser submitted a frame via requestVideoFrameCallback; `playing-fallback` means only the playing event was available. `content-paint` is two animation frames after the reading view committed (a paint opportunity, not proof all images loaded). `retained-view` identifies a response for an already-presented revision. Do not combine those categories blindly.
+
+Autoplay-blocked, media-error, request-error, stale, cancelled and timeout remain separate outcomes. A 30-second diagnostic timeout does **not** abort a request or commit progress. Superseded operations, navigation and hidden tabs cancel measurement; hidden-tab starts are excluded. Stale callbacks cannot complete a newer attempt. Only one pending attempt and one internal readiness identity are retained; neither identity is exported. Previews use the shared lifecycle but do not start session measurements.
+
+### Transition-diagnostics review
+
+Documentation reviewed: root/scoped AGENTS, CONTRIBUTING, workflow, Story index and terminology, current contract, runtime, rendering and type contracts, and the prior context/architecture reading set. Contract impact: browser-local observability only; request, save, routing and prefetch policies are unchanged. Current/target gap: production aggregation and real-device/hosted measurements remain future work. Reviewer: self-review; independent review pending. Verification: TypeScript, 109 unit tests and production build passed (existing bundle-size warning remains). Targeted timing/session tests passed again after guarding hidden-tab readiness callbacks. Emulator-backed browser checks passed for desktop/mobile video-frame timing, a simulated browser without frame callbacks, reading/dice timing and Dice Roll/reload/Next. The delayed transition still makes one POST and zero follow-up GETs, preserves video geometry and reuses its element. Injected 800 ms command/media delays appeared in their respective phases (about 900 ms request and 845 ms presentation locally); these verify attribution, not production speed. Backend rules/contracts were unchanged, so the prior 39 integration tests were not rerun in this diagnostics-only change. Real-device Safari and hosted measurements remain unverified.

@@ -6,7 +6,7 @@ Follow [the canonical terminology](../../../docs/story-system/terminology.md): S
 
 | Component responsibility | Current entry points | Read |
 | --- | --- | --- |
-| Player session and transitions | `player-session.ts`, `main.tsx` | [Player runtime](../../../docs/story-system/player-runtime.md) |
+| Player session and transitions | `player-session.ts`, `transition-timing.ts`, `main.tsx` | [Player runtime](../../../docs/story-system/player-runtime.md) |
 | Context composition | `Story.tsx`, `main.tsx` | [architecture](../../../docs/story-system/architecture.md), [StoryContext](../../../docs/story-system/story-context.md), [PlayerContext](../../../docs/story-system/player-context.md), [UserContext](../../../docs/story-system/user-context.md) |
 | StoryNode lifecycle and rendering | `StoryNode.tsx`, `ScenePlayer.tsx`, `ComicStrip.tsx`, `SharedStoryNode.tsx`, player CSS | [StoryNode rendering](../../../docs/story-system/node-rendering.md), [type contracts](../../../docs/story-system/node-types.md) |
 | Authoring and reusable content | `Studio.tsx`, `studio-model.ts`, `StoryGraph.tsx`, `StoryOutline.tsx`, `ComicEditor.tsx`, `Library.tsx` | [StoryNodes](../../../docs/story-system/story-nodes.md), [Creator Studio](../../../docs/17-creator-studio.md) |

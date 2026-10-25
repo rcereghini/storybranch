@@ -1,3 +1,4 @@
+import { transitionTiming } from "./transition-timing";
 import { Button } from "./ui";
 import { useEffect, useRef, type ReactNode } from "react";
 import type {
@@ -74,6 +75,19 @@ export function StoryNode({
   const heading = useRef<HTMLHeadingElement>(null);
   const type = storyNode.storyNodeType;
   const video = type === "video" || type === "video-options";
+  useEffect(() => {
+    if (video) return;
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() =>
+        transitionTiming.ready(save.id + "-" + save.revision, "content-paint"),
+      );
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [save.id, save.revision, video]);
   const lastVideo = useRef<{
     storyNode: RenderStoryNode;
     media?: SceneMedia;
