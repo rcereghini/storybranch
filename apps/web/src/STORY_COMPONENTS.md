@@ -16,3 +16,5 @@ Follow [the canonical terminology](../../../docs/story-system/terminology.md): S
 Names are navigation aids, not an exhaustive allowlist. A new renderer, hook, selector or nested component must follow the contract for its responsibility. UI previews are disposable and use the same `Story`/`StoryNode` lifecycle; only the server commits real progress.
 
 Record the relevant documents and invariants in the plan/work summary and the [pre-commit review](../../../CONTRIBUTING.md). Do not copy the full canonical specification next to each component.
+
+`StoryProgressEditor.tsx` authors persistent Player + Story key definitions in StoryTrunk. Read [keys](../../../docs/story-system/keys.md#first-implementation-persistent-story-progress) and [Creator Studio](../../../docs/17-creator-studio.md) before changing it or its branch-condition controls.

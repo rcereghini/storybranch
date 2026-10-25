@@ -55,7 +55,12 @@ export function evaluate(c: Condition, s: Save): boolean {
     case "stat":
       return compare(s.stats[c.stat], c.op, c.value);
     case "key":
-      return s.keys.includes(c.keyId) === c.present;
+      return (
+        (c.scope === "story"
+          ? (s.storyProgressSnapshot?.keys ?? [])
+          : s.keys
+        ).includes(c.keyId) === c.present
+      );
     case "item":
       return compare(s.items[c.itemId] ?? 0, c.op, c.quantity);
     case "all":
@@ -140,6 +145,7 @@ export function start(
   stats: Stats,
   now: number,
   parent?: Save,
+  progress?: Save["storyProgressSnapshot"],
 ): Save {
   return enter(
     {
@@ -154,6 +160,14 @@ export function start(
       statsSnapshot: { ...stats },
       stats: { ...stats },
       keys: [...(story.trunkContext?.initialKeys ?? [])],
+      ...(progress
+        ? {
+            storyProgressSnapshot: {
+              version: 1 as const,
+              keys: [...progress.keys],
+            },
+          }
+        : {}),
       items: {},
       health: 100,
       milestones: [],
@@ -385,6 +399,17 @@ export function validateStory(value: unknown): Story {
   }
   function checkNamespaces(v: unknown): void {
     if (!v || typeof v !== "object") return;
+    if (
+      "kind" in v &&
+      v.kind === "key" &&
+      "scope" in v &&
+      v.scope === "story" &&
+      (!("keyId" in v) ||
+        !story.progression?.keys.some((k) => k.keyId === v.keyId))
+    )
+      throw new Error(
+        "Story-scoped key conditions require a declared persistent key.",
+      );
     for (const [k, x] of Object.entries(v)) {
       if (
         ["keyId", "itemId", "milestoneId", "scoreId"].includes(k) &&

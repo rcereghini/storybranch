@@ -16,6 +16,7 @@ import {
   choiceCommandSchema,
   branchCommandSchema,
   type Save,
+  type Story,
   type Stats,
 } from "../../packages/contracts/index";
 import { start, transition } from "../../packages/domain/index";
@@ -34,6 +35,7 @@ import { assist } from "./assist";
 import { admin } from "./admin";
 import { profileRoutes } from "./profile";
 import { achievementRoutes, awardAchievement } from "./achievements";
+import { prepareStoryProgress, storyProgressSnapshot } from "./story-progress";
 import { edition } from "./story-store";
 import * as paths from "./paths";
 import {
@@ -349,6 +351,7 @@ async function handleCanonical(request: Request): Promise<Response> {
         return readStoryData<{ save: Save }>(previous.data()!.result);
       }
       let save: Save;
+      let progressStory: Story;
       let event: Record<string, unknown>;
       if (kind === "start") {
         const c = startSchema.parse(command);
@@ -368,7 +371,16 @@ async function handleCanonical(request: Request): Promise<Response> {
         const v = c.payload.versionId ?? latest.data()?.publishedVersionId;
         if (!v) throw new GameError("NOT_FOUND", "Story not found.");
         const { story } = await edition(tx, c.payload.storyId, v);
-        save = start(story, newId, uid, profile.data()!.stats as Stats, now);
+        progressStory = story;
+        save = start(
+          story,
+          newId,
+          uid,
+          profile.data()!.stats as Stats,
+          now,
+          undefined,
+          await storyProgressSnapshot(tx, uid, story),
+        );
         event = {
           label: `Started ${story.title}`,
           from: null,
@@ -383,6 +395,7 @@ async function handleCanonical(request: Request): Promise<Response> {
           throw new GameError("NOT_FOUND", "Adventure not found.");
         const current = readStoryData<Save>(snapshot.data());
         const { story } = await edition(tx, current.storyId, current.versionId);
+        progressStory = story;
         if (kind === "choice") {
           const c = choiceCommandSchema.parse(command);
           const moved = transition(
@@ -429,7 +442,16 @@ async function handleCanonical(request: Request): Promise<Response> {
             b.storyId,
             b.versionId,
           );
-          save = start(childStory, newId, uid, current.stats, now, current);
+          progressStory = childStory;
+          save = start(
+            childStory,
+            newId,
+            uid,
+            current.stats,
+            now,
+            current,
+            await storyProgressSnapshot(tx, uid, childStory),
+          );
           event = {
             label: "Entered community side quest",
             from: null,
@@ -439,7 +461,14 @@ async function handleCanonical(request: Request): Promise<Response> {
           };
         }
       }
+      const writeProgress = await prepareStoryProgress(
+        tx,
+        uid,
+        progressStory,
+        save,
+      );
       await awardAchievement(tx, uid, save);
+      writeProgress();
       if (save.completion?.revision === save.revision)
         event.completion = save.completion;
       const result = { save };

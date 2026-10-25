@@ -10,6 +10,75 @@ import { validatePublication } from "../packages/domain/authoring";
 import { playerRun, renderStoryNode } from "../packages/domain/player";
 import { starterStory } from "../apps/web/src/studio-model";
 
+it("keeps persistent key conditions separate from run keys and omits the snapshot from player data", () => {
+  const story = starterStory("progress-test");
+  story.progression = {
+    version: 1,
+    keys: [
+      { keyId: "progress-test:bonus", label: "Bonus", afterCompletions: 5 },
+    ],
+  };
+  story.storyNodes.opening.storyNodeType = "text-options";
+  const ordinary = story.storyNodes.opening.choices[0];
+  story.storyNodes.opening.choices.push({
+    ...structuredClone(ordinary),
+    id: "bonus",
+    label: "Bonus path",
+    unavailableDisplay: "hidden",
+    availableWhen: {
+      kind: "key",
+      scope: "story",
+      keyId: "progress-test:bonus",
+      present: true,
+    },
+  });
+  validatePublication(story);
+  const local = start(story, "run", "user", baseStats, 1);
+  local.keys.push("progress-test:bonus");
+  expect(
+    renderStoryNode(story.storyNodes.opening, local).outputs.map((o) => o.id),
+  ).not.toContain("bonus");
+  expect(() => transition(story, local, "bonus", 0, 2)).toThrow();
+  const unlocked = start(story, "next", "user", baseStats, 2, undefined, {
+    version: 1,
+    keys: ["progress-test:bonus"],
+  });
+  expect(
+    renderStoryNode(story.storyNodes.opening, unlocked).outputs.map(
+      (o) => o.id,
+    ),
+  ).toContain("bonus");
+  expect(transition(story, unlocked, "bonus", 0, 3).save.status).toBe(
+    "completed",
+  );
+  expect(playerRun(unlocked)).not.toHaveProperty("storyProgressSnapshot");
+  delete story.progression;
+  expect(() => validateStory(story)).toThrow(/declared persistent key/);
+});
+
+it("rejects foreign, duplicate and invalid persistent key definitions and unsupported account checks", () => {
+  const story = starterStory("progress-test");
+  story.progression = {
+    version: 1,
+    keys: [{ keyId: "foreign:key", label: "Key", afterCompletions: 1 }],
+  };
+  expect(() => validateStory(story)).toThrow(/Foreign namespace/);
+  story.progression.keys[0].keyId = "progress-test:key";
+  story.progression.keys[0].afterCompletions = 0;
+  expect(() => validateStory(story)).toThrow();
+  story.progression.keys[0].afterCompletions = 1;
+  story.progression.keys.push(story.progression.keys[0]);
+  expect(() => validateStory(story)).toThrow(/unique/);
+  story.progression.keys.pop();
+  story.storyNodes.opening.choices[0].availableWhen = {
+    kind: "key",
+    keyId: "progress-test:key",
+    present: true,
+    scope: "account",
+  } as never;
+  expect(() => validateStory(story)).toThrow();
+});
+
 function fixture() {
   const story = starterStory("leaf-test");
   story.trunkContext!.initialKeys = ["leaf-test:known"];

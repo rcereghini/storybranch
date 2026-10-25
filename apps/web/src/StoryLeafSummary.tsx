@@ -8,6 +8,7 @@ export function StoryLeafSummary({
   if (
     !completion.summary &&
     !completion.rewards.length &&
+    !completion.storyKeys?.length &&
     !completion.accountAchievement
   )
     return null;
@@ -19,6 +20,17 @@ export function StoryLeafSummary({
           : "Journey complete"}
       </h2>
       {completion.summary && <p>{completion.summary}</p>}
+      {!!completion.storyKeys?.length && (
+        <section aria-label="Persistent keys earned">
+          <h3>Unlocked for your next journey</h3>
+          <ul>
+            {completion.storyKeys.map((key) => (
+              <li key={key.keyId}>{key.label}</li>
+            ))}
+          </ul>
+          <p>These keys carry into your next run of this Story.</p>
+        </section>
+      )}
       {completion.accountAchievement && (
         <p>
           <strong>

@@ -10,6 +10,8 @@ Open **Create** in the main navigation (or `/studio`) and sign in. The Studio St
 
 ## Editor layout
 
+StoryTrunk also configures **Persistent Story keys**: stable key names, reward labels and required completed journeys (1–999). These persist per player across runs of this Story. Options can select a **Persistent key required**, hiding that option until the next run after the key is earned. The selector replaces that option's condition; compound/negative checks remain available through advanced JSON. Publication validates declared keys and requires a safe unconditional exit. Preview starts with no persistent keys and never awards them. New editions apply definition changes; existing runs retain their starting snapshot. This does not configure invitations, paid keys or subscriptions.
+
 - **Top bar:** the story title (edit it in place), the save status, Undo/Redo, **Save draft**, **Preview**, **Play published story** (once published) and **Publish edition**.
 - **StoryNodes** (left): the story as an outline in reading order, starting from the first StoryNode, with where each StoryNode's choices lead; StoryNodes nothing leads to yet are listed under "Not reachable yet". Selecting a StoryNode edits it and centers it on the map. The **Library** tab holds reusable StoryNodes.
 - **Map** (center): the branching canvas (below).
