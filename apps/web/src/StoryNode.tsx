@@ -1,6 +1,6 @@
 import { transitionTiming } from "./transition-timing";
 import { Button } from "./ui";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   StoryNode as StoryNodeData,
   StoryNodeOutput,
@@ -11,6 +11,7 @@ import type { RenderStoryNode } from "../../../packages/contracts/player";
 import type { SceneMedia } from "../../../packages/contracts/media";
 import { ScenePlayer } from "./ScenePlayer";
 import { ComicStrip } from "./ComicStrip";
+import { DiceRoll } from "./DiceRoll";
 import { useStory } from "./Story";
 
 // Every renderer shares the same persisted input and server-validated outputs.
@@ -63,6 +64,11 @@ export function StoryNode({
       preload.load();
     };
   }, [nextMedia?.landscape.src, nextMedia?.portrait?.src]);
+  const [rollAttempt, setRollAttempt] = useState<{
+    run: string;
+    node: string;
+    revision: number;
+  }>();
   const emitted = useRef(false);
   useEffect(() => {
     if (!disabled) emitted.current = false;
@@ -70,6 +76,12 @@ export function StoryNode({
   const emit = (output: StoryNodeOutput) => {
     if (disabled || emitted.current) return;
     emitted.current = true;
+    if (output.action === "roll")
+      setRollAttempt({
+        run: save.id,
+        node: storyNode.id,
+        revision: save.revision,
+      });
     onOutput(output);
   };
   const heading = useRef<HTMLHeadingElement>(null);
@@ -213,26 +225,17 @@ export function StoryNode({
           )}
           <p className="story-node-copy">{storyNode.transcript}</p>
           {type === "dice" && (
-            <div
-              className="dice-face"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              <span className="dice-result-label">
-                {rolled ? "You rolled" : "Ready to roll"}
-              </span>
-              <strong>
-                {rolled
-                  ? save.lastRoll!.value
-                  : `◇ d${storyNode.diceSides ?? "?"}`}
-              </strong>
-              <span className="dice-result-detail">
-                {rolled
-                  ? `${save.lastRoll!.passed ? "Pass" : "Fail"} · Target ${save.lastRoll!.target}`
-                  : "Roll to reveal your result"}
-              </span>
-            </div>
+            <DiceRoll
+              sides={storyNode.diceSides}
+              roll={rolled ? save.lastRoll : undefined}
+              busy={transitioning}
+              attempting={
+                rollAttempt?.run === save.id &&
+                rollAttempt.node === storyNode.id &&
+                (save.revision === rollAttempt.revision ||
+                  (!!rolled && save.revision === rollAttempt.revision + 1))
+              }
+            />
           )}
           {outputs}
         </section>

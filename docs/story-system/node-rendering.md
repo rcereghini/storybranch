@@ -56,6 +56,16 @@ Autoplay restrictions do not count as narrative failure. Provide play/continue c
 
 ## Layout and recovery
 
+### Animated d20 presentation
+
+The dice child renderer lazily loads a procedural Three.js d20 only for twenty-sided rolls. An accepted Roll intent starts a cosmetic tumble while the existing server command persists the outcome. The model settles with that saved value facing the viewer; animation never generates a result or dispatches an output. Next becomes available with the authoritative result and may skip the remaining animation. Reload restores the saved face without replaying the tumble.
+
+The die and accessible result occupy one fixed-size region in every state. Reduced-motion users receive a static face; unsupported WebGL, failed module loading and other dice sizes retain the numeric display. Request errors stop the tumble without inventing an outcome. Hidden tabs stop animation, and leaving the node releases graphics resources. The renderer does not alter commands, save schemas, routing or transition timing: `content-paint` still measures the reading view, not completion of cosmetic animation.
+
+Implementation review (October 25, 2026): read root/scoped instructions, CONTRIBUTING, documentation workflow, Story index/terminology, current contract, rendering, type, graph, player-runtime and design-system documents, with the context/storage and examples/current-state reading set from the preceding runtime work. This change implements d20 presentation only; StoryLeaf rewards and general type/visit contracts remain deferred. No service, portable contract, save, edition or routing changes. Self-review completed; independent review pending.
+
+Verification: 111 unit tests, TypeScript and production build passed. Geometry checks cover all twenty upright faces and opposite-face numbering. Emulator-backed mixed StoryNode checks passed at desktop/mobile widths. The new CI browser flow checks delayed Roll, keyboard input, saved result, fixed layout, identical-command retry after a failed request, static reload, separate Next, reduced motion and WebGL initialization/context-loss fallback in both themes at 390/1440 pixels. Desktop/mobile screenshots were inspected. Service integration tests were not rerun for this presentation-only change. Non-d20 and failed-module fallbacks were reviewed but not separately browser-tested; real-device Safari and production performance remain unverified. Three.js is a separate lazy chunk (about 132 KB gzip); the build reports size warnings for that chunk and the existing application chunk.
+
 Keep the player frame stable. Loading uses a fixed overlay or reserved placeholder, never a banner inserted above content. Existing video transitions retain the current frame with screen-reader loading status. Type transitions preserve media authorization where needed and respect reduced motion.
 
 Dice feedback replaces the centered dice display within reserved space, appears only on its pending visit, survives reload and goes into the story log afterward. Transient notifications overlay the layout. Reading StoryNodes have accessible headings, image alternatives and keyboard outputs. Videos provide available captions/transcripts; comics have a defined reading order and editable text separate from artwork. Forms and battles require keyboard navigation, readable status and focus restoration.
