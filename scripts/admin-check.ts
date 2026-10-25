@@ -13,6 +13,31 @@ try {
   tab.on("pageerror", (e) => errors.push(e.message));
   const overflow = () =>
     tab.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  // On failure, the deepest elements that stick out past the screen, outside
+  // anything that scrolls or clips on its own.
+  const wide = () =>
+    tab.evaluate(() =>
+      [...document.querySelectorAll("body *")]
+        .filter((e) => e.getBoundingClientRect().right > innerWidth + 1)
+        .filter(
+          (e) =>
+            ![...e.children].some(
+              (c) => c.getBoundingClientRect().right > innerWidth + 1,
+            ),
+        )
+        .filter((e) => {
+          for (let p = e.parentElement; p; p = p.parentElement)
+            if (/(auto|scroll|hidden)/.test(getComputedStyle(p).overflowX))
+              return false;
+          return true;
+        })
+        .slice(0, 6)
+        .map(
+          (e) =>
+            `${e.tagName.toLowerCase()}.${String(e.className)} "${(e.textContent ?? "").trim().slice(0, 40)}" (${Math.round(e.getBoundingClientRect().right)}px)`,
+        )
+        .join(", "),
+    );
 
   await tab.goto("http://127.0.0.1:5173/discover");
   await tab.getByRole("button", { name: "Sign in" }).first().click();
@@ -55,7 +80,7 @@ try {
   assert.equal(
     await overflow(),
     false,
-    "Horizontal overflow on Overview at 390",
+    `Horizontal overflow on Overview at 390: ${await wide()}`,
   );
   await tab.screenshot({
     path: "test-results/admin-overview-phone.png",
