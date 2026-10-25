@@ -7,7 +7,17 @@ async function showView(
 ) {
   const views = tab.getByRole("navigation", { name: "Editor views" });
   if (await views.isVisible())
-    await views.getByRole("button", { name, exact: true }).click();
+    await views
+      .getByRole("button", {
+        name:
+          name === "Edit StoryNode" ? /^(Edit StoryNode|StoryTrunk)$/ : name,
+      })
+      .click();
+  if (name === "Edit StoryNode")
+    await tab
+      .locator(".studio-panel .studio-tabs")
+      .getByRole("button", { name: "StoryNode", exact: true })
+      .click();
 }
 const browser = await launchBrowser();
 try {
@@ -26,7 +36,9 @@ try {
       .getByRole("button", { name: "Sign in ↗" })
       .click();
     await tab.getByRole("dialog").waitFor({ state: "hidden" });
-    await tab.getByRole("button", { name: "New story", exact: true }).click();
+    await tab
+      .getByRole("button", { name: "New starter story", exact: true })
+      .click();
     await showView(tab, "Edit StoryNode");
     const title = `Reusable film ${width} ${Date.now()}`;
     await tab.getByLabel("StoryNode title", { exact: true }).fill(title);
@@ -157,9 +169,7 @@ try {
         "base64",
       ),
     });
-    await assets
-      .getByText(`${photoName} is ready`, { exact: false })
-      .waitFor();
+    await assets.getByText(`${photoName} is ready`, { exact: false }).waitFor();
     await assets.getByRole("img", { name: photoName, exact: true }).waitFor();
     assert(
       await assets

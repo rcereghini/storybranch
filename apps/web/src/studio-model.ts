@@ -162,15 +162,19 @@ export function blankStory(id: string): StoryData {
     versionId: "draft",
     rulesetVersion: "prototype-1",
     title: "Untitled story",
+    entryStoryNodeId: "unconnected",
+    trunkContext: { version: 1, initialKeys: [] },
+    storyNodes: {},
+  };
+}
+
+export function starterStory(id: string): StoryData {
+  return {
+    ...blankStory(id),
     entryStoryNodeId: "opening",
     storyNodes: {
       opening: { ...makeStoryNode("opening"), title: "Opening" },
-      ending: {
-        ...makeStoryNode("ending"),
-        title: "The end",
-        kind: "ending",
-        choices: [],
-      },
+      ending: ending("ending", "The end", "Your journey ends here."),
     },
   };
 }

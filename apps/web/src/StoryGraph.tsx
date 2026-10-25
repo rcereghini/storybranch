@@ -78,10 +78,15 @@ export function StoryGraph({
   const points = { ...arrangeStoryNodes(story), ...positions, ...moving };
   const storyNodes = Object.values(story.storyNodes);
   const bounds = {
-    minX: Math.min(...storyNodes.map((p) => points[p.id].x)),
-    minY: Math.min(...storyNodes.map((p) => points[p.id].y)),
-    maxX: Math.max(...storyNodes.map((p) => points[p.id].x + CARD)),
+    minX: storyNodes.length
+      ? Math.min(...storyNodes.map((p) => points[p.id].x))
+      : 0,
+    minY: storyNodes.length
+      ? Math.min(...storyNodes.map((p) => points[p.id].y))
+      : 0,
+    maxX: Math.max(CARD, ...storyNodes.map((p) => points[p.id].x + CARD)),
     maxY: Math.max(
+      200,
       ...storyNodes.map((p) => points[p.id].y + graphCardHeight(p)),
     ),
   };

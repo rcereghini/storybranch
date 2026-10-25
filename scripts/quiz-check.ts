@@ -70,6 +70,10 @@ try {
   await signIn(tab);
   await tab.getByRole("button", { name: "New quiz", exact: true }).click();
   await tab
+    .locator(".studio-panel .studio-tabs")
+    .getByRole("button", { name: "StoryNode", exact: true })
+    .click();
+  await tab
     .getByLabel("Edit StoryNode", { exact: true })
     .selectOption("question-2");
   assert.match(

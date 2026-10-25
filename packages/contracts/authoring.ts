@@ -1,5 +1,26 @@
 import { z } from "zod";
-import { id, storySchema } from "./index";
+import { id, storySchema, storyTrunkContextSchema } from "./index";
+// The trunk is a configuration view, not a playable placement. Existing root
+// metadata stays the sole source of truth; editions need no duplicate title.
+export const storyTrunkSchema = z
+  .object({
+    title: z.string().max(160),
+    description: z.string().max(500),
+    startStoryNodeId: id.nullable(),
+    context: storyTrunkContextSchema,
+  })
+  .strict();
+export type StoryTrunk = z.infer<typeof storyTrunkSchema>;
+export function storyTrunkOf(draft: Draft): StoryTrunk {
+  return {
+    title: draft.story.title,
+    description: draft.description,
+    startStoryNodeId: draft.story.storyNodes[draft.story.entryStoryNodeId]
+      ? draft.story.entryStoryNodeId
+      : null,
+    context: draft.story.trunkContext ?? { version: 1, initialKeys: [] },
+  };
+}
 export const storyNodePositionsSchema = z
   .record(
     id,

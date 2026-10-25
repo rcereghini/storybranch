@@ -1,12 +1,12 @@
 # StoryNodes, graphs and authoring
 
-Status: target contract. Decisions: S01–S03, S06–S08. The current wire format is `Story.storyNodes` / `StoryNode` / `targetStoryNodeId`; see [current behavior](../16-story-nodes.md). **The naming change preserves current behavior; it does not revive the retired prototype format or implement the future graph features below.**
+Status: target contract. Decisions: S01–S03, S06–S08. The current wire format is `Story.storyNodes` / `StoryNode` / `targetStoryNodeId`; see [current behavior](../16-story-nodes.md). The naming change preserved behavior. The later implementation section below now supplies blank-trunk authoring and safe graph compilation; other target capabilities remain explicitly deferred.
 
 ## StoryTrunk, StoryNodes, StoryBranches and StoryLeaves
 
 Use [the canonical glossary](terminology.md). Each Story has exactly one StoryTrunk: the title/configuration root and default authoring starting point, outside the playthrough. It configures Story details and StoryContext definitions; its start connection leads into the playable graph. Every player-visible StoryNode connects to the StoryTrunk, other StoryNodes and/or StoryLeaves, and can have multiple outgoing StoryBranches. Drafts may contain disconnected work, with creator-facing diagnostics.
 
-Each StoryBranch is a directed connection from the StoryTrunk or a StoryNode to a StoryNode or StoryLeaf. It can carry typed data mappings and availability conditions. Paths may diverge and reconverge at StoryNodes. Following a branch within the playthrough keeps the current Story edition and PlayerContext. Starting a separately authored community side Story is a different operation with an isolated child run. These target capabilities remain future work; the [naming compatibility](naming-compatibility.md) change renames existing fields without adding their behavior.
+Each StoryBranch is a directed connection from the StoryTrunk or a StoryNode to a StoryNode or StoryLeaf. It can carry typed data mappings and availability conditions. Paths may diverge and reconverge at StoryNodes. Following a branch within the playthrough keeps the current Story edition and PlayerContext. Starting a separately authored community side Story is a different operation with an isolated child run. General typed branch bindings remain future work; blank authoring and safe publication are implemented below. The [naming compatibility](naming-compatibility.md) boundary preserves older editions.
 
 ## Consistent structure
 
@@ -68,7 +68,7 @@ Conditions decide availability or a server-selected output. Costs and effects ar
 
 New Story creates exactly one StoryTrunk with editable title/configuration and no StoryNodes, StoryLeaves or connected StoryBranches. This is the blank Story. Templates such as a quiz or comic are explicit creator choices. The draft can be saved, reopened, titled and edited. It cannot start a playthrough or publish a playable edition until a valid start connection and path to a StoryLeaf exist. Draft schemas permit incomplete wiring and report issues separately from the validated playable graph.
 
-Studio should open on the unique StoryTrunk, where the creator sets Story details and context definitions. The creator can add registered StoryNode types, edit configs, connect the trunk's start, bind data and conditions on StoryBranches, configure StoryLeaf rewards, and preview supported paths. A dedicated trunk schema is future work; current `entryStoryNodeId` remains the first playable placement. Route changes do not alter content-library revisions. Canvas position does not determine order. Deleting a connected StoryNode must surface affected references and disable unfinished paths; it cannot silently reroute them to an arbitrary ending.
+Studio should open on the unique StoryTrunk, where the creator sets Story details and context definitions. The creator can add registered StoryNode types, edit configs, connect the trunk's start, bind data and conditions on StoryBranches, configure StoryLeaf rewards, and preview supported paths. The implemented `StoryTrunk` projection and versioned starting keys are described below; `entryStoryNodeId` remains the first playable placement. Route changes do not alter content-library revisions. Canvas position does not determine order. Deleting a connected StoryNode must surface affected references and disable unfinished paths; it cannot silently reroute them to an arbitrary ending.
 
 ```mermaid
 flowchart LR
@@ -103,8 +103,32 @@ Creator diagnostics are visible in Studio, including which StoryBranches and opt
 
 The guarantee is that a player can finish, not that a person repeatedly choosing a voluntary loop must eventually stop. Unsupported or unprovable automatic cycles cannot enter the playable graph. The validated effective graph and its derivation are pinned at publication; repairing a draft creates a new edition, never changes an existing save's routes. Network/media failures preserve the visit and offer retry or exit controls without fabricating a narrative victory; see [StoryNode rendering](node-rendering.md).
 
-Current publication rejects unreachable nodes and missing structural paths to endings. Selective disabling/hiding with upstream propagation, the dedicated StoryTrunk, conditional trap analysis, automatic-cycle bounds, typed branch bindings and blank-trunk authoring UX are target work. This PR documents them and renames existing concepts; it does not change current graph validation behavior.
+The implementation below supplies blank-trunk authoring and conservative suppression with upstream propagation. General symbolic condition analysis, automatic-cycle counters and typed branch bindings remain deferred. Existing editions retain the publication policy they were issued with.
 
 ## Adding a type
 
 Before implementation, update [the type catalogue](node-types.md) and the required table in [docs/16](../16-story-nodes.md). Specify input/config/state/result schemas, intents, completion, output IDs, required/fallback routes, authority, limits, reload/retry behavior and preview behavior. Then implement the registered contracts, pure rules, service persistence, shared StoryNode renderer and Studio editor together. Include domain routing checks, server authority/idempotency tests and a browser flow with reload through the shared wrapper. Unsupported types must fail clearly; never use an implicit video fallback.
+
+## StoryTrunk and safe publication implementation
+
+S01–S03: Studio opens on the unique StoryTrunk configuration view. `StoryTrunk` is a portable projection of the existing Story title, draft description, start connection and `trunkContext`. It is not a StoryNode or a gameplay visit. Metadata retains one source of truth; no duplicate title/start fields are stored. New Story is empty, with draft-only `entryStoryNodeId: "unconnected"` until a first placement is added or selected. Quiz and Comic remain explicit templates.
+
+`trunkContext: {version: 1, initialKeys: string[]}` declares up to 40 unique Story-namespaced starting keys. The server copies them into each new run, including isolated child runs, before entry effects. They never grant account rights. Absent context means empty starting keys; issued editions and saved runs are not rewritten. Generic variables, imports and account rewards remain deferred.
+
+`reviewPublication` compiles a safe effective graph for preview and server publication, keeping incomplete content in the draft. Diagnostics identify excluded nodes and choice IDs. Start with valid leaves, then admit nodes with an unconditional, cost-free choice whose every outcome reaches the safe set. This conservative proof requires a guaranteed exit rather than attempting to solve arbitrary conditions. It rejects unavoidable automatic cycles and required random cycles; optional voluntary loops survive when an unconditional strategy to a leaf exists. Dice/check/reveal retain every required outcome or are suppressed upstream. Missing, unsafe and disconnected paths are omitted from the immutable edition; commands cannot select their choices.
+
+Inventory bounds are conservative: item entry effects require future bounded analysis, and item-changing routes cannot establish the guaranteed exit. Other optional item-changing routes still use runtime bounds and can fail without committing; an unconditional safe exit must remain. Full symbolic condition analysis and finite automatic-loop counters remain deferred. No existing edition is recompiled on read. New publications use this policy; repairing a draft creates another edition.
+
+### StoryTrunk / publication review — October 25, 2026
+
+Documentation reviewed: root/scoped AGENTS, CONTRIBUTING, development workflow; Story index, terminology, architecture, StoryNodes, type/rendering contracts, Story/Player/User contexts, keys, data/storage, AI boundaries, examples, current-state review, Studio and design system. Decisions S01–S08 and S14 constrain this change.
+
+Contract impact: blank Story authoring, an explicit Starter template, StoryTrunk configuration and versioned local starting keys, conservative effective-graph compilation with creator diagnostics. Required outcomes remain intact; server publication omits unsafe choices and preserves the full private draft. Existing editions, saves, receipts and Dice Roll/Next semantics remain unchanged. Linked content is verified against the original draft snapshot before safe output filtering, so suppression does not require mutating a reusable library revision.
+
+Current/target gap: generalized StoryContext variables/imports, typed branch payloads, symbolic condition/inventory analysis, automatic-cycle counters and account/leaf reward claims remain deferred. Conservative publication requires unconditional cost-free exits; inventory-changing entry effects cannot currently establish safety. Existing published graphs are not retroactively hardened. Metadata uses existing root fields rather than a duplicate trunk record. The draft synopsis remains draft/catalogue metadata as before.
+
+Reviewer: self-review; independent review pending.
+
+Verification: `pnpm check` passed TypeScript, 113 unit tests and the production build (existing bundle-size warning). All 41 emulator integration tests passed, including blank persistence, safe publication, linked-library output suppression, forged-choice denial, starting-key isolation, retry replay and unchanged pinned editions. Chrome StoryTrunk flows passed at 1440px/390px with both themes, plus Studio save/reload/preview/publish/upload/AI regression, graph layout/navigation, quiz and reusable StoryNode checks. Representative screenshots were inspected. The new StoryTrunk flow is included in CI's browser runner. Local documentation targets (168 links across 11 changed Markdown files) and diff whitespace checks passed; Mermaid rendering was not rerun because diagrams were unchanged.
+
+Production smoke check on the already-deployed player: resumed The Storm Signal, selected the dice branch, rolled 5, reloaded with the same pending result/revision, then explicitly selected Next and reached the saved ending with replay/discovery exits. This used the user's signed-in session and advanced that existing run. No production authoring or publication was performed; the new implementation remains local. Timing diagnostics were not collected in the production browser, so this is functional evidence, not a latency benchmark. Physical mobile/Safari verification remains outstanding.

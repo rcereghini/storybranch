@@ -10,9 +10,15 @@ import {
   type StoryNode as StoryNodeData,
   type Save,
 } from "../../../packages/contracts/index";
-import { type DraftRecord } from "../../../packages/contracts/authoring";
+import {
+  storyTrunkOf,
+  type DraftRecord,
+} from "../../../packages/contracts/authoring";
 import type { AssistChoice } from "../../../packages/contracts/assist";
-import { validatePublication } from "../../../packages/domain/authoring";
+import {
+  reviewPublication,
+  validatePublication,
+} from "../../../packages/domain/authoring";
 import {
   baseStats,
   isResultStoryNode,
@@ -46,6 +52,7 @@ import {
 } from "../../../packages/contracts/media";
 import {
   blankStory,
+  starterStory,
   choice,
   comicTemplate,
   countToward,
@@ -395,8 +402,8 @@ export function Studio({
     future.current = [];
     editVersion.current++;
     savedVersion.current = isDirty ? -1 : editVersion.current;
-    setView("map");
-    setPane("storyNode");
+    setView("panel");
+    setPane("story");
     setFocus(0);
     setPanel(null);
     setCompanion(false);
@@ -436,7 +443,7 @@ export function Studio({
     void work(async () => {
       resetEditor(await api<DraftRecord>(`/studio/${id}`), false);
     });
-  const create = (kind: "story" | "quiz" | "comic" = "story") => {
+  const create = (kind: "story" | "starter" | "quiz" | "comic" = "story") => {
     const id = `story-${crypto.randomUUID()}`;
     resetEditor(
       {
@@ -448,7 +455,9 @@ export function Studio({
             ? quizTemplate(id)
             : kind === "comic"
               ? comicTemplate(id)
-              : blankStory(id),
+              : kind === "starter"
+                ? starterStory(id)
+                : blankStory(id),
         ...(kind === "comic" ? { comic: { style: "", cast: [] } } : {}),
       },
       true,
@@ -592,6 +601,9 @@ export function Studio({
         value={target}
         onChange={(e) => update(e.target.value)}
       >
+        {!draft?.story.storyNodes[target] && (
+          <option value={target}>Not connected</option>
+        )}
         {draft &&
           Object.values(draft.story.storyNodes).map((p) => (
             <option key={p.id} value={p.id}>
@@ -667,6 +679,8 @@ export function Studio({
         { choiceId: storyNode.choices[0].id, slot: 0 },
         id,
       );
+    if (Object.keys(draft.story.storyNodes).length === 0)
+      story.entryStoryNodeId = id;
     change(story);
     setSelected(id);
     setPane("storyNode");
@@ -787,6 +801,13 @@ export function Studio({
             <Button
               className="btn btn-secondary"
               disabled={busy}
+              onClick={() => create("starter")}
+            >
+              New starter story
+            </Button>
+            <Button
+              className="btn btn-secondary"
+              disabled={busy}
               onClick={() => create("quiz")}
             >
               New quiz
@@ -868,6 +889,8 @@ export function Studio({
     !!draft.comic && storyNode?.storyNodeType === "comic" && !comicMap;
   const canUndo = past.current.length > 0;
   const canRedo = future.current.length > 0;
+  const publication = reviewPublication(draft.story);
+  const trunk = storyTrunkOf(draft);
   return (
     <section className="studio studio-shell" data-view={view}>
       {notices}
@@ -993,7 +1016,7 @@ export function Studio({
             setView("panel");
           }}
         >
-          {pane === "story" ? "Story" : "Edit StoryNode"}
+          {pane === "story" ? "StoryTrunk" : "Edit StoryNode"}
         </button>
       </nav>
 
@@ -1029,7 +1052,7 @@ export function Studio({
                     setView("panel");
                   }}
                 >
-                  Story details
+                  StoryTrunk
                 </Button>
               </>
             ) : (
@@ -1162,13 +1185,17 @@ export function Studio({
               aria-pressed={pane === "story"}
               onClick={() => setPane("story")}
             >
-              Story
+              StoryTrunk
             </button>
           </div>
           <div className="studio-scroll">
             {pane === "story" ? (
               <fieldset className="studio-story-settings" disabled={busy}>
-                <legend>Story details</legend>
+                <legend>StoryTrunk</legend>
+                <p>
+                  The title and configuration root of your Story. The
+                  playthrough starts at its first StoryNode.
+                </p>
                 <label>
                   Description
                   <textarea
@@ -1187,6 +1214,64 @@ export function Studio({
                   (entryStoryNodeId) =>
                     change({ ...draft.story, entryStoryNodeId }),
                 )}
+                <label>
+                  Starting keys
+                  <input
+                    aria-label="Starting keys"
+                    placeholder="brass-key, invitation"
+                    key={`${draft.story.id}-${(draft.story.trunkContext?.initialKeys ?? []).join(",")}`}
+                    defaultValue={trunk.context.initialKeys
+                      .map((key) => key.slice(draft.story.id.length + 1))
+                      .join(", ")}
+                    onBlur={(e) =>
+                      change({
+                        ...draft.story,
+                        trunkContext: {
+                          version: 1,
+                          initialKeys: e.target.value
+                            .split(",")
+                            .map((key) => key.trim())
+                            .filter(Boolean)
+                            .map((key) => `${draft.story.id}:${key}`),
+                        },
+                      })
+                    }
+                  />
+                </label>
+                <p>
+                  Local to each new run. Use lowercase names with hyphens; these
+                  keys cannot grant account access.
+                </p>
+                {Object.keys(draft.story.storyNodes).length === 0 && (
+                  <p>
+                    Your Story is blank. Open Map to add a StoryNode or
+                    StoryLeaf.
+                  </p>
+                )}
+                <section aria-label="Publication review">
+                  <h3>Playable paths</h3>
+                  <p>
+                    {publication.error ??
+                      "A safe starting path is ready for preview and publication."}
+                  </p>
+                  {publication.diagnostics.length > 0 && (
+                    <>
+                      <p>
+                        These paths stay in your draft and are omitted from
+                        play:
+                      </p>
+                      <ul>
+                        {publication.diagnostics.map((issue, i) => (
+                          <li key={i}>
+                            {issue.storyNodeId &&
+                              `${draft.story.storyNodes[issue.storyNodeId]?.title ?? issue.storyNodeId}: `}
+                            {issue.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </section>
                 <p className="studio-publish-note">
                   Publish makes this story public in Discover. Only publish
                   content you have rights to share. Sample clips are

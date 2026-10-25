@@ -225,6 +225,18 @@ export const storyNodeSchema = z
     branchLocation: id.optional(),
   })
   .strict();
+export const storyTrunkContextSchema = z
+  .object({
+    version: z.literal(1),
+    initialKeys: z
+      .array(namespaced)
+      .max(40)
+      .refine(
+        (keys) => new Set(keys).size === keys.length,
+        "Starting keys must be unique.",
+      ),
+  })
+  .strict();
 export const storySchema = z
   .object({
     id,
@@ -232,6 +244,7 @@ export const storySchema = z
     rulesetVersion: z.literal("prototype-1"),
     title: z.string(),
     entryStoryNodeId: id,
+    trunkContext: storyTrunkContextSchema.optional(),
     storyNodes: z.record(storyNodeSchema),
   })
   .strict();

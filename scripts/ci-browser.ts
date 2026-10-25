@@ -24,6 +24,7 @@ try {
   await import("./copilot-check");
   await import("./admin-check");
   await import("./email-check");
+  await import("./story-trunk-check");
 } finally {
   server.kill();
 }

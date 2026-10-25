@@ -56,6 +56,7 @@ pnpm check                 # types, pure domain/boundary tests, production build
 pnpm test:integration      # running emulators + seeded data required
 pnpm test:browser          # emulators + seed + pnpm dev:emulator required
 pnpm test:studio           # create, save/reload, preview, publish and play
+pnpm test:story-trunk      # blank trunks, starting keys, suppressed paths and publication
 pnpm test:auth             # same emulator setup; registration, sign-in and resume
 pnpm test:audio            # shipped audio clips, delayed choice response
 pnpm test:media            # verifies non-silent audio in every shipped MP4

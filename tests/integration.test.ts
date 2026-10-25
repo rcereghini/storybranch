@@ -1,4 +1,5 @@
 import { playerRun } from "../packages/domain/player";
+import { blankStory, starterStory } from "../apps/web/src/studio-model";
 import {
   playerContractHeader,
   playerContractVersion,
@@ -55,6 +56,121 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("saves blank trunks and publishes only safe routes while preserving drafts and pinned runs", async () => {
+  const storyId = `trunk-${randomUUID()}`;
+  const path = `/studio/${storyId}`;
+  const blank = { story: blankStory(storyId), description: "Trunk test" };
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        draft: blank,
+      })
+    ).status,
+  ).toBe(200);
+  expect((await call(path)).data.story.storyNodes).toEqual({});
+  const publish = (revision: number) =>
+    call(`${path}/publish`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: revision,
+      policyVersion: "creator-alpha-1",
+    });
+  expect((await publish(1)).status).toBe(400);
+  const story = starterStory(storyId);
+  story.trunkContext!.initialKeys = [`${storyId}:invitation`];
+  story.storyNodes.opening.storyNodeType = "text-options";
+  const safeChoice = story.storyNodes.opening.choices[0].id;
+  story.storyNodes.opening.choices.push({
+    ...structuredClone(story.storyNodes.opening.choices[0]),
+    id: "unfinished",
+    label: "Hidden unfinished path",
+    outcome: {
+      kind: "direct",
+      route: { targetStoryNodeId: "missing", effects: [] },
+    },
+  });
+  const libraryId = randomUUID();
+  const content = contentOf(story.storyNodes.opening);
+  expect(
+    (
+      await call(`/story-nodes/${libraryId}`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        content,
+      })
+    ).status,
+  ).toBe(200);
+  story.storyNodes.opening.sourceStoryNode = { id: libraryId, revision: 1 };
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: { ...blank, story },
+      })
+    ).status,
+  ).toBe(200);
+  expect((await publish(2)).status).toBe(200);
+  expect((await call(path)).data.story.storyNodes.opening.choices).toHaveLength(
+    2,
+  );
+  const begin = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId },
+  });
+  expect(begin.status).toBe(200);
+  expect(
+    begin.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).toEqual([safeChoice]);
+  expect(begin.data.save.keys).toEqual([`${storyId}:invitation`]);
+  const forged = await call(
+    `/playthroughs/${begin.data.save.id}/choices`,
+    choice(begin.data.save, "unfinished"),
+  );
+  expect(forged.status).toBe(400);
+  const next = choice(begin.data.save, safeChoice);
+  const completed = await call(
+    `/playthroughs/${begin.data.save.id}/choices`,
+    next,
+  );
+  expect(completed.data.save.status).toBe("completed");
+  expect(
+    (await call(`/playthroughs/${begin.data.save.id}/choices`, next)).data,
+  ).toEqual(completed.data);
+  story.storyNodes.opening.choices[1].outcome = {
+    kind: "direct",
+    route: { targetStoryNodeId: "ending", effects: [] },
+  };
+  story.trunkContext!.initialKeys = [];
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        draft: { ...blank, story },
+      })
+    ).status,
+  ).toBe(200);
+  expect((await publish(3)).status).toBe(200);
+  const old = await call(`/playthroughs/${begin.data.save.id}`);
+  expect(old.data.save.versionId).toBe("edition-2");
+  expect(old.data.save.keys).toEqual([`${storyId}:invitation`]);
+  expect(
+    (
+      await db
+        .doc(`stories/${storyId}/versions/edition-2/storyNodes/opening`)
+        .get()
+    ).data()!.choices,
+  ).toHaveLength(1);
+  expect(
+    (
+      await db
+        .doc(`stories/${storyId}/versions/edition-3/storyNodes/opening`)
+        .get()
+    ).data()!.choices,
+  ).toHaveLength(2);
+});
 let rules: RulesTestEnvironment;
 // Seeded accounts: player is the local admin, the rest are members with
 // every other feature. Tests switch a member's flag off and back.
