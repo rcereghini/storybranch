@@ -1,3 +1,8 @@
+import {
+  playerContractHeader,
+  playerContractVersion,
+} from "../../packages/contracts/player";
+import { playerView } from "./player-view";
 import { createHash, randomUUID, randomInt } from "node:crypto";
 import { FieldPath } from "firebase-admin/firestore";
 import { ZodError } from "zod";
@@ -11,11 +16,7 @@ import {
   type Save,
   type Stats,
 } from "../../packages/contracts/index";
-import {
-  isResultStoryNode,
-  start,
-  transition,
-} from "../../packages/domain/index";
+import { start, transition } from "../../packages/domain/index";
 import { ensurePlayerProfile } from "./player-profile";
 import { passwordReset, resendVerification, sendAccountEmail } from "./email";
 import { appSettings } from "./settings";
@@ -23,7 +24,7 @@ import { effectiveLimits } from "../../packages/contracts/settings";
 import { accountFeatures } from "../../packages/contracts/profile";
 import { newAccountFeatures } from "./access";
 import { authoring } from "./authoring";
-import { storyNodeMedia, storyNodeImage, uploads } from "./uploads";
+import { uploads } from "./uploads";
 import { storyNodeLibrary, sharedStoryNode } from "./story-node-library";
 import { generation } from "./generation";
 import { copilot } from "./copilot";
@@ -265,67 +266,15 @@ async function handleCanonical(request: Request): Promise<Response> {
           });
         }
         if (segments.length === 3) {
-          const { story, clips } = await db.runTransaction((tx) =>
-            edition(tx, s.storyId, s.versionId),
+          return json(
+            await playerView(
+              s,
+              uid,
+              profile.data() as { stats: Stats; achievements?: string[] },
+              request.headers.get(playerContractHeader) ===
+                playerContractVersion,
+            ),
           );
-          const storyNode = story.storyNodes[s.storyNodeId];
-          const next =
-            storyNode.choices.length === 1 &&
-            !storyNode.choices[0].availableWhen &&
-            storyNode.choices[0].outcome.kind === "direct"
-              ? story.storyNodes[
-                  storyNode.choices[0].outcome.route.targetStoryNodeId
-                ]
-              : undefined;
-          let branches: unknown[] = [];
-          let featuredId: string | null = null;
-          if (storyNode.branchLocation) {
-            branches = (
-              await db
-                .collection("branches")
-                .where("locationId", "==", storyNode.branchLocation)
-                .limit(20)
-                .get()
-            ).docs.map((d) => d.data());
-            featuredId =
-              (
-                await db.doc(`placements/${storyNode.branchLocation}`).get()
-              ).data()?.nominatedBranchId ?? null;
-          }
-          return json({
-            save: s,
-            story: {
-              id: story.id,
-              versionId: story.versionId,
-              title: story.title,
-            },
-            user: {
-              id: uid,
-              stats: profile.data()!.stats,
-              achievements: profile.data()!.achievements ?? [],
-              saveSpots: [
-                { id: s.id, storyId: s.storyId, storyNodeId: s.storyNodeId },
-              ],
-            },
-            storyNode,
-            // Quiz results share as "my result" rather than an ending.
-            result: isResultStoryNode(story, storyNode.id),
-            media: storyNodeMedia(storyNode.video, clips),
-            nextMedia: next?.storyNodeType.startsWith("video")
-              ? storyNodeMedia(next.video, clips)
-              : undefined,
-            image: storyNodeImage(storyNode.image, clips),
-            // Comic panel images, in panel order.
-            ...(storyNode.comic
-              ? {
-                  panels: storyNode.comic.panels.map((p) =>
-                    storyNodeImage(p.image, clips),
-                  ),
-                }
-              : {}),
-            branches,
-            featuredId,
-          });
         }
       }
     }
@@ -372,7 +321,7 @@ async function handleCanonical(request: Request): Promise<Response> {
             "IDEMPOTENCY_CONFLICT",
             "Command key was already used for a different request.",
           );
-        return readStoryData(previous.data()!.result);
+        return readStoryData<{ save: Save }>(previous.data()!.result);
       }
       let save: Save;
       let event: Record<string, unknown>;
@@ -482,7 +431,18 @@ async function handleCanonical(request: Request): Promise<Response> {
       });
       return result;
     });
-    return json(result);
+    return json(
+      request.headers.get(playerContractHeader) === playerContractVersion
+        ? {
+            player: await playerView(
+              result.save,
+              uid,
+              profile.data() as { stats: Stats; achievements?: string[] },
+              true,
+            ),
+          }
+        : result,
+    );
   } catch (error) {
     return failure(error, request, correlationId);
   }

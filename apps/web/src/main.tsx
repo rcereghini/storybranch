@@ -1,5 +1,13 @@
+import {
+  PlayerSession,
+  type PendingCommand as Pending,
+} from "./player-session";
+import {
+  playerContractHeader,
+  playerContractVersion,
+} from "../../../packages/contracts/player";
 import { storyPreviewPath } from "../../../packages/contracts/legacy-story-format";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
 import { analyticsUrl } from "./analytics";
@@ -8,16 +16,14 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth, emulatorMode } from "./firebase";
 import { AuthForm } from "./AuthForm";
 import { createApi, ApiError } from "../../../packages/api-client/index";
-import type { Save, Story } from "../../../packages/contracts/index";
+import type { Save } from "../../../packages/contracts/index";
 import "./style.css";
 import { StoryNode } from "./StoryNode";
 import { Studio } from "./Studio";
 import { AssetLibrary } from "./Library";
 import { SharedStoryNode } from "./SharedStoryNode";
 import { Story as StoryContainer } from "./Story";
-import type { StoryUser } from "../../../packages/contracts/index";
 import { ShareStory } from "./ShareStory";
-import type { SceneMedia } from "../../../packages/contracts/media";
 import type { PlayerProfile } from "../../../packages/contracts/profile";
 import { Dashboard } from "./Dashboard";
 import { Discover, type CatalogueEntry } from "./Discover";
@@ -37,19 +43,6 @@ const api = createApi(fetch, async () =>
   auth.currentUser ? auth.currentUser.getIdToken() : null,
 );
 type Branch = { id: string; title: string; author: string };
-type Player = {
-  story: { id: string; title: string; versionId: string };
-  user: StoryUser;
-  media?: SceneMedia;
-  nextMedia?: SceneMedia;
-  image?: string;
-  panels?: Array<string | undefined>;
-  save: Save;
-  storyNode: Story["storyNodes"][string];
-  result?: boolean;
-  branches: Branch[];
-  featuredId: string | null;
-};
 type Event = {
   roll?: Save["lastRoll"];
   label: string;
@@ -58,14 +51,32 @@ type Event = {
   revision: number;
   at: number;
 };
-type Pending = { path: string; body: unknown };
+
+const playerApi = createApi(
+  (input, init) => {
+    const headers = new Headers(init?.headers);
+    headers.set(playerContractHeader, playerContractVersion);
+    return fetch(input, { ...init, headers });
+  },
+  async () => (auth.currentUser ? auth.currentUser.getIdToken() : null),
+);
 function App() {
+  const [session] = useState(
+    () =>
+      new PlayerSession(
+        playerApi,
+        () => (auth.currentUser?.uid ?? "") + "|" + location.pathname,
+      ),
+  );
+  const { view: player, pending } = useSyncExternalStore(
+    session.subscribe,
+    session.snapshot,
+  );
   const [user, setUser] = useState<User | null>(null),
     [authReady, setAuthReady] = useState(false),
     [path, setPath] = useState(storyPreviewPath(location.pathname)),
     [saves, setSaves] = useState<Save[]>([]),
     [saveCursor, setSaveCursor] = useState<string | null>(null),
-    [player, setPlayer] = useState<Player | null>(null),
     [playing, setPlaying] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -76,7 +87,6 @@ function App() {
     [events, setEvents] = useState<Event[]>([]),
     [logCursor, setLogCursor] = useState<string | null>(null),
     [logOpen, setLogOpen] = useState(false),
-    [pending, setPending] = useState<Pending | null>(null),
     [catalogueItems, setCatalogueItems] = useState<CatalogueEntry[]>([]),
     [catalogueCursor, setCatalogueCursor] = useState<string | null>(null),
     [catalogueReady, setCatalogueReady] = useState(false),
@@ -152,10 +162,9 @@ function App() {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setAuthReady(true);
-      setPlayer(null);
+      session.reset();
       setSaves([]);
       setSavesError(false);
-      setPending(null);
     });
     return () => {
       unsub();
@@ -185,25 +194,18 @@ function App() {
     }
   };
   const loadPlayer = async (id: string) => {
-    const requestingUid = auth.currentUser?.uid;
-    const p = await api<Player>(`/playthroughs/${id}`);
-    if (
-      auth.currentUser?.uid !== requestingUid ||
-      location.pathname !== `/play/${id}`
-    )
-      return;
-    setPlayer(p);
+    await session.load(id);
     if (!catalogueItems.length) {
-      const catalogue = await api<{ items: CatalogueEntry[] }>(
-        "/catalogue",
-      ).catch(() => null);
-      if (catalogue) setCatalogueItems(catalogue.items);
+      void api<{ items: CatalogueEntry[] }>("/catalogue")
+        .then((catalogue) => setCatalogueItems(catalogue.items))
+        .catch(() => {});
     }
-    setStale(false);
-    setError("");
   };
   const refresh = async () => {
     const key = loadKey;
+    const scope = (auth.currentUser?.uid ?? "") + "|" + location.pathname;
+    const current = () =>
+      scope === (auth.currentUser?.uid ?? "") + "|" + location.pathname;
     setBusy(true);
     setError("");
     try {
@@ -225,11 +227,14 @@ function App() {
           );
         if (user) await loadSaves();
       }
+      if (current()) setStale(false);
     } catch (e) {
-      report(e);
+      if (current()) report(e);
     } finally {
-      setBusy(false);
-      setLoadedKey(key);
+      if (current()) {
+        setBusy(false);
+        setLoadedKey(key);
+      }
     }
   };
   const loadMoreCatalogue = async () => {
@@ -252,8 +257,7 @@ function App() {
     }
   };
   useEffect(() => {
-    setPlayer(null);
-    setPending(null);
+    session.reset();
     if (!path.startsWith("/play/") || user) void refresh();
   }, [path, user]);
   // The header shows the player's chosen name and avatar on every StoryNode.
@@ -269,22 +273,20 @@ function App() {
   }, [user]);
   const command = async (p: Pending) => {
     if (offline || busy) return;
-    const requestingUid = auth.currentUser?.uid;
-    setPending(p);
+    const scope = auth.currentUser?.uid + "|" + location.pathname;
     setBusy(true);
     setError("");
     try {
-      const result = await api<{ save: Save }>(p.path, p.body);
-      if (auth.currentUser?.uid !== requestingUid) return;
-      setPending(null);
-      if (path !== `/play/${result.save.id}`)
-        navigate(`/play/${result.save.id}`);
-      else await loadPlayer(result.save.id);
+      const result = await session.submit(p);
+      if (!result) return;
+      setStale(false);
+      if (location.pathname !== "/play/" + result.save.id)
+        navigate("/play/" + result.save.id);
     } catch (e) {
       report(e);
-      if (e instanceof ApiError && e.code !== "UNAVAILABLE") setPending(null);
     } finally {
-      setBusy(false);
+      if (scope === auth.currentUser?.uid + "|" + location.pathname)
+        setBusy(false);
     }
   };
   const start = (storyId = player?.save.storyId ?? "glass-harbor") => {

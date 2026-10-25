@@ -3,8 +3,10 @@ import { useEffect, useRef, type ReactNode } from "react";
 import type {
   StoryNode as StoryNodeData,
   StoryNodeOutput,
+  Save,
 } from "../../../packages/contracts/index";
-import { evaluate } from "../../../packages/domain/index";
+import { renderStoryNode } from "../../../packages/domain/player";
+import type { RenderStoryNode } from "../../../packages/contracts/player";
 import type { SceneMedia } from "../../../packages/contracts/media";
 import { ScenePlayer } from "./ScenePlayer";
 import { ComicStrip } from "./ComicStrip";
@@ -12,7 +14,7 @@ import { useStory } from "./Story";
 
 // Every renderer shares the same persisted input and server-validated outputs.
 export function StoryNode({
-  storyNode,
+  storyNode: input,
   media,
   nextMedia,
   image,
@@ -24,7 +26,7 @@ export function StoryNode({
   transitioning,
   result,
 }: {
-  storyNode: StoryNodeData;
+  storyNode: StoryNodeData | RenderStoryNode;
   result?: boolean;
   media?: SceneMedia;
   nextMedia?: SceneMedia;
@@ -38,6 +40,8 @@ export function StoryNode({
   transitioning: boolean;
 }) {
   const { save } = useStory();
+  const storyNode =
+    "outputs" in input ? input : renderStoryNode(input, save as Save);
   useEffect(() => {
     // Warm only one deterministic next clip. Save-data users skip speculation.
     const connection = (
@@ -71,7 +75,7 @@ export function StoryNode({
   const type = storyNode.storyNodeType;
   const video = type === "video" || type === "video-options";
   const lastVideo = useRef<{
-    storyNode: StoryNodeData;
+    storyNode: RenderStoryNode;
     media?: SceneMedia;
     sceneId: string;
   } | null>(null);
@@ -94,10 +98,8 @@ export function StoryNode({
               ? "YOUR ANSWERS ARE IN"
               : "WHAT WILL YOU DO?"}
       </p>
-      {storyNode.choices.map((output, i) => {
-        const locked =
-          !!output.availableWhen && !evaluate(output.availableWhen, save);
-        if (locked && output.unavailableDisplay === "hidden") return null;
+      {storyNode.outputs.map((output, i) => {
+        const locked = !output.enabled;
         return (
           <Button
             key={output.id}
@@ -154,15 +156,15 @@ export function StoryNode({
               video &&
               type === "video" &&
               storyNode.videoAdvance !== "continue" &&
-              storyNode.choices.length === 1
+              storyNode.outputs.length === 1
                 ? () => {
-                    emit({ choiceId: storyNode.choices[0].id });
+                    emit({ choiceId: storyNode.outputs[0].id });
                   }
                 : undefined
             }
             onNext={
-              video && type === "video" && storyNode.choices.length === 1
-                ? () => emit({ choiceId: storyNode.choices[0].id })
+              video && type === "video" && storyNode.outputs.length === 1
+                ? () => emit({ choiceId: storyNode.outputs[0].id })
                 : undefined
             }
             onPlaybackChange={onPlaybackChange}
@@ -209,7 +211,7 @@ export function StoryNode({
               <strong>
                 {rolled
                   ? save.lastRoll!.value
-                  : `◇ d${storyNode.choices[0].outcome.kind === "dice" ? storyNode.choices[0].outcome.sides : "?"}`}
+                  : `◇ d${storyNode.diceSides ?? "?"}`}
               </strong>
               <span className="dice-result-detail">
                 {rolled

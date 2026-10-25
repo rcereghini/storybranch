@@ -1,4 +1,8 @@
 import {
+  playerContractHeader,
+  playerContractVersion,
+} from "../packages/contracts/player";
+import {
   legacyStoryData,
   legacyStoryStorage,
   storyContractHeader,
@@ -550,12 +554,18 @@ it("edits only presentation fields and summarizes the player's own progress", as
     "progressed",
   );
 });
-async function call(path: string, body?: unknown, who = "player") {
+async function call(
+  path: string,
+  body?: unknown,
+  who = "player",
+  projected = false,
+) {
   const r = await handle(
     new Request(`http://localhost/api${path}`, {
       method: body ? "POST" : "GET",
       headers: {
         [storyContractHeader]: storyContractVersion,
+        ...(projected ? { [playerContractHeader]: playerContractVersion } : {}),
         ...(tokens[who] ? { Authorization: `Bearer ${tokens[who]}` } : {}),
         "Content-Type": "application/json",
       },
@@ -2977,4 +2987,95 @@ it("lets only admins manage accounts and stories, with guards, retries and an au
       .doc("users/progressed")
       .update({ features: memberFeatures, status: "active" });
   }
+});
+
+it("returns committed projected views and replays existing receipts without routing again", async () => {
+  const startBody = {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: "glass-harbor" },
+  };
+  const legacy = await call("/playthroughs", startBody);
+  expect(legacy.status).toBe(200);
+  const replay = await call("/playthroughs", startBody, "player", true);
+  expect(replay.status).toBe(200);
+  expect(replay.data.player.save.id).toBe(legacy.data.save.id);
+  const run = replay.data.player;
+  expect(run.storyNode).toHaveProperty("outputs");
+  expect(run.storyNode).not.toHaveProperty("choices");
+  expect(run.save).not.toHaveProperty("scores");
+  expect(run.save).not.toHaveProperty("appliedEntryEffects");
+  const command = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: { choiceId: "market" },
+  };
+  const route = "/playthroughs/" + run.save.id + "/choices";
+  const moved = await call(route, command, "player", true);
+  expect(moved.status).toBe(200);
+  expect(moved.data.player.save.revision).toBe(1);
+  expect(moved.data.player.storyNode.id).toBe(
+    moved.data.player.save.storyNodeId,
+  );
+  expect((await call(route, command, "player", true)).data).toEqual(moved.data);
+  const loaded = await call(
+    "/playthroughs/" + run.save.id,
+    undefined,
+    "player",
+    true,
+  );
+  expect(loaded.data).toEqual(moved.data.player);
+  expect(
+    (
+      await call(
+        route,
+        { ...command, idempotencyKey: randomUUID() },
+        "player",
+        true,
+      )
+    ).status,
+  ).toBe(409);
+});
+
+it("keeps projected dice results pending across retries and reload until Next", async () => {
+  const begun = await call(
+    "/playthroughs",
+    {
+      idempotencyKey: randomUUID(),
+      payload: { storyId: "storm-signal" },
+    },
+    "player",
+    true,
+  );
+  expect(begun.status).toBe(200);
+  let view = begun.data.player;
+  const route = `/playthroughs/${view.save.id}/choices`;
+  const step = async (action?: "roll" | "continue") => {
+    const body = {
+      idempotencyKey: randomUUID(),
+      expectedRevision: view.save.revision,
+      payload: {
+        choiceId: view.storyNode.outputs[0].id,
+        ...(action ? { action } : {}),
+      },
+    };
+    const result = await call(route, body, "player", true);
+    expect(result.status).toBe(200);
+    view = result.data.player;
+    return body;
+  };
+  await step();
+  expect(view.storyNode.storyNodeType).toBe("dice");
+  const diceId = view.storyNode.id;
+  expect(view.storyNode.diceSides).toBe(20);
+  const roll = await step("roll");
+  expect(view.storyNode.id).toBe(diceId);
+  expect(view.save.lastRoll.pending).toBe(true);
+  expect((await call(route, roll, "player", true)).data.player).toEqual(view);
+  expect(
+    (await call(`/playthroughs/${view.save.id}`, undefined, "player", true))
+      .data,
+  ).toEqual(view);
+  await step("continue");
+  expect(view.storyNode.id).not.toBe(diceId);
+  expect(view.save.lastRoll.pending).toBe(false);
 });

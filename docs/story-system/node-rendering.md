@@ -4,6 +4,8 @@ Status: target lifecycle with preserved current invariants. Read [type contracts
 
 The active StoryNode is presented by its type's renderer. Every renderer, including a future battle, form or advertisement, is a child of the shared `StoryNode` component and runs in `Story` context. The portable data type describes the placement; the shared component manages its rendering lifecycle. The wrapper owns shared busy/offline/error behavior, output dispatch, focus, accessibility and completion controls. A renderer owns its type-specific presentation and interaction controls, emitting only registered intents through that wrapper. The StoryTrunk title/configuration view is outside the playthrough and does not create a gameplay visit. Use [the canonical terminology](terminology.md) for graph concepts.
 
+The current [player runtime](player-runtime.md) implements session ordering, evaluated output presentation and combined command responses. The generalized visit lifecycle below remains a target; revision-scoped rendering does not establish durable visit identities.
+
 ## Inputs and intents
 
 Each StoryNode receives the pinned node config, validated resolved input, safe story/user projections and its current run/visit state. Read-only input does not confer permission to write those objects. UI-local values such as a hover, media time or an unsubmitted form edit remain transient unless the type explicitly defines a persisted draft.

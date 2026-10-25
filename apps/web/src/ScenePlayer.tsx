@@ -5,7 +5,10 @@ import type { SceneMedia } from "../../../packages/contracts/media";
 import "./scene-player.css";
 type Props = {
   sceneId: string;
-  storyNode: Story["storyNodes"][string];
+  storyNode: Pick<
+    Story["storyNodes"][string],
+    "video" | "title" | "transcript" | "kind" | "videoAdvance"
+  >;
   media?: SceneMedia;
   poster?: string;
   children: ReactNode;

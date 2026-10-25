@@ -1,6 +1,6 @@
 # Story system documentation
 
-Status: target architecture for future Story work, established October 23, 2026. The architecture is documented for future implementation; the code changes in this PR rename existing concepts and add compatibility for prior stored/API names. Gameplay rules are unchanged. The [current-state review](current-state-review.md) records what was inspected and verified at `49c2ac6`; [docs/16-story-nodes.md](../16-story-nodes.md) remains the current implementation contract.
+Status: architecture established October 23, 2026, with the player runtime implementation described in [player runtime](player-runtime.md). Other target capabilities remain explicitly deferred. The [current-state review](current-state-review.md) records what was inspected and verified at `49c2ac6`; [docs/16-story-nodes.md](../16-story-nodes.md) remains the current implementation contract.
 
 A **Story** contains a **StoryTrunk**, connected **StoryNodes**, their **StoryBranches**, and **StoryLeaves**. Every published StoryNode connects to the trunk, other nodes and/or leaves, and may have several outgoing StoryBranches. A StoryLeaf completes the current Story run. Read [the canonical terminology](terminology.md) before interpreting any of these concepts; it distinguishes narrative relationships from existing code names and separately authored community side Stories.
 
@@ -28,7 +28,7 @@ Always read this index, [terminology](terminology.md) and [the current contract]
 | --- | --- |
 | Understand or change system boundaries | [Architecture](architecture.md), [decisions](decisions.md) |
 | Create nodes, graph connections, blank stories, library placements | [StoryNodes](story-nodes.md), [types](node-types.md), [examples](examples.md) |
-| Render a StoryNode, add a type, change completion or transitions | [StoryNode rendering](node-rendering.md), [types](node-types.md), [StoryNodes](story-nodes.md) |
+| Render a StoryNode, add a type, change completion or transitions | [Player runtime](player-runtime.md), [StoryNode rendering](node-rendering.md), [types](node-types.md), [StoryNodes](story-nodes.md) |
 | Story definitions and runtime composition | [StoryContext](story-context.md), [architecture](architecture.md) |
 | Saves, visits, rolls, battle state and replay | [PlayerContext](player-context.md), [data/storage](data-storage.md) |
 | Accounts, account progress and safe user projection | [UserContext](user-context.md), [keys](keys.md) |

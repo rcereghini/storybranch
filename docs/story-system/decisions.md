@@ -40,3 +40,7 @@ S13 — User-authorized naming and compatibility: use canonical StoryNode names 
 ## Changing a decision
 
 State the trigger, affected ID, new rule, impact on editions/saves/rights and verification. Update the owning contract, examples, current contract if behavior changes, and relevant reading links together. Preserve the previous rationale when it explains compatibility. Do not label a design default as user-confirmed or a target rule as implemented merely because it appears in a document.
+
+## Player runtime implementation — October 25, 2026
+
+S05/S07 implementation: authenticated playback negotiates `X-Story-Player: player-view-v1`. Commands return the committed render view; old command receipts still store their original save result and are projected on replay without executing again. Current state remains version pinned. A bounded process-local edition cache retains definitions only and checks the manifest on every access. See [player runtime](player-runtime.md) for ordering, disclosure limitations and verification. This does not implement trunk authoring, conditional path compilation, typed cross-node bindings or reward claims.
