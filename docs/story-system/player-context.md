@@ -13,11 +13,13 @@ Status: target design, with current `Save` as its foundation. Decisions S04–S0
 | Interaction | Pending dice, form response draft, battle turn/state, bound node input | `lastRoll`; other type state deferred |
 | Effects and history | Once-per-run/visit markers, immutable transition events, claim refs | `appliedEntryEffects` and event log; generalized cadence deferred |
 | Parent relation | Parent run and entry revision, explicit import policy | `parentPlaythroughId`, `parentRevision`; no local-state merge |
-| Completion | Ending ID, completion time, export/reward receipt refs | Completed status and optional versioned `completion` receipt for local keys; account/export claims deferred |
+| Completion | Ending ID, completion time, export/reward receipt refs | Completed status and versioned `completion` receipt for local keys, approved account achievement outcome and newly earned persistent Story keys; cross-Story exports deferred |
 
 Current names remain valid until a versioned change implements the target. Do not put future fields into existing strict schemas without migration/version planning.
 
 ## Starting and resuming
+
+Persistent Player + Story progress is separate from this single-run context (S17). New runs receive a server-only `storyProgressSnapshot` containing only the pinned edition's declared, previously granted permanent keys. Existing saves without it resolve those keys as absent; another run's awards never change an active run. Child runs snapshot their own Story's progress, without inheriting the parent's keys. See [persistent Story progress](keys.md#first-implementation-persistent-story-progress).
 
 Starting a root run validates user access, selects a published edition, snapshots account stats, resolves declared imports and applies entry effects once. A missing optional import gets its declared default; a missing required import produces a clear eligibility message before creating the run. Each new run has a separate ID and inventory. A restart never resets account-level reward claims or creates new paid rights.
 

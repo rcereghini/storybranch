@@ -21,6 +21,7 @@ Status: target persistence design with an explicit current-path map. Decisions S
 | Approved account achievement definitions | `achievementDefinitions/{hash(story, edition, leaf)}` | Creator submission and audited admin review; live approval scoped to an immutable published ending |
 | Account achievement claims | `users/{uid}/achievementClaims/{hash(story, leaf)}` | Server-only durable claim with definition revision, source run/edition and display snapshot; no TTL, shared across editions of the same ending |
 | Other account rights and export receipts | Deferred registry and user-owned grant records | Issuer-controlled definitions, unique claims and provenance; no client grants |
+| Player + Story progress | `users/{uid}/storyProgress/{storyId}` with `keys/{keyId}` and `completions/{runId}` subcollections | Private completion counter, permanent grants with pinned source definition, durable no-TTL deduplication; atomic with run/event/achievement writes. No backfill or client access |
 | Durable inbox/outbox for external work | Production target; not a guarantee of current generation durability | Deduplicated events, leases, retries and reconciliation |
 
 Physical future collection names are intentionally not finalized. Indexes, access rules, size limits and query patterns must be designed with the feature. The old illustrative `draftNodes`/`nodes` paths in [docs/05](../05-data-and-api-contracts.md) are not today's schema and should not be reintroduced just because the conceptual name is StoryNode.

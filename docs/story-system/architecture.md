@@ -18,6 +18,7 @@ Use [the canonical terminology](terminology.md). Each Story has one StoryTrunk f
 | StoryContext | Read-only edition, declared variables, imports/exports and type definitions | Run-local inventory or account credentials |
 | PlayerContext | One run/save and its durable interaction state | The account wallet or all other runs |
 | UserContext | Account identity, profile, achievements and verified entitlements | A shared mutable story save |
+| Player + Story progress | Private per-account completion count and permanent keys for one Story, across editions/runs | Global Story ownership, another Story's inventory, or live paid access |
 
 A StoryNode's content can be reusable, but placement and StoryBranch routing belong to an edition. A library revision describes content and output slots; each placement binds those slots independently. An edit to the library never mutates an existing placement snapshot, published edition or save. StoryBranches can split and reconverge at StoryNodes. The effective playable graph contains only reachable placements with usable paths to StoryLeaves. An unfinished branch is disabled, its option hidden from players, and its creator notified; incomplete draft content is preserved. See [graph validation](story-nodes.md#storyleaves-and-termination).
 
@@ -62,6 +63,8 @@ flowchart TD
 ```
 
 These are logical ownership boundaries; they do not require three React providers or a state-management library. The existing `Story` provider already composes story metadata, `save` and `StoryUser`. A future implementation may expose selectors or nested providers while keeping one source of truth for each field. Native clients consume the same portable projections through native adapters.
+
+S17 places persistent Player + Story progress under UserContext storage. StoryTrunk/StoryContext declares the key definitions; the command service resolves only the pinned edition's granted keys into a new run's server-only snapshot. Renderers receive permitted outputs rather than a private key inventory. This adds no new React provider. Live account entitlements remain a separate future authority path.
 
 ## Extension architecture
 

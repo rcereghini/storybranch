@@ -46,6 +46,18 @@ try {
       .getByLabel("Starting keys", { exact: true })
       .fill("invitation, brass-key");
     await tab.getByLabel("Description", { exact: true }).click();
+    await tab
+      .getByRole("button", { name: "Add persistent key", exact: true })
+      .click();
+    await tab
+      .getByLabel("Persistent key 1 name", { exact: true })
+      .fill("returning");
+    await tab
+      .getByLabel("Persistent key 1 label", { exact: true })
+      .fill("Returning explorer");
+    await tab
+      .getByLabel("Persistent key 1 completions", { exact: true })
+      .fill("1");
     await save();
     await tab.reload();
     await tab.getByRole("button", { name: new RegExp(title) }).click();
@@ -110,6 +122,16 @@ try {
       .click();
     const outputs = [
       {
+        id: "bonus",
+        label: "Returning explorer route",
+        costs: [],
+        unavailableDisplay: "hidden",
+        outcome: {
+          kind: "direct",
+          route: { targetStoryNodeId: ending, effects: [] },
+        },
+      },
+      {
         id: "safe",
         label: "Finish",
         costs: [],
@@ -132,6 +154,9 @@ try {
     ];
     await tab.getByLabel("Outputs JSON").fill(JSON.stringify(outputs));
     await tab.getByLabel("StoryNode title", { exact: true }).click();
+    await tab
+      .getByLabel("Option 1 persistent key", { exact: true })
+      .selectOption({ label: "Returning explorer" });
     await pane("StoryTrunk");
     await tab
       .getByRole("region", { name: "Publication review" })
@@ -149,6 +174,12 @@ try {
       );
       await tab.screenshot({
         path: `test-results/trunk-${width}-${theme}.png`,
+      });
+      await tab
+        .getByLabel("Persistent key 1 name", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await tab.screenshot({
+        path: `test-results/persistent-keys-${width}-${theme}.png`,
       });
     }
     await save();
@@ -169,6 +200,12 @@ try {
     await tab.getByRole("button", { name: "Preview", exact: true }).click();
     const preview = tab.locator(".studio-preview");
     await preview.getByRole("heading", { name: "Choose a path" }).waitFor();
+    assert.equal(
+      await preview
+        .getByRole("button", { name: /Returning explorer route/ })
+        .count(),
+      0,
+    );
     assert.equal(
       await preview
         .getByRole("button", { name: /Secret unfinished route/ })
@@ -236,6 +273,12 @@ try {
     await tab.getByRole("heading", { name: "Choose a path" }).waitFor();
     assert.equal(
       await tab
+        .getByRole("button", { name: /Returning explorer route/ })
+        .count(),
+      0,
+    );
+    assert.equal(
+      await tab
         .getByRole("button", { name: /Secret unfinished route/ })
         .count(),
       0,
@@ -248,6 +291,10 @@ try {
       .getByText("You brought the harbor home.", { exact: true })
       .waitFor();
     await tab.getByText("Harbor rescuer — Earned", { exact: true }).waitFor();
+    await tab
+      .getByRole("region", { name: "Persistent keys earned" })
+      .getByText("Returning explorer", { exact: true })
+      .waitFor();
     await tab
       .getByText("Old invitation — Already held", { exact: true })
       .waitFor();
@@ -273,7 +320,7 @@ try {
     }
     await tab.getByRole("button", { name: /Begin another journey/ }).click();
     await tab.getByRole("heading", { name: "Choose a path" }).waitFor();
-    await tab.getByRole("button", { name: /Finish/ }).click();
+    await tab.getByRole("button", { name: /Returning explorer route/ }).click();
     await tab
       .getByRole("region", { name: "StoryLeaf completion" })
       .getByText(/Already earned/)
@@ -311,7 +358,7 @@ try {
     await tab.close();
   }
   console.log(
-    "PASS: blank StoryTrunk save/reload, starting keys, diagnostics, safe preview/publication/player completion at desktop/mobile in both themes.",
+    "PASS: StoryTrunk save/reload, persistent-key authoring, hidden branch unlock on replay, achievement approval/revocation, and safe publication/completion at desktop/mobile in both themes.",
   );
 } finally {
   await browser.close();

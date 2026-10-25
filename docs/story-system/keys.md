@@ -1,10 +1,48 @@
 # Keys, items, achievements and cross-story imports
 
-Status: target contract with implemented local state and approved account achievements. Decisions S04, S06, S09 and S16. Current runtime supports story-namespaced local keys/items/milestones/scores, rejects foreign namespaces, and grants approved account achievements at completion. Cross-story imports and commercial entitlements are not implemented.
+Status: target contract with implemented local state, persistent Player + Story keys and approved account achievements. Decisions S04, S06, S09, S16 and S17. Current runtime supports story-namespaced local keys/items/milestones/scores, completion-threshold keys across runs, and approved account achievements. Foreign namespaces, cross-story imports and commercial entitlements remain unsupported.
 
 “Key” is a creator-facing idea for a fact or right used in a condition. Storage and authorization distinguish several kinds; a single unrestricted boolean map is not sufficient.
 
 ## Kinds and ownership
+
+### Shared key model (S17)
+
+A key is an issuer-owned definition plus a verified grant to a subject. Achievements record accomplishments and may award keys; invitations, gameplay and verified purchases can also award keys. A key check does not implicitly consume it. Consumable quantities require an explicit atomic cost contract. Definitions declare scope, issuer, permitted consumers, grant rules, expiry/revocation and consumption; grants retain subject, source event, definition/edition, time and uniqueness identity.
+
+| Scope | Subject and lifetime | Example |
+| --- | --- | --- |
+| Playthrough (`run`) | One player run; separate on replay | Found item or opened door |
+| Player + Story (`story`) | One account's progress in one Story across runs/editions | Five completions unlock bonus content on the sixth run |
+| Account (`account`, future) | One account; only declared authorized consumers may check | Creator beta invitation, paid option, expiring subscriber access |
+
+StoryContext owns definitions, never shared player ownership. Player + Story progress belongs to private UserContext storage; a run receives a bounded, immutable starting snapshot. Other accounts and Stories cannot read it. Stable key IDs retain their meaning across editions; renaming creates a new identity. Creators can define and award their own narrative keys without platform achievement approval. They cannot mint another issuer's keys or platform/premium rights.
+
+Beta invitations are future account grants scoped to entering the creator's Story. A shop purchase may grant permission for Option C in that issuer's Story. Game 1 items require explicit export/import permission and source-run selection when needed before Game 2 can check them. Subscription keys are live expiring rights checked at start, resume and protected actions; they are never made permanent by a run snapshot. Expiry preserves saves and offers a recoverable access screen; current content may finish, but further protected transitions require renewed access. Payment/refund/provider and offline-lease implementation remain deferred.
+
+The server evaluates branch conditions when presenting options and again when accepting intent. Unavailable hidden branches disclose neither their option nor protected content; locked presentation may expose only an authored non-sensitive label. A disabled/expired conditional branch must retain a safe alternative. A whole-Story entry gate offers recovery before any protected content is fetched. Monetized keys may also be earned through gameplay only when their issuer explicitly permits that grant source.
+
+### First implementation: persistent Story progress
+
+`Story.progression: {version: 1, keys: [{keyId, label, afterCompletions}]}` declares up to 40 unique Story-namespaced permanent boolean keys, each awarded at a threshold from 1–999 completed runs. Counts include committed StoryLeaf completions after this feature is deployed, across editions and isolated child runs of the same Story. A watch means a completed run, not a reload, visit or raw video-play event. No historical completion backfill occurs. Existing completed saves stay unchanged.
+
+On each new root/child run, the service snapshots only declared granted keys into server-only `Save.storyProgressSnapshot` (version 1, keys). Existing saves without it have no persistent keys. Active runs never change when another run earns a key. Conditions use `{kind: "key", scope: "story", keyId, present}`; absent scope or `run` uses existing local keys. Story-scoped conditions must reference declared definitions. Account scope is reserved and rejected by current schemas.
+
+Completion atomically increments `users/{uid}/storyProgress/{storyId}.completions`, creates missing permanent grants under its `keys/{keyId}` subcollection with source run/edition/definition snapshot, and records `completions/{runId}` as a durable no-TTL deduplication receipt. These writes commit with the run/event/command receipt and any approved achievement. Thresholds use the completing run's pinned edition. Completion exposes only newly granted labels/IDs through optional `completion.storyKeys`; normal player responses omit the progress snapshot and total. No client writes or generic grant endpoint exist. Definition removal stops future snapshots/grants without deleting history. Reintroduction of the same ID recognizes its prior grant.
+
+Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations, mid-run persistent awards, achievement-to-key bindings, sequel imports, consumption, shops and subscriptions are follow-on implementations, not supported by this first slice.
+
+```mermaid
+flowchart LR
+  Definition[StoryTrunk: pinned key definitions] --> Complete[Server validates StoryLeaf completion]
+  Complete --> Atomic[Atomic run, event and unique completion receipt]
+  Atomic --> Progress[Private Player + Story count and grants]
+  Progress --> Start[Next run: snapshot declared earned keys]
+  Start --> Condition[Server evaluates StoryBranch condition]
+  Condition --> Options[Permitted option projection]
+  Options --> Intent[Player selects option]
+  Intent --> Check[Server rechecks snapshot and revision]
+```
 
 | Kind | Example | Authoritative scope and issuer | Lifetime/consumption |
 | --- | --- | --- | --- |

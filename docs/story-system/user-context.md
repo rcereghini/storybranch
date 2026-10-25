@@ -34,6 +34,8 @@ The client projection helps presentation but cannot authorize commands. Each ser
 
 ## Global progress and key boundaries
 
+UserContext also owns per-player, per-Story progress across runs: completion counts and permanent narrative key grants. This is private to the account and the named Story, not shared StoryContext state or a platform achievement. The server resolves declared keys at run start and keeps the snapshot out of ordinary player payloads; only authorized branch results and newly earned completion labels are disclosed. See S17 in [keys](keys.md#shared-key-model-s17).
+
 Approved account achievements are now stored as private durable claims, listed through `/api/achievements` and displayed in My adventures. Their grant authority is the separate [approval registry](keys.md#approved-account-achievements). Existing profile achievement strings are not claim evidence and are not populated from this registry; claims do not flow automatically into every Story's user projection. Only the current completion's achievement outcome is shown in that run. Cross-Story imports, public display consent and commercial rights remain deferred.
 
 A story can award its namespaced local key through a validated effect. An approved export can create a persistent account fact, such as completion of a canonical chapter. A creator cannot grant platform XP, premium access, another creator's achievement, currency or a subscription merely by defining a key with that name.

@@ -30,6 +30,7 @@ import { Story } from "./Story";
 import { StoryNode } from "./StoryNode";
 import { StoryLeafEditor } from "./StoryLeafEditor";
 import { AchievementSubmission } from "./Achievements";
+import { StoryProgressEditor } from "./StoryProgressEditor";
 import { ClipPicker } from "./ClipPicker";
 import { StoryNodeLibrary } from "./Library";
 import { StoryGraph } from "./StoryGraph";
@@ -1246,6 +1247,7 @@ export function Studio({
                   Local to each new run. Use lowercase names with hyphens; these
                   keys cannot grant account access.
                 </p>
+                <StoryProgressEditor story={draft.story} onChange={change} />
                 {Object.keys(draft.story.storyNodes).length === 0 && (
                   <p>
                     Your Story is blank. Open Map to add a StoryNode or
@@ -1734,6 +1736,53 @@ export function Studio({
                               </select>
                             </label>
                           )}
+                        {storyNode.storyNodeType.endsWith("options") && (
+                          <label>
+                            Persistent key required
+                            <select
+                              aria-label={`Option ${i + 1} persistent key`}
+                              value={
+                                !c.availableWhen
+                                  ? ""
+                                  : c.availableWhen.kind === "key" &&
+                                      c.availableWhen.scope === "story" &&
+                                      c.availableWhen.present
+                                    ? c.availableWhen.keyId
+                                    : "advanced"
+                              }
+                              onChange={(e) => {
+                                const { availableWhen: _, ...rest } = c;
+                                editChoice(
+                                  i,
+                                  e.target.value
+                                    ? {
+                                        ...rest,
+                                        availableWhen: {
+                                          kind: "key",
+                                          scope: "story",
+                                          keyId: e.target.value,
+                                          present: true,
+                                        },
+                                        unavailableDisplay: "hidden",
+                                      }
+                                    : rest,
+                                );
+                              }}
+                            >
+                              <option value="">No condition</option>
+                              <option value="advanced" disabled>
+                                Advanced condition (see JSON)
+                              </option>
+                              {(draft.story.progression?.keys ?? []).map(
+                                (k) => (
+                                  <option key={k.keyId} value={k.keyId}>
+                                    {k.label}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </label>
+                        )}
                         {storyNode.storyNodeType.endsWith("options") && (
                           <Button
                             onClick={() =>

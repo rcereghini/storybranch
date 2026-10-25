@@ -56,6 +56,167 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("counts distinct completions and snapshots persistent Story keys without exposing or trusting them", async () => {
+  const storyId = `progress-${randomUUID()}`;
+  const story = starterStory(storyId);
+  const keyId = `${storyId}:bonus`;
+  story.progression = {
+    version: 1,
+    keys: [{ keyId, label: "Returning explorer", afterCompletions: 5 }],
+  };
+  story.storyNodes.opening.storyNodeType = "text-options";
+  const ordinary = story.storyNodes.opening.choices[0];
+  story.storyNodes.opening.choices.push({
+    ...structuredClone(ordinary),
+    id: "bonus",
+    label: "Secret option",
+    unavailableDisplay: "hidden",
+    availableWhen: { kind: "key", scope: "story", keyId, present: true },
+  });
+  expect(
+    (
+      await call(`/studio/${storyId}`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        draft: { story, description: "Progress test" },
+      })
+    ).status,
+  ).toBe(200);
+  const published = await call(`/studio/${storyId}/publish`, {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    policyVersion: "creator-alpha-1",
+  });
+  expect(published.status).toBe(200);
+  const begin = (who = "player") =>
+    call(
+      "/playthroughs",
+      { idempotencyKey: randomUUID(), payload: { storyId } },
+      who,
+    );
+  const finish = (save: Save, command = choice(save, ordinary.id)) =>
+    call(`/playthroughs/${save.id}/choices`, command);
+  const pinned = (await begin()).data.save;
+  expect(
+    (await call(`/playthroughs/${pinned.id}/choices`, choice(pinned, "bonus")))
+      .status,
+  ).toBe(400);
+  const concurrent = await Promise.all([begin(), begin()]);
+  expect(
+    (await Promise.all(concurrent.map((r) => finish(r.data.save)))).map(
+      (r) => r.status,
+    ),
+  ).toEqual([200, 200]);
+  for (let count = 3; count <= 5; count++) {
+    const begun = await begin();
+    expect(
+      begun.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+    ).not.toContain("bonus");
+    const command = choice(begun.data.save, ordinary.id);
+    const result = await finish(begun.data.save, command);
+    expect(result.status).toBe(200);
+    expect(result.data.save.completion.storyKeys).toEqual(
+      count === 5 ? [{ keyId, label: "Returning explorer" }] : [],
+    );
+    expect((await finish(begun.data.save, command)).data).toEqual(result.data);
+    if (count === 5) {
+      await db
+        .doc(receipt("player", "choice", command.idempotencyKey))
+        .delete();
+      expect((await finish(begun.data.save, command)).status).toBe(409);
+    }
+  }
+  const root = db.doc(`users/player/storyProgress/${storyId}`);
+  expect((await root.get()).data()!.completions).toBe(5);
+  expect((await root.collection("completions").get()).size).toBe(5);
+  const grant = await root.collection("keys").doc(keyId).get();
+  expect(grant.data()).toMatchObject({
+    versionId: published.data.publishedVersionId,
+    afterCompletions: 5,
+  });
+  expect(
+    (await call(`/playthroughs/${pinned.id}`)).data.storyNode.outputs.map(
+      (o: { id: string }) => o.id,
+    ),
+  ).not.toContain("bonus");
+  const sixth = await begin();
+  expect(
+    sixth.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).toContain("bonus");
+  expect(JSON.stringify(sixth.data)).not.toContain("storyProgressSnapshot");
+  expect(JSON.stringify(sixth.data)).not.toContain(keyId);
+  expect(
+    (
+      await call(
+        `/playthroughs/${sixth.data.save.id}/choices`,
+        choice(sixth.data.save, "bonus"),
+      )
+    ).status,
+  ).toBe(200);
+  expect((await root.get()).data()!.completions).toBe(6);
+  expect((await root.collection("keys").doc(keyId).get()).data()).toEqual(
+    grant.data(),
+  );
+  const other = await begin("progressed");
+  expect(
+    other.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).not.toContain("bonus");
+  const own = rules.authenticatedContext("player").firestore();
+  await assertFails(getDoc(doc(own, root.path)));
+  await assertFails(getDoc(doc(own, grant.ref.path)));
+  await assertFails(setDoc(doc(own, grant.ref.path), { keyId }));
+  expect(
+    (
+      await call("/playthroughs", {
+        idempotencyKey: randomUUID(),
+        payload: {
+          storyId,
+          storyProgressSnapshot: { version: 1, keys: [keyId] },
+        },
+      })
+    ).status,
+  ).toBe(400);
+  // New definitions do not change pinned runs or erase a stable key's grant.
+  const laterKey = `${storyId}:later`;
+  story.progression!.keys[0].afterCompletions = 999;
+  story.progression!.keys.push({
+    keyId: laterKey,
+    label: "Later edition",
+    afterCompletions: 2,
+  });
+  expect(
+    (
+      await call(`/studio/${storyId}`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: { story, description: "Progress test" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`/studio/${storyId}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  expect((await finish(pinned)).data.save.completion.storyKeys).toEqual([]);
+  expect((await root.collection("keys").doc(laterKey).get()).exists).toBe(
+    false,
+  );
+  const later = await begin();
+  expect(
+    later.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).toContain("bonus");
+  expect(
+    (await finish(later.data.save)).data.save.completion.storyKeys,
+  ).toEqual([{ keyId: laterKey, label: "Later edition" }]);
+  expect((await root.collection("keys").doc(keyId).get()).data()).toEqual(
+    grant.data(),
+  );
+});
 it("requires achievement approval and atomically deduplicates private account claims across runs and editions", async () => {
   const storyId = `achievement-${randomUUID()}`;
   const story = starterStory(storyId);

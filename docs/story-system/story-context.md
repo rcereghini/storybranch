@@ -20,6 +20,8 @@ StoryContext describes **which story edition is being played and what it permits
 
 Definition defaults are not mutable global state. For example, a story may define `harbor:brass-key`; whether a player has it is run data. A creator can define a battle's `preemptive` input, but the resolved value for a visit comes from the run and validated bindings.
 
+For S17 permanent narrative keys, optional version-1 `progression` declares Story-owned IDs, labels and completion thresholds. Actual grants and completion counts belong to a particular account's Story progress. A run snapshots only its edition's declared grants; changing StoryTrunk or earning a key in another run does not mutate the active context. See [key scopes and progression](keys.md#shared-key-model-s17).
+
 ## Lifecycle
 
 Load an authorized edition, verify its supported schema/rules/type versions, and construct a read-only projection. A run retains this identity until completion. New publication creates a new edition; resuming an old save reads its old edition. If an edition becomes unavailable, show recovery/support/replay options without replacing its content behind the player's back.

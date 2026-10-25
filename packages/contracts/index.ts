@@ -16,7 +16,7 @@ export type Condition =
       value: number;
     }
   | { kind: "stat"; stat: StatId; op: "gte" | "lte" | "eq"; value: number }
-  | { kind: "key"; keyId: string; present: boolean }
+  | { kind: "key"; keyId: string; present: boolean; scope?: "run" | "story" }
   | { kind: "item"; itemId: string; op: "gte" | "lte" | "eq"; quantity: number }
   | { kind: "all" | "any"; conditions: Condition[] }
   | { kind: "not"; condition: Condition };
@@ -48,6 +48,7 @@ function conditionAt(depth: number): z.ZodType<Condition> {
         kind: z.literal("key"),
         keyId: namespaced,
         present: z.boolean(),
+        scope: z.enum(["run", "story"]).optional(),
       })
       .strict(),
     z
@@ -218,6 +219,14 @@ export const completionSchema = z
     storyNodeId: id,
     revision: z.number().int().nonnegative(),
     at: z.number().finite(),
+    storyKeys: z
+      .array(
+        z
+          .object({ keyId: namespaced, label: z.string().min(1).max(80) })
+          .strict(),
+      )
+      .max(40)
+      .optional(),
     accountAchievement: z
       .object({ id, title: z.string().max(80), newlyGranted: z.boolean() })
       .strict()
@@ -283,6 +292,27 @@ export const storySchema = z
     title: z.string(),
     entryStoryNodeId: id,
     trunkContext: storyTrunkContextSchema.optional(),
+    progression: z
+      .object({
+        version: z.literal(1),
+        keys: z
+          .array(
+            z
+              .object({
+                keyId: namespaced,
+                label: z.string().trim().min(1).max(80),
+                afterCompletions: z.number().int().min(1).max(999),
+              })
+              .strict(),
+          )
+          .max(40)
+          .refine(
+            (keys) => new Set(keys.map((k) => k.keyId)).size === keys.length,
+            "Persistent keys must be unique.",
+          ),
+      })
+      .strict()
+      .optional(),
     storyNodes: z.record(storyNodeSchema),
   })
   .strict();
@@ -330,6 +360,8 @@ export type Save = LocalState & {
   parentRevision: number | null;
   updatedAt: number;
   completion?: StoryCompletion;
+  // Server-only starting facts; never refreshed from another active run.
+  storyProgressSnapshot?: { version: 1; keys: string[] };
   lastRoll?: {
     storyNodeId: string;
     value: number;
