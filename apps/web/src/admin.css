@@ -784,10 +784,12 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
   gap: 12px;
 }
+/* min-width 0: a sparkline's default 300px width must not widen a tile. */
 .cc-tile {
   display: grid;
   gap: 4px;
   align-content: start;
+  min-width: 0;
   padding: 16px;
 }
 .cc-label {
@@ -821,7 +823,9 @@
   color: var(--text-body);
 }
 .cc-spark {
+  display: block;
   width: 100%;
+  min-width: 0;
   height: 30px;
   margin-top: 4px;
 }
