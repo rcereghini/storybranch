@@ -1,4 +1,4 @@
-import type { Save } from "../../../packages/contracts/index";
+import type { PlayerRun as Save } from "../../../packages/contracts/player";
 import type { CatalogueEntry } from "./Discover";
 import { StoryCover } from "./StoryCover";
 

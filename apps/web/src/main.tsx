@@ -17,7 +17,10 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth, emulatorMode } from "./firebase";
 import { AuthForm } from "./AuthForm";
 import { createApi, ApiError } from "../../../packages/api-client/index";
-import type { Save } from "../../../packages/contracts/index";
+import type {
+  PlayerRun as Save,
+  PlayerEvent,
+} from "../../../packages/contracts/player";
 import "./style.css";
 import { StoryNode } from "./StoryNode";
 import { Studio } from "./Studio";
@@ -44,14 +47,7 @@ const api = createApi(fetch, async () =>
   auth.currentUser ? auth.currentUser.getIdToken() : null,
 );
 type Branch = { id: string; title: string; author: string };
-type Event = {
-  roll?: Save["lastRoll"];
-  label: string;
-  to: string;
-  outcome?: string;
-  revision: number;
-  at: number;
-};
+type Event = PlayerEvent;
 
 const playerApi = createApi(
   (input, init) => {

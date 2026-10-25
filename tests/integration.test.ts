@@ -1,3 +1,4 @@
+import { playerRun } from "../packages/domain/player";
 import {
   playerContractHeader,
   playerContractVersion,
@@ -18,7 +19,7 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { getBytes, ref, uploadBytes } from "firebase/storage";
 import { auth, bucket, db } from "../services/api/firebase";
 import { setEmailSender, type EmailMessage } from "../services/api/email";
@@ -558,7 +559,7 @@ async function call(
   path: string,
   body?: unknown,
   who = "player",
-  projected = false,
+  projected = true,
 ) {
   const r = await handle(
     new Request(`http://localhost/api${path}`, {
@@ -572,7 +573,12 @@ async function call(
       ...(body ? { body: JSON.stringify(body) } : {}),
     }),
   );
-  return { status: r.status, data: await r.json() };
+  const data = await r.json();
+  // Keep command assertions concise; actual wire-shape checks use handle directly.
+  return {
+    status: r.status,
+    data: data.player ? { ...data, save: data.player.save } : data,
+  };
 }
 
 it("resumes legacy editions, saves and receipts without rewriting the published data", async () => {
@@ -600,9 +606,9 @@ it("resumes legacy editions, saves and receipts without rewriting the published 
   const begun = await call("/playthroughs", command);
   expect(begun.status).toBe(200);
   const saveRef = db.doc(saveOf(begun.data.save.id));
-  await saveRef.set(legacyStoryData(begun.data.save) as object);
+  await saveRef.set(legacyStoryData((await saveRef.get()).data()) as object);
   await db.doc(receipt("player", "start", command.idempotencyKey)).update({
-    result: legacyStoryData(begun.data),
+    result: legacyStoryData({ save: (await saveRef.get()).data() }),
   });
   const view = await call(`/playthroughs/${saveRef.id}`);
   expect(view.status).toBe(200);
@@ -613,14 +619,17 @@ it("resumes legacy editions, saves and receipts without rewriting the published 
       headers: { Authorization: `Bearer ${tokens.player}` },
     }),
   );
-  expect(await oldClient.json()).toEqual(legacyStoryData(view.data));
+  expect(oldClient.status).toBe(400);
+  expect((await oldClient.json()).error.message).toMatch(/Reload Storybranch/);
   const advanced = await call(`/playthroughs/${saveRef.id}/choices`, {
     idempotencyKey: randomUUID(),
     expectedRevision: begun.data.save.revision,
-    payload: { choiceId: view.data.storyNode.choices[0].id },
+    payload: { choiceId: view.data.storyNode.outputs[0].id },
   });
   expect(advanced.status).toBe(200);
-  expect((await saveRef.get()).data()).toEqual(advanced.data.save);
+  expect(playerRun((await saveRef.get()).data() as Save)).toEqual(
+    advanced.data.save,
+  );
   expect((await editionRef.get()).data()).toEqual(storedManifest);
   expect((await editionRef.collection("storyNodes").get()).empty).toBe(true);
   // The original start receipt still replays the same save identity.
@@ -1016,7 +1025,11 @@ it("Firestore rules deny all authoritative writes and private cross-user reads",
   const own = rules.authenticatedContext("player").firestore();
   const other = rules.authenticatedContext("progressed").firestore();
   const anon = rules.unauthenticatedContext().firestore();
-  await assertSucceeds(getDoc(doc(own, saveOf(s.id))));
+  await assertFails(getDoc(doc(own, saveOf(s.id))));
+  await assertFails(getDoc(doc(own, `${eventsOf(s.id)}/00000000`)));
+  await assertFails(getDoc(doc(own, "users/player/receipts/any-receipt")));
+  await assertFails(getDocs(collection(own, "users/player/playthroughs")));
+  await assertFails(getDocs(collection(own, "users/player/receipts")));
   await assertSucceeds(getDoc(doc(own, "users/player")));
   await assertFails(getDoc(doc(other, saveOf(s.id))));
   await assertFails(getDoc(doc(other, "users/player")));
@@ -1064,10 +1077,11 @@ it("persists one server dice result across retries and rejects injected results"
     ).status,
   ).toBe(400);
   const first = await call(path, command);
-  await db.doc(saveOf(s.id)).set(legacyStoryData(first.data.save) as object);
+  const storedRoll = (await db.doc(saveOf(s.id)).get()).data();
+  await db.doc(saveOf(s.id)).set(legacyStoryData(storedRoll) as object);
   await db
     .doc(receipt("player", "choice", command.idempotencyKey))
-    .update({ result: legacyStoryData(first.data) });
+    .update({ result: legacyStoryData({ save: storedRoll }) });
   const retry = await call(path, command);
   expect(first.status).toBe(200);
   expect(retry.data).toEqual(first.data);
@@ -1400,7 +1414,8 @@ it("reveals a quiz result from server-held scores, not the client", async () => 
     choice(s, "reveal"),
   );
   expect(revealed.data.save.storyNodeId).toBe("spark");
-  expect(revealed.data.save.scores).toMatchObject({
+  expect(revealed.data.save).not.toHaveProperty("scores");
+  expect((await db.doc(saveOf(s.id)).get()).data()!.scores).toMatchObject({
     "explorer-quiz:spark": 2,
     "explorer-quiz:keeper": 1,
   });
@@ -3078,4 +3093,88 @@ it("keeps projected dice results pending across retries and reload until Next", 
   await step("continue");
   expect(view.storyNode.id).not.toBe(diceId);
   expect(view.save.lastRoll.pending).toBe(false);
+});
+
+it("requires the player contract before reads, commands or receipt replay and exposes only allowed fields", async () => {
+  const command = {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: "explorer-quiz" },
+  };
+  const request = async (path: string, body?: unknown, version?: string) => {
+    const response = await handle(
+      new Request("http://localhost/api" + path, {
+        method: body ? "POST" : "GET",
+        headers: {
+          Authorization: "Bearer " + tokens.player,
+          "Content-Type": "application/json",
+          ...(version ? { [playerContractHeader]: version } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      }),
+    );
+    return { status: response.status, data: await response.json() };
+  };
+  for (const version of [undefined, "unknown-player-version"]) {
+    expect((await request("/playthroughs", command, version)).status).toBe(400);
+    expect(
+      (await db.doc(receipt("player", "start", command.idempotencyKey)).get())
+        .exists,
+    ).toBe(false);
+  }
+  const started = await request(
+    "/playthroughs",
+    command,
+    playerContractVersion,
+  );
+  expect(started.status).toBe(200);
+  expect(Object.keys(started.data)).toEqual(["player"]);
+  const run = started.data.player.save;
+  const base = "/playthroughs/" + run.id;
+  const saved = db.doc(saveOf(run.id));
+  await saved.update({
+    scores: { "explorer-quiz:secret": 99 },
+    privateDiagnostic: "do-not-send",
+  });
+  await db
+    .doc(eventsOf(run.id) + "/00000000")
+    .update({ commandId: "do-not-send", secretRoute: "do-not-send" });
+  for (const path of ["/playthroughs", base, base + "/events"]) {
+    expect((await request(path)).status).toBe(400);
+    const response = await request(path, undefined, playerContractVersion);
+    expect(response.status).toBe(200);
+    const serialized = JSON.stringify(response.data);
+    for (const secret of [
+      "scores",
+      "appliedEntryEffects",
+      "privateDiagnostic",
+      "do-not-send",
+      "secretRoute",
+      "commandId",
+      "targetStoryNodeId",
+      "availableWhen",
+    ])
+      expect(serialized).not.toContain(secret);
+  }
+  const before = (await saved.get()).data();
+  for (const suffix of ["choices", "branches"]) {
+    expect(
+      (
+        await request(base + "/" + suffix, {
+          idempotencyKey: randomUUID(),
+          expectedRevision: 0,
+          payload: {},
+        })
+      ).status,
+    ).toBe(400);
+    expect((await saved.get()).data()).toEqual(before);
+  }
+  expect((await request("/playthroughs", command)).status).toBe(400);
+  const replay = await request("/playthroughs", command, playerContractVersion);
+  expect(replay.data).toEqual(started.data);
+  // Internal receipts still retain authoritative fields for safe, exact retries.
+  expect(
+    (
+      await db.doc(receipt("player", "start", command.idempotencyKey)).get()
+    ).data()!.result.save,
+  ).toHaveProperty("appliedEntryEffects");
 });

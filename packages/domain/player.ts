@@ -1,5 +1,9 @@
 import type { Save, StoryNode } from "../contracts/index";
-import { renderStoryNodeSchema, type PlayerRun } from "../contracts/player";
+import {
+  renderStoryNodeSchema,
+  playerRollSchema,
+  type PlayerRun,
+} from "../contracts/player";
 import { evaluate } from "./index";
 
 // Explicit allowlist: authored routes, scoring and entry effects stay server-side.
@@ -55,6 +59,8 @@ export function playerRun(save: Save): PlayerRun {
     parentPlaythroughId: save.parentPlaythroughId,
     parentRevision: save.parentRevision,
     updatedAt: save.updatedAt,
-    ...(save.lastRoll ? { lastRoll: save.lastRoll } : {}),
+    ...(save.lastRoll
+      ? { lastRoll: playerRollSchema.parse(save.lastRoll) }
+      : {}),
   };
 }

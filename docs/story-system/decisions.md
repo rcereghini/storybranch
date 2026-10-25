@@ -44,3 +44,7 @@ State the trigger, affected ID, new rule, impact on editions/saves/rights and ve
 ## Player runtime implementation — October 25, 2026
 
 S05/S07 implementation: authenticated playback negotiates `X-Story-Player: player-view-v1`. Commands return the committed render view; old command receipts still store their original save result and are projected on replay without executing again. Current state remains version pinned. A bounded process-local edition cache retains definitions only and checks the manifest on every access. See [player runtime](player-runtime.md) for ordering, disclosure limitations and verification. This does not implement trunk authoring, conditional path compilation, typed cross-node bindings or reward claims.
+
+## Required player contract — October 25, 2026
+
+User decision: require the new player contract and retire detailed old player responses. S07/S08 implementation: all playthrough routes reject missing/unsupported player versions before command execution; save lists and history use allowlists; raw run/event/receipt Firestore reads are server-only. Preserve immutable editions, legacy stored-name normalization and full internal receipts. Non-player authoring/library compatibility is unchanged. This replaces the initial optional player-projection negotiation, not the naming migration. See [player runtime](player-runtime.md#player-disclosure-boundary).

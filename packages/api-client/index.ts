@@ -1,3 +1,7 @@
+import {
+  playerContractHeader,
+  playerContractVersion,
+} from "../contracts/player";
 import type { ErrorCode } from "../contracts/index";
 import {
   storyContractHeader,
@@ -21,6 +25,9 @@ export function createApi(
       method: body ? "POST" : "GET",
       headers: {
         [storyContractHeader]: storyContractVersion,
+        ...(/^\/playthroughs(?:[/?]|$)/.test(path)
+          ? { [playerContractHeader]: playerContractVersion }
+          : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         "Content-Type": "application/json",
       },

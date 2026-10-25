@@ -1,8 +1,10 @@
+import { playerRun } from "../../packages/domain/player";
+import { playerEventSchema } from "../../packages/contracts/player";
 import {
   playerContractHeader,
   playerContractVersion,
 } from "../../packages/contracts/player";
-import { playerView } from "./player-view";
+import { playerView, projectStoredPlayerData } from "./player-view";
 import { createHash, randomUUID, randomInt } from "node:crypto";
 import { FieldPath } from "firebase-admin/firestore";
 import { ZodError } from "zod";
@@ -73,6 +75,7 @@ async function owned(saveId: string, uid: string) {
 export async function handle(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const canonicalClient =
+    request.headers.get(playerContractHeader) === playerContractVersion ||
     request.headers.get(storyContractHeader) === storyContractVersion ||
     /^\/api\/(?:story-nodes|shared-story-nodes)(?:\/|$)/.test(url.pathname);
   url.pathname = storyApiPath(url.pathname);
@@ -181,6 +184,14 @@ async function handleCanonical(request: Request): Promise<Response> {
         "Your session expired. Sign in again.",
       );
     }
+    if (
+      segments[1] === "playthroughs" &&
+      request.headers.get(playerContractHeader) !== playerContractVersion
+    )
+      throw new GameError(
+        "VALIDATION_FAILED",
+        "This player version is no longer supported. Reload Storybranch to update before continuing.",
+      );
     const profileRef = db.doc(paths.user(uid));
     if (
       await ensurePlayerProfile(
@@ -243,7 +254,11 @@ async function handleCanonical(request: Request): Promise<Response> {
         }
         const d = await q.get();
         return json({
-          items: d.docs.map((x) => readStoryData(x.data())),
+          items: d.docs.map((x) =>
+            projectStoredPlayerData(() =>
+              playerRun(readStoryData<Save>(x.data())),
+            ),
+          ),
           nextCursor:
             d.size === limit
               ? `${d.docs.at(-1)!.data().updatedAt}_${d.docs.at(-1)!.id}`
@@ -261,7 +276,11 @@ async function handleCanonical(request: Request): Promise<Response> {
           if (cursor) q = q.startAfter(cursor);
           const e = await q.get();
           return json({
-            items: e.docs.map((x) => x.data()),
+            items: e.docs.map((x) =>
+              projectStoredPlayerData(() =>
+                playerEventSchema.parse(readStoryData(x.data())),
+              ),
+            ),
             nextCursor: e.size === limit ? e.docs.at(-1)!.id : null,
           });
         }
@@ -271,8 +290,6 @@ async function handleCanonical(request: Request): Promise<Response> {
               s,
               uid,
               profile.data() as { stats: Stats; achievements?: string[] },
-              request.headers.get(playerContractHeader) ===
-                playerContractVersion,
             ),
           );
         }
@@ -431,18 +448,13 @@ async function handleCanonical(request: Request): Promise<Response> {
       });
       return result;
     });
-    return json(
-      request.headers.get(playerContractHeader) === playerContractVersion
-        ? {
-            player: await playerView(
-              result.save,
-              uid,
-              profile.data() as { stats: Stats; achievements?: string[] },
-              true,
-            ),
-          }
-        : result,
-    );
+    return json({
+      player: await playerView(
+        result.save,
+        uid,
+        profile.data() as { stats: Stats; achievements?: string[] },
+      ),
+    });
   } catch (error) {
     return failure(error, request, correlationId);
   }
