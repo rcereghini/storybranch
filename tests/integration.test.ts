@@ -56,6 +56,134 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("commits StoryLeaf rewards once with durable completion, retries and pinned editions", async () => {
+  const storyId = `leaf-${randomUUID()}`;
+  const story = starterStory(storyId);
+  story.storyNodes.ending.leaf = {
+    version: 1,
+    summary: "Saved the harbor",
+    rewards: [{ keyId: `${storyId}:rescuer`, label: "Harbor rescuer" }],
+  };
+  const draftPath = `/studio/${storyId}`;
+  const persist = (revision: number) =>
+    call(draftPath, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: revision,
+      draft: { story, description: "Leaf test" },
+    });
+  const publish = (revision: number) =>
+    call(`${draftPath}/publish`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: revision,
+      policyVersion: "creator-alpha-1",
+    });
+  expect((await persist(0)).status).toBe(200);
+  expect((await publish(1)).status).toBe(200);
+  const begin = () =>
+    call("/playthroughs", {
+      idempotencyKey: randomUUID(),
+      payload: { storyId },
+    });
+  const opened = (await begin()).data.save;
+  const profileBefore = (await db.doc("users/player").get()).data();
+  const command = choice(opened, story.storyNodes.opening.choices[0].id);
+  const path = `/playthroughs/${opened.id}/choices`;
+  expect(
+    (
+      await call(path, {
+        ...command,
+        payload: { ...command.payload, rewards: ["platform:premium"] },
+      })
+    ).status,
+  ).toBe(400);
+  expect((await call(path, command, "progressed")).status).toBe(404);
+  const raced = await Promise.all([
+    call(path, command),
+    call(path, command),
+    call(path, { ...command, idempotencyKey: randomUUID() }),
+  ]);
+  // Either distinct command can win; exact retries of that winner replay safely.
+  const winner = raced.find((r) => r.status === 200)!;
+  expect(winner).toBeDefined();
+  expect(raced.some((r) => r.status === 409)).toBe(true);
+  expect(raced.every((r) => r.status === 200 || r.status === 409)).toBe(true);
+  const saved = winner.data.save;
+  expect(saved.status).toBe("completed");
+  expect(saved.keys).toEqual([`${storyId}:rescuer`]);
+  expect(saved.completion).toMatchObject({
+    version: 1,
+    storyNodeId: "ending",
+    revision: 1,
+    summary: "Saved the harbor",
+    rewards: [
+      {
+        keyId: `${storyId}:rescuer`,
+        label: "Harbor rescuer",
+        newlyGranted: true,
+      },
+    ],
+  });
+  expect((await db.collection(eventsOf(saved.id)).get()).size).toBe(2);
+  expect(
+    (await call(`/playthroughs/${saved.id}/events`)).data.items.at(-1)
+      .completion,
+  ).toEqual(saved.completion);
+  expect(
+    (await call(`/playthroughs/${saved.id}`)).data.save.completion,
+  ).toEqual(saved.completion);
+  // Expiring the transient receipt cannot reset the durable run completion.
+  const receipts = await db.collection("users/player/receipts").get();
+  for (const doc of receipts.docs)
+    if (doc.data().result?.save?.id === saved.id) await doc.ref.delete();
+  expect((await call(path, command)).status).toBe(409);
+  expect(
+    (await call(path, choice(saved, command.payload.choiceId))).status,
+  ).toBe(400);
+  expect((await db.doc(saveOf(saved.id)).get()).data()!.completion).toEqual(
+    saved.completion,
+  );
+  expect((await db.doc("users/player").get()).data()).toEqual(profileBefore);
+  const pinned = (await begin()).data.save;
+  story.storyNodes.ending.leaf.summary = "New edition summary";
+  story.storyNodes.ending.leaf.rewards = [
+    { keyId: `${storyId}:new-reward`, label: "New reward" },
+  ];
+  expect((await persist(1)).status).toBe(200);
+  expect((await publish(2)).status).toBe(200);
+  const oldEnd = await call(
+    `/playthroughs/${pinned.id}/choices`,
+    choice(pinned, command.payload.choiceId),
+  );
+  expect(oldEnd.data.save.completion.summary).toBe("Saved the harbor");
+  const replay = (await begin()).data.save;
+  const replayCommand = choice(replay, command.payload.choiceId);
+  const replayEnd = await call(
+    `/playthroughs/${replay.id}/choices`,
+    replayCommand,
+  );
+  expect(replayEnd.data.save.keys).toEqual([`${storyId}:new-reward`]);
+  expect(
+    (await call(`/playthroughs/${replay.id}/choices`, replayCommand)).data.save,
+  ).toEqual(replayEnd.data.save);
+  // Old completed saves remain untouched on read; no invented award history.
+  const legacy = { ...saved };
+  delete legacy.completion;
+  await db.doc(saveOf(saved.id)).set(legacy);
+  expect(
+    (await call(`/playthroughs/${saved.id}`)).data.save.completion,
+  ).toBeUndefined();
+  story.entryStoryNodeId = "ending";
+  expect((await persist(2)).status).toBe(200);
+  expect((await publish(3)).status).toBe(200);
+  const directLeaf = (await begin()).data.save;
+  expect(directLeaf.status).toBe("completed");
+  expect(directLeaf.completion.revision).toBe(0);
+  expect(directLeaf.keys).toEqual([`${storyId}:new-reward`]);
+  expect(
+    (await call(`/playthroughs/${directLeaf.id}/events`)).data.items[0]
+      .completion,
+  ).toEqual(directLeaf.completion);
+});
 it("saves blank trunks and publishes only safe routes while preserving drafts and pinned runs", async () => {
   const storyId = `trunk-${randomUUID()}`;
   const path = `/studio/${storyId}`;

@@ -13,7 +13,7 @@ Status: target design, with current `Save` as its foundation. Decisions S04–S0
 | Interaction | Pending dice, form response draft, battle turn/state, bound node input | `lastRoll`; other type state deferred |
 | Effects and history | Once-per-run/visit markers, immutable transition events, claim refs | `appliedEntryEffects` and event log; generalized cadence deferred |
 | Parent relation | Parent run and entry revision, explicit import policy | `parentPlaythroughId`, `parentRevision`; no local-state merge |
-| Completion | Ending ID, completion time, export/reward receipt refs | Completed status; explicit completion/export receipts deferred |
+| Completion | Ending ID, completion time, export/reward receipt refs | Completed status and optional versioned `completion` receipt for local keys; account/export claims deferred |
 
 Current names remain valid until a versioned change implements the target. Do not put future fields into existing strict schemas without migration/version planning.
 

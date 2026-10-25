@@ -1,4 +1,8 @@
-import type { Save, StoryNode } from "../contracts/index";
+import {
+  completionSchema,
+  type Save,
+  type StoryNode,
+} from "../contracts/index";
 import {
   renderStoryNodeSchema,
   playerRollSchema,
@@ -59,6 +63,9 @@ export function playerRun(save: Save): PlayerRun {
     parentPlaythroughId: save.parentPlaythroughId,
     parentRevision: save.parentRevision,
     updatedAt: save.updatedAt,
+    ...(save.completion
+      ? { completion: completionSchema.parse(save.completion) }
+      : {}),
     ...(save.lastRoll
       ? { lastRoll: playerRollSchema.parse(save.lastRoll) }
       : {}),

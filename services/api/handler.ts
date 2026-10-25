@@ -431,6 +431,8 @@ async function handleCanonical(request: Request): Promise<Response> {
           };
         }
       }
+      if (save.completion?.revision === save.revision)
+        event.completion = save.completion;
       const result = { save };
       tx.set(db.doc(paths.save(uid, save.id)), save);
       tx.create(

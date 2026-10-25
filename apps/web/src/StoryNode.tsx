@@ -12,6 +12,7 @@ import type { SceneMedia } from "../../../packages/contracts/media";
 import { ScenePlayer } from "./ScenePlayer";
 import { ComicStrip } from "./ComicStrip";
 import { DiceRoll } from "./DiceRoll";
+import { StoryLeafSummary } from "./StoryLeafSummary";
 import { useStory } from "./Story";
 
 // Every renderer shares the same persisted input and server-validated outputs.
@@ -150,6 +151,10 @@ export function StoryNode({
           </Button>
         );
       })}
+      {save.status === "completed" &&
+        save.completion?.storyNodeId === storyNode.id && (
+          <StoryLeafSummary completion={save.completion} />
+        )}
       {children}
     </section>
   );

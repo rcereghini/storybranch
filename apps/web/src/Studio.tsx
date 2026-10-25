@@ -28,6 +28,7 @@ import {
 import { resolveFixtureMedia } from "../../../fixtures/media";
 import { Story } from "./Story";
 import { StoryNode } from "./StoryNode";
+import { StoryLeafEditor } from "./StoryLeafEditor";
 import { ClipPicker } from "./ClipPicker";
 import { StoryNodeLibrary } from "./Library";
 import { StoryGraph } from "./StoryGraph";
@@ -564,6 +565,7 @@ export function Studio({
             ...rest,
             storyNodeType: type,
             kind: "scene",
+            leaf: undefined,
             choices: [revealChoice(ids.map((r) => result(draft.story.id, r)))],
           },
         },
@@ -585,6 +587,7 @@ export function Studio({
       ...rest,
       storyNodeType: type,
       kind: type === "dice" ? "scene" : storyNode.kind,
+      ...(type === "dice" ? { leaf: undefined } : {}),
       ...(type.startsWith("video") ? { video: media[0].landscape.src } : {}),
       choices: storyNode.kind === "ending" && type !== "dice" ? [] : [c],
     });
@@ -1487,6 +1490,9 @@ export function Studio({
                               updateStoryNode({
                                 ...storyNode,
                                 kind: e.target.checked ? "ending" : "scene",
+                                leaf: e.target.checked
+                                  ? storyNode.leaf
+                                  : undefined,
                                 choices: e.target.checked ? [] : [choice()],
                               })
                             }
@@ -1495,6 +1501,13 @@ export function Studio({
                         </label>
                       )}
                     <h3>Outputs</h3>
+                    {storyNode.kind === "ending" && (
+                      <StoryLeafEditor
+                        storyId={draft.story.id}
+                        node={storyNode}
+                        onChange={updateStoryNode}
+                      />
+                    )}
                     {storyNode.kind === "ending" && (
                       <p>
                         This closes the story and offers replay or another

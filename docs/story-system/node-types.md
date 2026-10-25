@@ -32,6 +32,8 @@ Each type must provide bounded config/input/intent/state/result schemas, a pinne
 
 Current library support is Text/Text with Options/Video/Video with Options. Dice, Reveal and Comic remain placements; extending library support must pin content revisions and validate inputs without leaking story/run identity.
 
+StoryLeaf local completion is implemented separately from a new renderer type: eligible ending placements accept versioned summary/labeled-key configuration, and committed entry records the durable run receipt. The shared StoryNode presents it in both preview and playback. Account rewards and exports remain deferred. See [local completion contract](story-nodes.md#local-completion-contract) for bounds, claim scope and old-save behavior.
+
 ## DiceRoll details
 
 Initial rule remains uniform integer 1–N, pass on `value >= threshold`; target must be within 1–N. The service supplies randomness and persists it before the UI shows a result. Transaction retries reuse the draw; command retries replay the receipt. Repeated Roll on the pending visit is rejected. Next routes from the stored result and consumes it exactly once. A future modifier must name its source, bounds and ruleset version; the browser cannot supply a total.
