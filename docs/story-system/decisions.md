@@ -48,3 +48,7 @@ S05/S07 implementation: authenticated playback negotiates `X-Story-Player: playe
 ## Required player contract — October 25, 2026
 
 User decision: require the new player contract and retire detailed old player responses. S07/S08 implementation: all playthrough routes reject missing/unsupported player versions before command execution; save lists and history use allowlists; raw run/event/receipt Firestore reads are server-only. Preserve immutable editions, legacy stored-name normalization and full internal receipts. Non-player authoring/library compatibility is unchanged. This replaces the initial optional player-projection negotiation, not the naming migration. See [player runtime](player-runtime.md#player-disclosure-boundary).
+
+## S14 — StoryTrunk authoring and conservative effective graphs
+
+Implement S01–S03 using a single trunk projection over existing root metadata plus optional versioned `trunkContext.initialKeys`. Blank drafts contain no placements. Preview and new publication compile a safe subset with creator diagnostics, retaining unfinished draft work. Require an unconditional cost-free strategy to a StoryLeaf, all required outcomes safe, and preserve optional voluntary loops only when that strategy exists. Inventory-dependent guarantees need later bounded analysis. Existing immutable editions retain their original graphs and semantics; no read-time recompilation or migration. See [implementation contract](story-nodes.md#storytrunk-and-safe-publication-implementation).

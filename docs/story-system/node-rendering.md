@@ -12,7 +12,7 @@ Each StoryNode receives the pinned node config, validated resolved input, safe s
 
 An intent identifies the permitted action and bounded user input. It never supplies trusted destination IDs, selected random values, damage totals, reward amounts or entitlement flags. The service derives those from the edition and authoritative state. A choice ID is an intent to choose that option, subject to revalidation. Local disabling and debouncing improve UX; server idempotency provides correctness.
 
-Target output projection omits disabled StoryBranches whose paths cannot reach a StoryLeaf, including their buttons and video overlay options. Studio shows the diagnostic to the creator; the player does not see an unfinished option. The server rejects direct or stale invocations of those branches. An ordinary unmet condition on a valid path can use the declared locked/hidden policy. See [graph validation](story-nodes.md#storyleaves-and-termination) for required outcomes and upstream suppression.
+New published editions omit disabled StoryBranches whose paths cannot safely reach a StoryLeaf, including their buttons and video overlay options. Existing editions keep their original graphs. Studio shows the diagnostic to the creator; the player does not see an unfinished option. The server rejects direct or stale invocations of those branches. An ordinary unmet condition on a valid path can use the declared locked/hidden policy. See [graph validation](story-nodes.md#storyleaves-and-termination) for required outcomes and upstream suppression.
 
 ## Lifecycle
 

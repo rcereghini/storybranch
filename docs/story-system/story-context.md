@@ -24,7 +24,7 @@ Definition defaults are not mutable global state. For example, a story may defin
 
 Load an authorized edition, verify its supported schema/rules/type versions, and construct a read-only projection. A run retains this identity until completion. New publication creates a new edition; resuming an old save reads its old edition. If an edition becomes unavailable, show recovery/support/replay options without replacing its content behind the player's back.
 
-The current web provider composes `{story, user, save}`. The target composition adds structured definitions/resolved input as needed, while retaining the shared provider. Components should select only the fields needed for their work. The entire graph, including hidden outcomes, need not be delivered to the browser; server-only data may remain in the authoritative edition store.
+The current web provider composes `{story, user, save}`. StoryTrunk settings project root metadata and optional version-1 starting-key definitions. Initial keys are copied into each new run before entry effects, never imported from another run or applied when resuming an existing save. The target composition adds structured definitions/resolved input as needed, while retaining the shared provider. Components should select only the fields needed for their work. The entire graph, including hidden outcomes, need not be delivered to the browser; server-only data may remain in the authoritative edition store.
 
 ## Authoring and reusable content
 

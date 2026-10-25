@@ -133,7 +133,7 @@ export function start(
       status: "active",
       statsSnapshot: { ...stats },
       stats: { ...stats },
-      keys: [],
+      keys: [...(story.trunkContext?.initialKeys ?? [])],
       items: {},
       health: 100,
       milestones: [],
@@ -276,6 +276,12 @@ export function validateStory(value: unknown): Story {
   if (storyNodes.length > 100 || !story.storyNodes[story.entryStoryNodeId])
     throw new Error("Invalid graph entry or size");
   const effectIds = new Set<string>();
+  if (
+    story.trunkContext?.initialKeys.some(
+      (key) => !key.startsWith(story.id + ":"),
+    )
+  )
+    throw new Error("Foreign namespace without import contract");
   for (const [key, n] of Object.entries(story.storyNodes)) {
     if (
       key !== n.id ||

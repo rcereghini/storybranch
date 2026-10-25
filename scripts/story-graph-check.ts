@@ -7,7 +7,7 @@ const show = async (tab: BrowserTab, view: "Map" | "Panel") => {
   if (await views.isVisible())
     await views
       .getByRole("button", {
-        name: view === "Map" ? "Map" : /^(Edit StoryNode|Story)$/,
+        name: view === "Map" ? "Map" : /^(Edit StoryNode|StoryTrunk)$/,
       })
       .click();
 };
@@ -25,7 +25,9 @@ try {
       .getByRole("button", { name: "Sign in ↗" })
       .click();
     await tab.getByRole("dialog").waitFor({ state: "hidden" });
-    await tab.getByRole("button", { name: "New story", exact: true }).click();
+    await tab
+      .getByRole("button", { name: "New starter story", exact: true })
+      .click();
     const title = `Branching paths ${width} ${Date.now()}`;
     await tab.getByLabel("Story title", { exact: true }).fill(title);
     const graph = tab.getByRole("region", {
@@ -211,6 +213,8 @@ try {
     );
     await tab.reload();
     await tab.getByRole("button", { name: new RegExp(title) }).click();
+    await tab.getByLabel("Description", { exact: true }).waitFor();
+    await show(tab, "Map");
     const restored = await graph
       .locator(`[data-story-node-id="${forestId}"]`)
       .evaluate((el) => ({

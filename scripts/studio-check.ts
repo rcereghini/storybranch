@@ -11,7 +11,7 @@ export const showView = async (
   if (!(await views.isVisible())) return;
   await views
     .getByRole("button", {
-      name: view === "Panel" ? /^(Edit StoryNode|Story)$/ : view,
+      name: view === "Panel" ? /^(Edit StoryNode|StoryTrunk)$/ : view,
       exact: view !== "Panel",
     })
     .click();
@@ -23,7 +23,10 @@ export const showPane = async (
   await showView(tab, "Panel");
   await tab
     .locator(".studio-panel .studio-tabs")
-    .getByRole("button", { name: pane, exact: true })
+    .getByRole("button", {
+      name: pane === "Story" ? "StoryTrunk" : pane,
+      exact: true,
+    })
     .click();
 };
 const saved = (tab: BrowserTab) =>
@@ -52,7 +55,9 @@ try {
       console.error(e.message);
     });
     await signIn(tab);
-    await tab.getByRole("button", { name: "New story", exact: true }).click();
+    await tab
+      .getByRole("button", { name: "New starter story", exact: true })
+      .click();
     const title = `Studio journey ${width} ${Date.now()}`;
     // Autosave: editing alone saves the draft, without pressing Save.
     const autosaved = tab.waitForResponse(
@@ -183,10 +188,13 @@ try {
     const errors: string[] = [];
     tab.on("pageerror", (e) => errors.push(e.message));
     await signIn(tab);
-    await tab.getByRole("button", { name: "New story", exact: true }).click();
+    await tab
+      .getByRole("button", { name: "New starter story", exact: true })
+      .click();
     await tab
       .getByLabel("Story title", { exact: true })
       .fill(`Uploaded clip ${Date.now()}`);
+    await showPane(tab, "StoryNode");
     await tab
       .getByLabel("StoryNode type", { exact: true })
       .selectOption("video");
@@ -323,7 +331,9 @@ try {
       });
     });
     await signIn(tab);
-    await tab.getByRole("button", { name: "New story", exact: true }).click();
+    await tab
+      .getByRole("button", { name: "New starter story", exact: true })
+      .click();
     await tab
       .getByLabel("Story title", { exact: true })
       .fill(`AI help ${width}`);

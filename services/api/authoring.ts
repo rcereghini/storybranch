@@ -135,7 +135,7 @@ export async function authoring(
           if (
             root?.ownerUid !== uid ||
             !source ||
-            JSON.stringify(contentOf(storyNode)) !==
+            JSON.stringify(contentOf(old.story.storyNodes[storyNode.id])) !==
               JSON.stringify(source.content)
           )
             throw new GameError(

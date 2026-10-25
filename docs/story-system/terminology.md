@@ -58,7 +58,7 @@ The code, UI, files and new stored/API contracts use the canonical names. The [c
 | Canonical concept | Existing implementation vocabulary |
 | --- | --- |
 | Story and its edition | `Story`, `Story.storyNodes`, `versionId`, `entryStoryNodeId` |
-| StoryTrunk | Story metadata/title surfaces partially cover its purpose; no dedicated trunk record/schema exists. `entryStoryNodeId` currently identifies the first playable placement, not the title/configuration root. A future trunk schema must preserve that distinction. |
+| StoryTrunk | `StoryTrunk` projects Story title, draft description, start connection and versioned `trunkContext`. Studio opens on this configuration view. `entryStoryNodeId` identifies the first playable placement, never a trunk visit; no duplicate metadata record is stored. |
 | StoryNode | A placement currently represented by `StoryNode`, `storyNodeSchema`, `storyNodeType`, `storyNodeId`; rendered inside the shared `Story` provider and `StoryNode` component |
 | StoryBranch | A logical output route; current `choices` and their `outcome` route bindings, including dice success/failure and reveal results. One choice can resolve to several possible branches. |
 | StoryLeaf | Eligible placement with `kind: "ending"`; completion shell supplies exits outside the story graph. Generalized leaf reward configuration remains target work. |
