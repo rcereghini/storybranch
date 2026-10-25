@@ -245,6 +245,9 @@ try {
         json: {
           ...profile,
           features: { ...profile.features, copilot: true },
+          // Studio uses the server-derived writingHelp capability, which also
+          // accounts for deployment settings/provider availability.
+          writingHelp: true,
         },
       });
     });

@@ -14,7 +14,7 @@ try {
     });
     await tab.goto("http://127.0.0.1:5173");
     await tab.locator(".loading-overlay").waitFor();
-    const loadingHero = await tab.locator(".hero").boundingBox();
+    const loadingHero = await tab.locator(".disc-hero").boundingBox();
     assert.equal(
       await tab
         .locator(".loading-overlay")
@@ -24,7 +24,7 @@ try {
     releaseCatalogue();
     await tab.locator(".loading-overlay").waitFor({ state: "hidden" });
     assert.deepEqual(
-      await tab.locator(".hero").boundingBox(),
+      await tab.locator(".disc-hero").boundingBox(),
       loadingHero,
       "Catalogue loading must not shift or resize the hero",
     );
@@ -74,6 +74,12 @@ try {
       }
       requestAnimationFrame(sample);
     });
+    const transitionRequests: string[] = [];
+    tab.on("request", (request) => {
+      if (request.url().includes("/api/playthroughs/"))
+        transitionRequests.push(request.method() + " " + request.url());
+    });
+    const transitionStarted = Date.now();
     await tab.getByRole("button", { name: /Speak to the courier/ }).click();
     await tab.waitForFunction(() => {
       const v = document.querySelector("video")!;
@@ -89,6 +95,21 @@ try {
         reused: w.originalVideo === document.querySelector("video"),
       };
     });
+    assert.equal(
+      transitionRequests.filter((r) => r.startsWith("POST ")).length,
+      1,
+    );
+    assert.equal(
+      transitionRequests.filter((r) => r.startsWith("GET ")).length,
+      0,
+      "Committed transitions must not refetch the player",
+    );
+    console.log(
+      width +
+        "px click-to-playing with injected API/media delays: " +
+        (Date.now() - transitionStarted) +
+        "ms",
+    );
     assert(result.reused);
     for (const field of ["top", "height"]) {
       const values = result.samples.map((s: any) => s[field]);
