@@ -1,6 +1,35 @@
 import { expect, it } from "vitest";
 import { createApi } from "../packages/api-client/index";
 import apiFunction from "../services/functions/api";
+import {
+  playerContractHeader,
+  playerContractVersion,
+} from "../packages/contracts/player";
+
+it("negotiates the required contract on every player route", async () => {
+  const requests: Headers[] = [];
+  const api = createApi(
+    async (_input, init) => {
+      requests.push(new Headers(init?.headers));
+      return Response.json({});
+    },
+    async () => "token",
+  );
+  await api("/playthroughs");
+  await api("/playthroughs?cursor=next");
+  await api("/playthroughs/run/events");
+  await api("/playthroughs/run/choices", { intent: true });
+  await api("/catalogue");
+  expect(
+    requests
+      .slice(0, 4)
+      .every(
+        (headers) =>
+          headers.get(playerContractHeader) === playerContractVersion,
+      ),
+  ).toBe(true);
+  expect(requests[4].has(playerContractHeader)).toBe(false);
+});
 
 it.each([
   new Response(

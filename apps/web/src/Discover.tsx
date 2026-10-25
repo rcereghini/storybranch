@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Save } from "../../../packages/contracts/index";
+import type { PlayerRun as Save } from "../../../packages/contracts/player";
 import { genreLabels, genreOf } from "../../../packages/domain/dashboard";
 import type { GenreId } from "../../../packages/contracts/profile";
 import { StoryCover } from "./StoryCover";

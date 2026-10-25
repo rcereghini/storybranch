@@ -4,6 +4,24 @@ import type { SceneMedia } from "./media";
 
 export const playerContractHeader = "X-Story-Player";
 export const playerContractVersion = "player-view-v1";
+export const playerRollSchema = z.object({
+  storyNodeId: id,
+  value: z.number().int(),
+  sides: z.number().int().positive(),
+  target: z.number().int(),
+  passed: z.boolean(),
+  pending: z.boolean(),
+});
+export const playerEventSchema = z.object({
+  label: z.string(),
+  revision: z.number().int().nonnegative(),
+  at: z.number(),
+  from: id.nullable().optional(),
+  to: id.optional(),
+  outcome: z.string().optional(),
+  roll: playerRollSchema.optional(),
+});
+export type PlayerEvent = z.infer<typeof playerEventSchema>;
 export const renderStoryNodeSchema = storyNodeSchema
   .pick({
     id: true,

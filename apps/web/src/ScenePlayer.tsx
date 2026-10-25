@@ -1,3 +1,4 @@
+import { transitionTiming } from "./transition-timing";
 import { Button } from "./ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Story } from "../../../packages/contracts/index";
@@ -75,6 +76,12 @@ export function ScenePlayer({
     // Reuse the authorized media element across committed scenes. Loading the
     // new source resets its timeline even when fixtures reuse the same URL.
     element?.load();
+    const frameCallback =
+      element && typeof element.requestVideoFrameCallback === "function"
+        ? element.requestVideoFrameCallback(() => {
+            if (active) transitionTiming.ready(sceneId, "video-frame");
+          })
+        : undefined;
     setBuffering(true);
     // Start automatically when the story opens; keep this authorized element
     // for subsequent StoryNodes. A denied play gets one prominent gesture fallback.
@@ -86,12 +93,18 @@ export function ScenePlayer({
         return;
       setWatching(false);
       setBuffering(false);
-      if (error instanceof DOMException && error.name === "NotAllowedError")
+      if (error instanceof DOMException && error.name === "NotAllowedError") {
         setBlocked(true);
-      else setFailed(true);
+        transitionTiming.ready(sceneId, "autoplay-blocked");
+      } else {
+        setFailed(true);
+        transitionTiming.ready(sceneId, "media-error");
+      }
     });
     return () => {
       active = false;
+      if (frameCallback !== undefined)
+        element?.cancelVideoFrameCallback(frameCallback);
     };
   }, [source, retry, sceneId, visible]);
   useEffect(() => {
@@ -125,6 +138,7 @@ export function ScenePlayer({
     setWatching(false);
   };
   const fail = () => {
+    transitionTiming.ready(sceneId, "media-error");
     setBuffering(false);
     setFailed(true);
     setWatching(false);
@@ -142,6 +156,8 @@ export function ScenePlayer({
           preload="auto"
           poster={poster ?? (media ? rendition?.poster : "/media/harbor.svg")}
           onPlaying={() => {
+            if (typeof video.current?.requestVideoFrameCallback !== "function")
+              transitionTiming.ready(sceneId, "playing-fallback");
             setBuffering(false);
             setWatching(true);
             setBlocked(false);

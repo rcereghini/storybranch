@@ -5,11 +5,19 @@ import { db } from "./firebase";
 import { edition } from "./story-store";
 import { storyNodeMedia, storyNodeImage } from "./uploads";
 
+// Invalid stored data is a service failure, never a bad player command.
+export function projectStoredPlayerData<T>(project: () => T): T {
+  try {
+    return project();
+  } catch (cause) {
+    throw new Error("Stored player data could not be projected.", { cause });
+  }
+}
+
 export async function playerView(
   s: Save,
   uid: string,
   profile: { stats: Stats; achievements?: string[] },
-  projected: boolean,
 ) {
   const { story, clips } = await db.runTransaction((tx) =>
     edition(tx, s.storyId, s.versionId),
@@ -33,16 +41,14 @@ export async function playerView(
         .get()
     ).docs.map((d) => {
       const branch = d.data();
-      return projected
-        ? { id: branch.id, title: branch.title, author: branch.author }
-        : branch;
+      return { id: branch.id, title: branch.title, author: branch.author };
     });
     featuredId =
       (await db.doc(`placements/${storyNode.branchLocation}`).get()).data()
         ?.nominatedBranchId ?? null;
   }
-  return {
-    save: projected ? playerRun(s) : s,
+  return projectStoredPlayerData(() => ({
+    save: playerRun(s),
     story: {
       id: story.id,
       versionId: story.versionId,
@@ -54,7 +60,7 @@ export async function playerView(
       achievements: profile.achievements ?? [],
       saveSpots: [{ id: s.id, storyId: s.storyId, storyNodeId: s.storyNodeId }],
     },
-    storyNode: projected ? renderStoryNode(storyNode, s) : storyNode,
+    storyNode: renderStoryNode(storyNode, s),
     // Quiz results share as "my result" rather than an ending.
     result: isResultStoryNode(story, storyNode.id),
     media: storyNodeMedia(storyNode.video, clips),
@@ -72,5 +78,5 @@ export async function playerView(
       : {}),
     branches,
     featuredId,
-  };
+  }));
 }

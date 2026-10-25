@@ -1,14 +1,20 @@
 rules_version = '2';
 // The app reads and writes through its API with the Admin SDK, which bypasses
 // these rules. Clients may only read the public catalogue and their own
-// records under users/{uid}; nobody writes directly.
+// profile/authoring records under users/{uid}; nobody writes directly.
+// Run state, events and receipts are server-only: player projections come from
+// authenticated API routes, including for the owning player.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /catalogue/{storyId} {
       allow read: if true;
     }
-    match /users/{uid}/{document=**} {
+    match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
+    }
+    match /users/{uid}/{collection}/{document=**} {
+      allow read: if request.auth != null && request.auth.uid == uid
+        && collection in ['drafts', 'clips', 'copilot'];
     }
     match /{document=**} {
       allow write: if false;

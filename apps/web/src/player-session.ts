@@ -1,3 +1,4 @@
+import type { TransitionTiming } from "./transition-timing";
 import type { PlayerView } from "../../../packages/contracts/player";
 import { ApiError } from "../../../packages/api-client/index";
 
@@ -18,6 +19,7 @@ export class PlayerSession {
   constructor(
     private api: Api,
     private scope: () => string,
+    private timing?: TransitionTiming,
   ) {}
   snapshot = () => this.state;
   subscribe = (listener: () => void) => {
@@ -31,6 +33,7 @@ export class PlayerSession {
     this.listeners.forEach((listener) => listener());
   }
   reset() {
+    this.timing?.cancel();
     ++this.sequence;
     this.update({ view: null, pending: null, phase: "idle" });
   }
@@ -48,13 +51,27 @@ export class PlayerSession {
   async load(id: string) {
     const sequence = ++this.sequence,
       scope = this.scope();
+    const attempt = this.timing?.begin("load");
     this.update({ phase: "loading" });
     try {
       const view = await this.api<PlayerView>(`/playthroughs/${id}`);
-      if (sequence !== this.sequence || scope !== this.scope()) return;
+      if (sequence !== this.sequence || scope !== this.scope()) {
+        if (attempt !== undefined) this.timing?.end(attempt, "cancelled");
+        return;
+      }
+      if (attempt !== undefined)
+        this.timing?.received(
+          attempt,
+          `${view.save.id}-${view.save.revision}`,
+          view.storyNode.storyNodeType,
+        );
       this.accept(view);
     } catch (error) {
-      if (sequence !== this.sequence || scope !== this.scope()) return;
+      if (sequence !== this.sequence || scope !== this.scope()) {
+        if (attempt !== undefined) this.timing?.end(attempt, "cancelled");
+        return;
+      }
+      if (attempt !== undefined) this.timing?.end(attempt, "request-error");
       this.update({ phase: "retry" });
       throw error;
     }
@@ -65,17 +82,37 @@ export class PlayerSession {
     command = this.state.pending ?? command;
     const sequence = ++this.sequence,
       scope = this.scope();
+    const attempt = this.timing?.begin("command");
     this.update({ pending: command, phase: "submitting" });
     try {
       const { player } = await this.api<{ player: PlayerView }>(
         command.path,
         command.body,
       );
-      if (sequence !== this.sequence || scope !== this.scope()) return;
+      if (sequence !== this.sequence || scope !== this.scope()) {
+        if (attempt !== undefined) this.timing?.end(attempt, "cancelled");
+        return;
+      }
+      if (attempt !== undefined)
+        this.timing?.received(
+          attempt,
+          `${player.save.id}-${player.save.revision}`,
+          player.storyNode.storyNodeType,
+        );
       this.accept(player);
       return player;
     } catch (error) {
-      if (sequence !== this.sequence || scope !== this.scope()) return;
+      if (sequence !== this.sequence || scope !== this.scope()) {
+        if (attempt !== undefined) this.timing?.end(attempt, "cancelled");
+        return;
+      }
+      if (attempt !== undefined)
+        this.timing?.end(
+          attempt,
+          error instanceof ApiError && error.code === "STALE_REVISION"
+            ? "stale"
+            : "request-error",
+        );
       const definitive =
         error instanceof ApiError && error.code !== "UNAVAILABLE";
       this.update({

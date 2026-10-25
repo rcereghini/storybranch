@@ -93,3 +93,7 @@ Use separate public projections for catalogue, shared StoryNodes and creator dis
 Keep current state bounded and histories paginated. Retain media referenced by issued editions, saves or public shared revisions; account/asset deletion must use a documented retention and access policy. Forms require response-specific retention/deletion decisions before launch. Narrative event integrity does not remove privacy obligations; sensitive data should not be copied into every event.
 
 Generation workers and entitlement providers require durable jobs/inbox/outbox, signed evidence where applicable, deduplication and reconciliation. Today's browser comic queue and request-based generation are limited implementations; see [AI authoring](ai-authoring.md). This document creates no collections, indexes, migrations or external resources.
+
+## Player read boundary (October 25, 2026)
+
+Player APIs require `X-Story-Player: player-view-v1`. The service alone reads full saves, immutable graphs and receipts; it returns the allowlisted PlayerRun/RenderStoryNode and history-event projections. Firestore rules deny direct run/event/receipt reads even to the owner, while preserving owner profile and draft/clip/Copilot reads. The rule change must be deployed with the API; updating only the web bundle does not establish this boundary. Old stored names and full-save receipts remain valid internally and are not rewritten or deleted. See [player runtime](player-runtime.md#player-disclosure-boundary) for rollout and limits.

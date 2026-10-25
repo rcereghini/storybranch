@@ -45,6 +45,15 @@ try {
       .getByText("You rolled", { exact: true })
       .waitFor();
     const result = await tab.locator(".dice-face").innerText();
+    await tab.waitForFunction(() => {
+      const sample = window
+        .storybranchTransitionTimings()
+        .filter((s) => s.operation === "command")
+        .at(-1);
+      return (
+        sample?.storyNodeType === "dice" && sample.outcome === "content-paint"
+      );
+    });
     const afterRoll = await tab.locator(".reading-story-node").boundingBox();
     assert.equal(
       afterRoll!.height,
