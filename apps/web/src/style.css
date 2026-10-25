@@ -540,15 +540,38 @@ hr {
   max-width: 65ch;
 }
 .dice-face {
-  height: 200px;
+  height: 240px;
   display: grid;
-  grid-template-rows: 28px 92px 32px;
+  grid-template-rows: 28px 180px 32px;
   align-content: center;
   justify-items: center;
   margin: 24px 0;
   font: 700 64px var(--font-display);
   text-align: center;
   color: var(--primary);
+}
+.dice-stage {
+  position: relative;
+  width: 220px;
+  height: 180px;
+  display: grid;
+  place-items: center;
+}
+.dice-model {
+  position: absolute;
+  inset: 0;
+}
+.dice-model canvas {
+  display: block;
+  width: 220px;
+  height: 180px;
+}
+.dice-accessible-value {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .app-notices {
   position: fixed;
