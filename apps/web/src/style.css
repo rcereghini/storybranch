@@ -550,6 +550,20 @@ hr {
   text-align: center;
   color: var(--primary);
 }
+.story-leaf-summary {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.story-leaf-summary p {
+  white-space: pre-line;
+}
+.story-leaf-summary ul {
+  padding-left: 24px;
+}
 .dice-stage {
   position: relative;
   width: 220px;

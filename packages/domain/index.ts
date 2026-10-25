@@ -111,6 +111,26 @@ function enter(s: Save, story: Story) {
   if (!n) throw new GameError("VALIDATION_FAILED", "Missing destination.");
   effects(s, n.entryEffects, true);
   s.status = n.kind === "ending" ? "completed" : "active";
+  if (s.status === "completed" && !s.completion) {
+    const rewards = (n.leaf?.rewards ?? []).map((reward) => {
+      if (!reward.keyId.startsWith(story.id + ":"))
+        throw new GameError(
+          "VALIDATION_FAILED",
+          "StoryLeaf rewards must belong to this Story.",
+        );
+      const newlyGranted = !s.keys.includes(reward.keyId);
+      if (newlyGranted) s.keys.push(reward.keyId);
+      return { ...reward, newlyGranted };
+    });
+    s.completion = {
+      version: 1,
+      storyNodeId: n.id,
+      revision: s.revision,
+      at: s.updatedAt,
+      summary: n.leaf?.summary ?? "",
+      rewards,
+    };
+  }
   return s;
 }
 export function start(
@@ -290,6 +310,8 @@ export function validateStory(value: unknown): Story {
       throw new Error("Duplicate or mismatched node/choice ID");
     if (n.kind === "ending" && n.choices.length)
       throw new Error("Ending has choices");
+    if (n.leaf && n.kind !== "ending")
+      throw new Error("Only a StoryLeaf can configure completion rewards.");
     const storyNodeType = n.storyNodeType;
     if (n.videoAdvance && storyNodeType !== "video")
       throw new Error(

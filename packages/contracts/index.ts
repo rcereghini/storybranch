@@ -192,12 +192,46 @@ export const comicSchema = z
   })
   .strict();
 export type Comic = z.infer<typeof comicSchema>;
+export const leafRewardSchema = z
+  .object({
+    keyId: namespaced,
+    label: z.string().trim().min(1).max(80),
+  })
+  .strict();
+export const storyLeafSchema = z
+  .object({
+    version: z.literal(1),
+    summary: z.string().max(1000),
+    rewards: z
+      .array(leafRewardSchema)
+      .max(20)
+      .refine(
+        (rewards) =>
+          new Set(rewards.map((r) => r.keyId)).size === rewards.length,
+        "StoryLeaf reward keys must be unique.",
+      ),
+  })
+  .strict();
+export const completionSchema = z
+  .object({
+    version: z.literal(1),
+    storyNodeId: id,
+    revision: z.number().int().nonnegative(),
+    at: z.number().finite(),
+    summary: z.string().max(1000),
+    rewards: z
+      .array(leafRewardSchema.extend({ newlyGranted: z.boolean() }))
+      .max(20),
+  })
+  .strict();
+export type StoryCompletion = z.infer<typeof completionSchema>;
 export const storyNodeSchema = z
   .object({
     id,
     title: z.string().max(160),
     transcript: z.string().max(10000),
     kind: z.enum(["scene", "ending"]),
+    leaf: storyLeafSchema.optional(),
     storyNodeType: z.enum([
       "text",
       "text-options",
@@ -291,6 +325,7 @@ export type Save = LocalState & {
   parentPlaythroughId: string | null;
   parentRevision: number | null;
   updatedAt: number;
+  completion?: StoryCompletion;
   lastRoll?: {
     storyNodeId: string;
     value: number;

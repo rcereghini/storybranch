@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { id, storyNodeSchema, type Save, type StoryUser } from "./index";
+import {
+  id,
+  storyNodeSchema,
+  completionSchema,
+  type Save,
+  type StoryUser,
+} from "./index";
 import type { SceneMedia } from "./media";
 
 export const playerContractHeader = "X-Story-Player";
@@ -20,6 +26,7 @@ export const playerEventSchema = z.object({
   to: id.optional(),
   outcome: z.string().optional(),
   roll: playerRollSchema.optional(),
+  completion: completionSchema.optional(),
 });
 export type PlayerEvent = z.infer<typeof playerEventSchema>;
 export const renderStoryNodeSchema = storyNodeSchema

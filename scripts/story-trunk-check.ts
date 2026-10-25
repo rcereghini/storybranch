@@ -86,6 +86,23 @@ try {
       .getByLabel("StoryNode title", { exact: true })
       .fill("Safe ending");
     await tab
+      .getByLabel("Completion summary", { exact: true })
+      .fill("You brought the harbor home.");
+    await tab
+      .getByRole("button", { name: "Add reward key", exact: true })
+      .click();
+    await tab.getByLabel("Reward 1 key", { exact: true }).fill("rescuer");
+    await tab
+      .getByLabel("Reward 1 label", { exact: true })
+      .fill("Harbor rescuer");
+    await tab
+      .getByRole("button", { name: "Add reward key", exact: true })
+      .click();
+    await tab.getByLabel("Reward 2 key", { exact: true }).fill("invitation");
+    await tab
+      .getByLabel("Reward 2 label", { exact: true })
+      .fill("Old invitation");
+    await tab
       .getByLabel("Edit StoryNode", { exact: true })
       .selectOption(opening);
     await tab
@@ -135,6 +152,20 @@ try {
       });
     }
     await save();
+    await tab.reload();
+    await tab.getByRole("button", { name: new RegExp(title) }).click();
+    await pane("StoryNode");
+    await tab
+      .getByLabel("Edit StoryNode", { exact: true })
+      .selectOption(ending);
+    assert.equal(
+      await tab.getByLabel("Completion summary", { exact: true }).inputValue(),
+      "You brought the harbor home.",
+    );
+    assert.equal(
+      await tab.getByLabel("Reward 1 key", { exact: true }).inputValue(),
+      "rescuer",
+    );
     await tab.getByRole("button", { name: "Preview", exact: true }).click();
     const preview = tab.locator(".studio-preview");
     await preview.getByRole("heading", { name: "Choose a path" }).waitFor();
@@ -146,6 +177,12 @@ try {
     );
     await preview.getByRole("button", { name: /Finish/ }).click();
     await preview.getByRole("heading", { name: "Safe ending" }).waitFor();
+    await preview
+      .getByText("Harbor rescuer — Earned", { exact: true })
+      .waitFor();
+    await preview
+      .getByText("Old invitation — Already held", { exact: true })
+      .waitFor();
     await tab.getByRole("button", { name: "Close preview" }).click();
     await tab
       .getByRole("button", { name: "Publish edition", exact: true })
@@ -167,6 +204,30 @@ try {
     await tab.getByRole("heading", { name: "Safe ending" }).waitFor();
     await tab.reload();
     await tab.getByRole("heading", { name: "Safe ending" }).waitFor();
+    await tab
+      .getByText("You brought the harbor home.", { exact: true })
+      .waitFor();
+    await tab.getByText("Harbor rescuer — Earned", { exact: true }).waitFor();
+    await tab
+      .getByText("Old invitation — Already held", { exact: true })
+      .waitFor();
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate(
+        (t) => (document.documentElement.dataset.theme = t),
+        theme,
+      );
+      await tab
+        .getByRole("region", { name: "StoryLeaf completion" })
+        .scrollIntoViewIfNeeded();
+      assert(
+        await tab.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await tab.screenshot({
+        path: `test-results/story-leaf-${width}-${theme}.png`,
+      });
+    }
     assert.deepEqual(errors, []);
     await tab.close();
   }
