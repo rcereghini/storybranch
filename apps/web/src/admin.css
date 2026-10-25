@@ -755,9 +755,11 @@
   }
 }
 
-/* Overview command center. */
+/* Overview command center. Like .admin, minmax(0, 1fr) keeps a wide table
+   from widening the whole Overview past the screen. */
 .cc {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
 }
 .cc-head {
