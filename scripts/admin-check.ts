@@ -34,9 +34,34 @@ try {
     .waitFor();
   await accountMenu.getByRole("button", { name: "Admin", exact: true }).click();
   await tab.waitForURL("**/admin");
-  await tab.getByText("Published stories", { exact: true }).waitFor();
+  // The Overview: headline numbers, what needs attention, services, the
+  // most played stories, recent changes and the totals strip.
+  await tab.getByRole("heading", { name: "Needs attention" }).waitFor();
+  await tab.getByText("New sign-ups", { exact: true }).waitFor();
+  await tab.getByRole("heading", { name: "Services" }).waitFor();
+  await tab.getByText(/\d+ Published stories/).waitFor();
+  await tab.getByText("Local emulators").waitFor();
+  await tab.getByRole("button", { name: "7 days" }).click();
+  await tab.getByText("Last 7 days, compared with the 7 before.").waitFor();
+  await tab.getByRole("button", { name: "30 days" }).click();
+  await tab.getByText("Last 30 days, compared with the 30 before.").waitFor();
   assert.equal(await overflow(), false, "Horizontal overflow on Admin at 1024");
-  await tab.screenshot({ path: "test-results/admin-overview.png" });
+  await tab.waitForTimeout(300);
+  await tab.screenshot({
+    path: "test-results/admin-overview.png",
+    fullPage: true,
+  });
+  await tab.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await overflow(),
+    false,
+    "Horizontal overflow on Overview at 390",
+  );
+  await tab.screenshot({
+    path: "test-results/admin-overview-phone.png",
+    fullPage: true,
+  });
+  await tab.setViewportSize({ width: 1024, height: 900 });
 
   // Users: turn a member's Copilot off and back on.
   const sections = tab.getByRole("navigation", { name: "Admin sections" });

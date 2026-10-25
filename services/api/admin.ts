@@ -36,6 +36,7 @@ import {
 import { emailCommand, emailLog, listEmails } from "./admin-emails";
 import { clearUsersCache, listUsers, userDetail } from "./admin-users";
 import { analytics } from "./analytics";
+import { commandCenter } from "./command";
 import { storedAccountLimits } from "../../packages/contracts/settings";
 
 // Admin routes: everything here is reached only by accounts whose features
@@ -128,6 +129,10 @@ export async function admin(
   }
   if (request.method === "GET" && area === "users" && target)
     return userDetail(target);
+  if (request.method === "GET" && area === "command" && !target)
+    return commandCenter(
+      Number(new URL(request.url).searchParams.get("days") ?? 30),
+    );
   if (request.method === "GET" && area === "analytics" && !target)
     return analytics(
       Number(new URL(request.url).searchParams.get("days") ?? 30),

@@ -23,7 +23,7 @@ The account must have signed up; if it has never opened the app, the command cre
 
 | Section | What it shows | What it changes |
 |---|---|---|
-| Overview | Users, admins, disabled accounts, published and hidden stories, drafts, playthroughs, AI requests and estimated AI spend over 30 days | Nothing |
+| Overview | For the last 7, 30 or 90 days: active players (of all accounts), new sign-ups, stories finished, AI requests and estimated AI spend, each with a daily trend and change against the period before where that history exists; a Needs attention queue; how each service is set up; the most played stories; the latest admin changes; and a strip of totals (users, admins, disabled, published and hidden stories, drafts, playthroughs) | Nothing (each attention item links to the page that deals with it) |
 | Usage & spend | For the last 7, 30 or 90 UTC days: estimated spend, AI requests, images and refusals; requests per day; totals per feature (Copilot, writing help, images); the 20 heaviest users | Nothing |
 | Analytics | For the last 30 or 90 UTC days: accounts, new sign-ups (and per day), accounts active in the last day, week and month, players in the period, and per story: players, finishers, completion rate, recent players and last played; plus a link to Vercel for page views | Nothing |
 | Users | Sign-ups with when they were last active, 50 at a time, sorted by recently active (default), recently signed in or newest account: search by email, name or ID and filter by status or access, all on the server. Each opens a detail page: email and whether it's confirmed, sign-in methods, joined and last sign-in, access, daily limits and today's usage, published stories, drafts, playthroughs, 30-day AI usage and spend, recent emails and the admin changes made to it | Turn features on or off; disable or re-enable; set the account's own daily limits; reset today's usage |
@@ -47,6 +47,7 @@ All routes need the `admin` feature.
 | Route | Purpose |
 |---|---|
 | `GET /api/admin/overview` | Counts for the Overview |
+| `GET /api/admin/command?days=7|30|90` | The Overview's command center (`CommandCenter` in `packages/contracts/command.ts`) |
 | `GET /api/admin/users?q=&status=&feature=&cursor=` | One page of 50 accounts matching the search and filters, with the total (`AdminUsersPage`). Firebase Auth can't search, so the server reads the first 10,000 sign-ups and their profiles, keeps them for 30 seconds, and searches those; a larger app needs the email copied onto profiles for indexed search |
 | `GET /api/admin/users/{uid}` | One account's detail page (`AdminUserDetail`) |
 | `POST /api/admin/users/{uid}` | `{ idempotencyKey, features?: { [feature]: boolean }, status?: "active" | "disabled", limits?: { aiRequestsPerDay, imagesPerDay }, resetToday?: ["ai" | "images"] }` |
@@ -86,6 +87,14 @@ Estimated spend (`packages/domain/usage.ts`) multiplies the totals by the prices
 ## Verification
 
 Unit tests cover admin implying every feature and hidden stories on the dashboard. An emulator integration test covers member refusal on every route, feature changes, retries and key conflicts, the self-lockout rules, disabling and re-enabling, hiding (Discover, new starts refused, existing saves still play, dashboard kept but not recommended) and the audit log. Another records Claude usage (including a fallback step at its own model) and image outcomes for a new user and checks the report, the overview totals, the period validation and member refusal; unit tests cover the estimates and UTC day ranges. `scripts/admin-check.ts`, run in CI, drives the admin view as the local admin: navigation, overview, a feature toggle, locked self controls, hide and show, activity, the Usage tab (one bar per day, the period switch, a hover readout that leaves the chart in place), no horizontal overflow at 1024 and 390 px, and a member seeing neither the nav item nor the admin view. A users test covers server search, status and access filters, page size, the detail page, own limits (invalid values refused; 0 stops Copilot), resetting today's count, and disabling (sessions revoked, sign-in blocked, listed as disabled) and enabling; the browser check also searches, filters, opens a member's page, sets and clears an own limit, and checks a phone-width layout.
+
+## The Overview
+
+The command center (`services/api/command.ts`, counting in `packages/domain/command.ts`) is built on request from data the app already keeps, with no new records:
+
+- **Changes against the period before** appear only where the history exists: sign-ups (account creation), stories finished (when a completed save last changed, each player once per story) and AI requests and spend (daily AI usage records, which start when usage recording shipped, so an empty earlier period reads "new this period"). Active players come from Firebase's last session refresh, which keeps only the latest, so they show no earlier figure.
+- **Needs attention**, most urgent first: emails that failed in the last 24 hours; on a live deployment, a missing Anthropic, OpenAI or SendGrid key; image jobs whose outcome is uncertain (marked so, or still "submitting" after the time limit); AI requests refused today; AI features switched off; and images left unpriced in the period. Each links to the page that deals with it.
+- **Services** say what is set up on this deployment and whether recent sends failed. Nothing contacts the providers, so loading the Overview costs nothing and can't be slowed by them.
 
 ## Site analytics
 
