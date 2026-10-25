@@ -9,6 +9,7 @@ import {
 type Api = ReturnType<typeof createApi>;
 type Action = (typeof adminAuditActions)[number];
 const actionLabels: Record<Action, string> = {
+  achievement: "Achievements",
   user: "Accounts",
   story: "Stories",
   email: "Emails",

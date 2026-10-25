@@ -32,6 +32,7 @@ import type { PlayerProfile } from "../../../packages/contracts/profile";
 import { Dashboard } from "./Dashboard";
 import { Discover, type CatalogueEntry } from "./Discover";
 import { Adventures } from "./Adventures";
+import { AccountAchievements } from "./Achievements";
 import { Avatar } from "./avatars";
 import { AccountMenu } from "./AccountMenu";
 import { Icon, Logo, type IconName } from "./icons";
@@ -867,6 +868,7 @@ function App() {
             onResume={(saveId) => navigate(`/play/${saveId}`)}
             onSignIn={() => setLogin(true)}
             onDiscover={() => navigate("/discover")}
+            children={user && <AccountAchievements key={user.uid} api={api} />}
           />
         ) : (
           <Discover

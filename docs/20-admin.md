@@ -42,6 +42,10 @@ The account must have signed up; if it has never opened the app, the command cre
 
 ## API
 
+Account achievements have an **Achievements** section at `/admin/achievements`. Creators submit metadata for published endings; admins review the exact Story/edition/StoryLeaf and must enter a reason to Approve, Reject or Revoke. Pending and revoked definitions can be approved; only pending definitions can be rejected; only approved definitions can be revoked. Approved/revoked metadata is immutable. The Activity log supports achievement reviews. Admins may review their own creator submissions under the current alpha policy.
+
+`GET /api/admin/achievements?cursor=` lists 50 definitions at a time. `POST /api/admin/achievements/{definitionId}` accepts an idempotency key, expected definition revision, status and reason. Approval affects future completions; revocation blocks future grants while preserving claim history. Existing claims reflect their source definition's current approval status in the private account list. No paid rights or XP are granted.
+
 All routes need the `admin` feature.
 
 | Route | Purpose |

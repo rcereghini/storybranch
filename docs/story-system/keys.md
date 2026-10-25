@@ -1,6 +1,6 @@
 # Keys, items, achievements and cross-story imports
 
-Status: target contract. Decisions S04, S06 and S09. Current runtime supports story-namespaced local keys/items/milestones/scores, and rejects foreign namespaces. Export/import registries and commercial entitlements are not implemented.
+Status: target contract with implemented local state and approved account achievements. Decisions S04, S06, S09 and S16. Current runtime supports story-namespaced local keys/items/milestones/scores, rejects foreign namespaces, and grants approved account achievements at completion. Cross-story imports and commercial entitlements are not implemented.
 
 “Key” is a creator-facing idea for a fact or right used in a condition. Storage and authorization distinguish several kinds; a single unrestricted boolean map is not sufficient.
 
@@ -21,7 +21,17 @@ Subscriber and premium may be labels for the same entitlement system, not separa
 
 ## Definitions and grants
 
-Current StoryLeaf completion supports labeled local keys only, with a versioned configuration and an embedded durable completion receipt in the run. The server grants them once on completion, recording which were already held; replay is a distinct run and child rewards stay isolated. There are no account grants or sequel exports in this implementation. See [the local completion contract](story-nodes.md#local-completion-contract).
+### Approved account achievements
+
+Current implementation policy: creators submit a title/description for one published StoryLeaf in one immutable edition; admins approve, reject or revoke that exact submission with an audit reason. Approval does not modify the edition and never grants paid access, XP, currency or subscriber rights. Definitions are private to their creator and admins. Approval is live eligibility at completion; it is not retroactive. StoryLeaf IDs form a stable achievement identity within a Story across editions; a new edition requires its own approval but cannot award the same achievement twice to an account.
+
+The service atomically creates an account claim with the completion, preserving source run, edition, StoryLeaf, definition revision, time and display snapshot. The claim key is `(user, Story, StoryLeaf)` and has no TTL. Replay and concurrent runs return already-earned status. Revocation prevents new grants; existing historical claims are retained and marked revoked on account-list reads according to their source definition. Reapproval can restore that definition's active display status; rejection cannot alter an already approved definition. Account claims are private, paginated and API-only; they are not automatically exposed to other Stories, AI, public profiles or sequel imports. Legacy profile achievement strings remain separate and are not accepted as claim evidence.
+
+Creator API: `POST /api/achievement-submissions` accepts `{idempotencyKey, expectedRevision, storyId, versionId, storyNodeId, title, description}`. The service checks ownership and the published leaf, snapshots its title/transcript/type for review and creates or resubmits pending/rejected metadata. `GET /api/achievement-submissions?storyId=&versionId=&storyNodeId=` retrieves the owned edition-specific submission; list/detail reads are also owner-only. Admin review is documented in [Admin](../20-admin.md). `GET /api/achievements?cursor=` lists up to 50 private claims with their current revocation status. Definitions and claims remain denied to direct Firestore clients under existing rules. IDs are SHA-256 digests of JSON-encoded identity tuples, not authority tokens. Commands use revision checks, bounded bodies, strict schemas and idempotency receipts; durable claims have no TTL.
+
+The completion's optional `accountAchievement` is a historical grant/already-earned display snapshot, not a live entitlement assertion. Approved definitions are consulted inside the completion transaction, including direct-entry leaves and child runs. There is no post-completion claim endpoint or retroactive scan. Private Studio previews do not invoke this grant service. Source claims and completion receipts are never deleted on revocation, and existing editions and saves are not migrated.
+
+StoryLeaf's authored reward configuration supports labeled local keys, with a versioned configuration and an embedded durable completion receipt in the run. The server grants them once on completion, recording which were already held; replay is a distinct run and child rewards stay isolated. Approved account achievements use the separate registry above; sequel exports remain deferred. See [the local completion contract](story-nodes.md#local-completion-contract).
 
 Target definitions declare a stable ID/namespace, definition version, kind/value schema, scope, issuer, eligibility, stacking/consumption, expiry/revocation behavior and export/import policy. Grants record subject, definition version, source run/event or verified provider reference, time, value/quantity, claim ID and current status. Separate the definition from each grant.
 

@@ -56,6 +56,163 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("requires achievement approval and atomically deduplicates private account claims across runs and editions", async () => {
+  const storyId = `achievement-${randomUUID()}`;
+  const story = starterStory(storyId);
+  const saveDraft = (revision: number) =>
+    call(`/studio/${storyId}`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: revision,
+      draft: { story, description: "Achievement test" },
+    });
+  const publish = (revision: number) =>
+    call(`/studio/${storyId}/publish`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: revision,
+      policyVersion: "creator-alpha-1",
+    });
+  expect((await saveDraft(0)).status).toBe(200);
+  const published = await publish(1);
+  expect(published.status).toBe(200);
+  const versionId = published.data.publishedVersionId;
+  const submission = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    storyId,
+    versionId,
+    storyNodeId: "ending",
+    title: "Verified rescuer",
+    description: "Finished the approved ending.",
+  };
+  expect(
+    (await call("/achievement-submissions", submission, "progressed")).status,
+  ).toBe(403);
+  expect(
+    (
+      await call("/achievement-submissions", {
+        ...submission,
+        status: "approved",
+      })
+    ).status,
+  ).toBe(400);
+  const submitted = await call("/achievement-submissions", submission);
+  expect(submitted.status).toBe(200);
+  expect((await call("/achievement-submissions", submission)).data).toEqual(
+    submitted.data,
+  );
+  let definition = submitted.data;
+  expect(
+    (
+      await call(
+        `/achievement-submissions/${definition.id}`,
+        undefined,
+        "progressed",
+      )
+    ).status,
+  ).toBe(404);
+  const review = (status: string) =>
+    call(`/admin/achievements/${definition.id}`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: definition.revision,
+      status,
+      reason: "Reviewed the published ending.",
+    });
+  expect(
+    (await call("/admin/achievements", undefined, "progressed")).status,
+  ).toBe(403);
+  const begin = async () =>
+    (
+      await call("/playthroughs", {
+        idempotencyKey: randomUUID(),
+        payload: { storyId },
+      })
+    ).data.save;
+  const finish = (save: Save) =>
+    call(
+      `/playthroughs/${save.id}/choices`,
+      choice(save, story.storyNodes.opening.choices[0].id),
+    );
+  expect(
+    (await finish(await begin())).data.save.completion.accountAchievement,
+  ).toBeUndefined();
+  definition = (await review("approved")).data;
+  expect(definition.status).toBe("approved");
+  expect(
+    (
+      await call("/achievement-submissions", {
+        ...submission,
+        idempotencyKey: randomUUID(),
+        expectedRevision: definition.revision,
+        title: "Changed after approval",
+      })
+    ).status,
+  ).toBe(400);
+  const runs = await Promise.all([begin(), begin()]);
+  const completed = await Promise.all(runs.map(finish));
+  expect(completed.map((r) => r.status)).toEqual([200, 200]);
+  expect(
+    completed
+      .map((r) => r.data.save.completion.accountAchievement.newlyGranted)
+      .sort(),
+  ).toEqual([false, true]);
+  const ref = db.doc(
+    `users/player/achievementClaims/${definition.achievementId}`,
+  );
+  const originalClaim = (await ref.get()).data()!;
+  expect(originalClaim.definitionId).toBe(definition.id);
+  expect(originalClaim.runId).toBe(
+    completed.find(
+      (r) => r.data.save.completion.accountAchievement.newlyGranted,
+    )!.data.save.id,
+  );
+  expect(
+    (await call("/achievements")).data.items.find(
+      (r: { id: string }) => r.id === definition.achievementId,
+    ).revoked,
+  ).toBe(false);
+  expect(
+    (await call("/achievements", undefined, "progressed")).data.items,
+  ).toEqual([]);
+  const own = rules.authenticatedContext("player").firestore();
+  await assertFails(getDoc(doc(own, ref.path)));
+  await assertFails(setDoc(doc(own, ref.path), { title: "Forged" }));
+  await assertFails(
+    getDoc(doc(own, `achievementDefinitions/${definition.id}`)),
+  );
+  definition = (await review("revoked")).data;
+  expect(
+    (await call("/achievements")).data.items.find(
+      (r: { id: string }) => r.id === definition.achievementId,
+    ).revoked,
+  ).toBe(true);
+  expect(
+    (await finish(await begin())).data.save.completion.accountAchievement,
+  ).toBeUndefined();
+  expect((await ref.get()).data()).toEqual(originalClaim);
+  definition = (await review("approved")).data;
+  expect(
+    (await finish(await begin())).data.save.completion.accountAchievement
+      .newlyGranted,
+  ).toBe(false);
+  expect((await saveDraft(1)).status).toBe(200);
+  const newer = await publish(2);
+  const nextSubmission = await call("/achievement-submissions", {
+    ...submission,
+    idempotencyKey: randomUUID(),
+    versionId: newer.data.publishedVersionId,
+  });
+  definition = nextSubmission.data;
+  expect(definition.status).toBe("pending");
+  expect(
+    (await finish(await begin())).data.save.completion.accountAchievement,
+  ).toBeUndefined();
+  definition = (await review("approved")).data;
+  expect(
+    (await finish(await begin())).data.save.completion.accountAchievement
+      .newlyGranted,
+  ).toBe(false);
+  expect((await ref.get()).data()).toEqual(originalClaim);
+});
 it("commits StoryLeaf rewards once with durable completion, retries and pinned editions", async () => {
   const storyId = `leaf-${randomUUID()}`;
   const story = starterStory(storyId);

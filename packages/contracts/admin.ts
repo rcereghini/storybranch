@@ -149,13 +149,14 @@ export type AdminAuditEntry = {
   at: number;
   actorUid: string;
   actorEmail: string | null;
-  action: "user" | "story" | "email" | "settings";
+  action: "user" | "story" | "email" | "settings" | "achievement";
   target: string;
   change: Record<string, unknown>;
 };
 
 // The activity log, newest first, filtered on the server.
 export const adminAuditActions = [
+  "achievement",
   "user",
   "story",
   "email",

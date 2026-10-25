@@ -33,6 +33,7 @@ import { copilot } from "./copilot";
 import { assist } from "./assist";
 import { admin } from "./admin";
 import { profileRoutes } from "./profile";
+import { achievementRoutes, awardAchievement } from "./achievements";
 import { edition } from "./story-store";
 import * as paths from "./paths";
 import {
@@ -213,6 +214,13 @@ async function handleCanonical(request: Request): Promise<Response> {
     const features = accountFeatures(profile.data());
     // Daily limits: the person's own, else the defaults in Settings.
     const limits = effectiveLimits(profile.data(), await appSettings());
+    if (
+      ["achievements", "achievement-submissions"].includes(segments[1]) ||
+      (segments[1] === "admin" && segments[2] === "achievements")
+    )
+      return json(
+        await achievementRoutes(request, uid, segments, features, cursor),
+      );
     if (segments[1] === "studio")
       return json(
         await authoring(request, uid, segments, cursor, limit, features),
@@ -431,6 +439,7 @@ async function handleCanonical(request: Request): Promise<Response> {
           };
         }
       }
+      await awardAchievement(tx, uid, save);
       if (save.completion?.revision === save.revision)
         event.completion = save.completion;
       const result = { save };

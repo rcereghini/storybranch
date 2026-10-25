@@ -5,7 +5,12 @@ export function StoryLeafSummary({
 }: {
   completion: StoryCompletion;
 }) {
-  if (!completion.summary && !completion.rewards.length) return null;
+  if (
+    !completion.summary &&
+    !completion.rewards.length &&
+    !completion.accountAchievement
+  )
+    return null;
   return (
     <section className="story-leaf-summary" aria-label="StoryLeaf completion">
       <h2>
@@ -14,6 +19,17 @@ export function StoryLeafSummary({
           : "Journey complete"}
       </h2>
       {completion.summary && <p>{completion.summary}</p>}
+      {completion.accountAchievement && (
+        <p>
+          <strong>
+            Account achievement: {completion.accountAchievement.title}
+          </strong>{" "}
+          —{" "}
+          {completion.accountAchievement.newlyGranted
+            ? "Earned"
+            : "Already earned"}
+        </p>
+      )}
       {completion.rewards.length > 0 && (
         <>
           <ul>
