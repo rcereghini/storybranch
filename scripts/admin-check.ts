@@ -15,7 +15,7 @@ try {
     tab.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   // On failure, the deepest elements that stick out past the screen, outside
   // anything that scrolls or clips on its own.
-  const wide = () =>
+  const overflowing = () =>
     tab.evaluate(() =>
       [...document.querySelectorAll("body *")]
         .filter((e) => e.getBoundingClientRect().right > innerWidth + 1)
@@ -80,7 +80,7 @@ try {
   assert.equal(
     await overflow(),
     false,
-    `Horizontal overflow on Overview at 390: ${await wide()}`,
+    `Horizontal overflow on Overview at 390: ${await overflowing()}`,
   );
   await tab.screenshot({
     path: "test-results/admin-overview-phone.png",
