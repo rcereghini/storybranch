@@ -1,3 +1,4 @@
+import { sideStory } from "./side-story";
 import { playerRun } from "../../packages/domain/player";
 import { playerEventSchema } from "../../packages/contracts/player";
 import {
@@ -40,6 +41,7 @@ import {
   resolveKeyImports,
   storyImportOffer,
   storySourceRuns,
+  sideStoryImports,
 } from "./key-imports";
 import { assertStoryEntry, invitationRoutes } from "./invitations";
 import { edition } from "./story-store";
@@ -239,6 +241,46 @@ async function handleCanonical(request: Request): Promise<Response> {
       segments.length === 3
     )
       return json(await storyImportOffer(uid, segments[2]));
+    if (
+      request.method === "GET" &&
+      segments[1] === "playthroughs" &&
+      segments[3] === "branches" &&
+      segments[5] === "imports" &&
+      (segments.length === 6 ||
+        (segments.length === 7 && segments[6] === "runs"))
+    ) {
+      const revisionText = url.searchParams.get("expectedRevision") ?? "";
+      if (!/^\d{1,8}$/.test(revisionText))
+        throw new GameError(
+          "VALIDATION_FAILED",
+          "Expected parent revision is required.",
+        );
+      const runs = segments.length === 7;
+      const versionId = runs
+        ? id.parse(url.searchParams.get("versionId"))
+        : undefined;
+      const storyId = runs
+        ? id.parse(url.searchParams.get("storyId"))
+        : undefined;
+      const keyId = runs ? (url.searchParams.get("keyId") ?? "") : undefined;
+      if (
+        runs &&
+        (!/^[a-z0-9-]+:[a-z0-9-]+$/.test(keyId!) || keyId!.length > 100)
+      )
+        throw new GameError("VALIDATION_FAILED", "Invalid imported key alias.");
+      return json(
+        await sideStoryImports(
+          uid,
+          segments[2],
+          segments[4],
+          Number(revisionText),
+          versionId,
+          keyId,
+          cursor,
+          storyId,
+        ),
+      );
+    }
     // Daily limits: the person's own, else the defaults in Settings.
     const limits = effectiveLimits(profile.data(), await appSettings());
     if (["story-invitations", "story-entry"].includes(segments[1]))
@@ -452,40 +494,32 @@ async function handleCanonical(request: Request): Promise<Response> {
           event = moved.event;
         } else {
           const c = branchCommandSchema.parse(command);
-          if (current.revision !== c.expectedRevision)
-            throw new GameError(
-              "STALE_REVISION",
-              "Progress changed on another device. Reload current progress.",
-            );
-          if (current.parentPlaythroughId || current.status !== "active")
-            throw new GameError(
-              "FORBIDDEN",
-              "Nested branches are unavailable.",
-            );
-          const b = (
-            await tx.get(db.doc(`branches/${c.payload.branchId}`))
-          ).data();
+          const childStory = await sideStory(
+            tx,
+            uid,
+            current,
+            story,
+            c.payload.branchId,
+            c.expectedRevision,
+            c.payload.versionId,
+            c.payload.storyId,
+          );
           if (
-            !b ||
-            b.locationId !==
-              story.storyNodes[current.storyNodeId].branchLocation ||
-            b.sourceVersionId !== current.versionId
+            childStory.keyImports?.keys.length &&
+            (!c.payload.versionId || !c.payload.storyId)
           )
             throw new GameError(
               "VALIDATION_FAILED",
-              "Branch unavailable at this location.",
+              "Review this side Story's imports before entering.",
             );
-          const { story: childStory } = await edition(
+          const imports = await resolveKeyImports(
             tx,
-            b.storyId,
-            b.versionId,
+            uid,
+            childStory,
+            c.payload.importConsent === true,
+            now,
+            c.payload.sourceRuns,
           );
-          await assertStoryEntry(tx, uid, childStory.id);
-          if (childStory.keyImports?.keys.length)
-            throw new GameError(
-              "FORBIDDEN",
-              "This side Story needs imported-key consent, which is not supported for side Stories yet.",
-            );
           progressStory = childStory;
           save = start(
             childStory,
@@ -495,6 +529,7 @@ async function handleCanonical(request: Request): Promise<Response> {
             now,
             current,
             await storyProgressSnapshot(tx, uid, childStory),
+            imports,
           );
           event = {
             label: "Entered community side quest",

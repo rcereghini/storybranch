@@ -11,6 +11,7 @@ type ImportKey = StoryImportOffer["keys"][number];
 function SourceJourneyPicker({
   api,
   offer,
+  sourceRunsEndpoint,
   source,
   required,
   selected,
@@ -18,6 +19,7 @@ function SourceJourneyPicker({
 }: {
   api: Api;
   offer: StoryImportOffer;
+  sourceRunsEndpoint?: string;
   source: ImportKey;
   required: boolean;
   selected: string;
@@ -27,7 +29,11 @@ function SourceJourneyPicker({
   const [cursor, setCursor] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
-  const endpoint = `/story-imports/${offer.storyId}/${offer.versionId}/runs?keyId=${encodeURIComponent(source.keyId)}`;
+  const endpoint =
+    (sourceRunsEndpoint
+      ? `${sourceRunsEndpoint}&`
+      : `/story-imports/${offer.storyId}/${offer.versionId}/runs?`) +
+    `keyId=${encodeURIComponent(source.keyId)}`;
   const request = (cursor?: string) =>
     api<StorySourceRuns>(
       endpoint + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""),
@@ -117,12 +123,14 @@ function SourceJourneyPicker({
 export function StoryImportConsent({
   api,
   offer,
+  sourceRunsEndpoint,
   disabled,
   onCancel,
   onStart,
 }: {
   api: Api;
   offer: StoryImportOffer;
+  sourceRunsEndpoint?: string;
   disabled: boolean;
   onCancel: () => void;
   onStart: (consent: boolean, selections: SourceRunSelection[]) => void;
@@ -196,6 +204,7 @@ export function StoryImportConsent({
             key={identity}
             api={api}
             offer={offer}
+            sourceRunsEndpoint={sourceRunsEndpoint}
             source={group.source}
             required={group.required}
             selected={selected[identity] ?? ""}

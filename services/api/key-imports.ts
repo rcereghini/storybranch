@@ -12,6 +12,7 @@ import type {
 import { readStoryData } from "../../packages/contracts/legacy-story-format";
 import { db } from "./firebase";
 import { edition } from "./story-store";
+import { sideStory } from "./side-story";
 import { assertStoryEntry } from "./invitations";
 
 const denied = () =>
@@ -231,50 +232,8 @@ export async function storySourceRuns(
     const listing = await tx.get(db.doc(`catalogue/${storyId}`));
     if (!listing.exists || listing.data()?.hidden === true) throw denied();
     await assertStoryEntry(tx, uid, storyId);
-    const root = await tx.get(db.doc(`stories/${storyId}`));
     const { story } = await edition(tx, storyId, versionId);
-    await validateKeyImports(tx, story, root.data()!.creatorUid);
-    const key = story.keyImports?.keys.find(
-      (k) => k.keyId === keyId && k.selection === "completed-run",
-    );
-    if (!key)
-      throw new GameError(
-        "VALIDATION_FAILED",
-        "No completed-run import is declared for that key.",
-      );
-    const { story: sourceStory } = await edition(
-      tx,
-      key.sourceStoryId,
-      key.sourceVersionId,
-    );
-    let query = db
-      .collection(`users/${uid}/playthroughs`)
-      .where("storyId", "==", key.sourceStoryId)
-      .orderBy(FieldPath.documentId())
-      .limit(20);
-    if (cursor) query = query.startAfter(cursor);
-    const records = await tx.get(query);
-    const items = records.docs.flatMap((record) => {
-      const source = readStoryData<Save>(record.data());
-      if (
-        !eligibleSource(source, uid, key.sourceStoryId, key.sourceVersionId) ||
-        source.id !== record.id
-      )
-        return [];
-      const ending = sourceStory.storyNodes[source.storyNodeId];
-      if (ending?.kind !== "ending") return [];
-      return [
-        {
-          runId: source.id,
-          completedAt: source.completion!.at,
-          endingTitle: ending.title,
-        },
-      ];
-    });
-    return {
-      items,
-      nextCursor: records.size === 20 ? records.docs.at(-1)!.id : null,
-    };
+    return sourceRunsForStory(tx, uid, story, keyId, cursor);
   });
 }
 
@@ -302,5 +261,96 @@ export async function storyImportOffer(
       title: story.title,
       keys: await validateKeyImports(tx, story, root.data()!.creatorUid),
     };
+  });
+}
+
+async function sourceRunsForStory(
+  tx: Transaction,
+  uid: string,
+  story: Story,
+  keyId: string,
+  cursor: string | null,
+): Promise<StorySourceRuns> {
+  const root = await tx.get(db.doc(`stories/${story.id}`));
+  await validateKeyImports(tx, story, root.data()!.creatorUid);
+  const key = story.keyImports?.keys.find(
+    (k) => k.keyId === keyId && k.selection === "completed-run",
+  );
+  if (!key)
+    throw new GameError(
+      "VALIDATION_FAILED",
+      "No completed-run import is declared for that key.",
+    );
+  const { story: sourceStory } = await edition(
+    tx,
+    key.sourceStoryId,
+    key.sourceVersionId,
+  );
+  let query = db
+    .collection(`users/${uid}/playthroughs`)
+    .where("storyId", "==", key.sourceStoryId)
+    .orderBy(FieldPath.documentId())
+    .limit(20);
+  if (cursor) query = query.startAfter(cursor);
+  const records = await tx.get(query);
+  const items = records.docs.flatMap((record) => {
+    const source = readStoryData<Save>(record.data());
+    if (
+      !eligibleSource(source, uid, key.sourceStoryId, key.sourceVersionId) ||
+      source.id !== record.id
+    )
+      return [];
+    const ending = sourceStory.storyNodes[source.storyNodeId];
+    if (ending?.kind !== "ending") return [];
+    return [
+      {
+        runId: source.id,
+        completedAt: source.completion!.at,
+        endingTitle: ending.title,
+      },
+    ];
+  });
+  return {
+    items,
+    nextCursor: records.size === 20 ? records.docs.at(-1)!.id : null,
+  };
+}
+
+export async function sideStoryImports(
+  uid: string,
+  parentId: string,
+  branchId: string,
+  expectedRevision: number,
+  versionId?: string,
+  keyId?: string,
+  cursor: string | null = null,
+  storyId?: string,
+) {
+  return db.runTransaction(async (tx) => {
+    const record = await tx.get(
+      db.doc(`users/${uid}/playthroughs/${parentId}`),
+    );
+    if (!record.exists)
+      throw new GameError("NOT_FOUND", "Adventure not found.");
+    const parent = readStoryData<Save>(record.data());
+    const { story } = await edition(tx, parent.storyId, parent.versionId);
+    const child = await sideStory(
+      tx,
+      uid,
+      parent,
+      story,
+      branchId,
+      expectedRevision,
+      versionId,
+      storyId,
+    );
+    if (keyId) return sourceRunsForStory(tx, uid, child, keyId, cursor);
+    const root = await tx.get(db.doc(`stories/${child.id}`));
+    return {
+      storyId: child.id,
+      versionId: child.versionId,
+      title: child.title,
+      keys: await validateKeyImports(tx, child, root.data()!.creatorUid),
+    } satisfies StoryImportOffer;
   });
 }

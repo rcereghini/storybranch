@@ -455,6 +455,18 @@ export type Save = LocalState & {
     pending: boolean;
   };
 };
+const sourceRunsSchema = z
+  .array(
+    z.object({ sourceStoryId: id, sourceVersionId: id, runId: id }).strict(),
+  )
+  .max(20)
+  .refine(
+    (runs) =>
+      new Set(runs.map((r) => `${r.sourceStoryId}/${r.sourceVersionId}`))
+        .size === runs.length,
+    "Choose one run per source Story edition.",
+  )
+  .optional();
 export const startSchema = z
   .object({
     idempotencyKey: id,
@@ -463,21 +475,7 @@ export const startSchema = z
         storyId: id,
         versionId: id.optional(),
         importConsent: z.boolean().optional(),
-        sourceRuns: z
-          .array(
-            z
-              .object({ sourceStoryId: id, sourceVersionId: id, runId: id })
-              .strict(),
-          )
-          .max(20)
-          .refine(
-            (runs) =>
-              new Set(
-                runs.map((r) => `${r.sourceStoryId}/${r.sourceVersionId}`),
-              ).size === runs.length,
-            "Choose one run per source Story edition.",
-          )
-          .optional(),
+        sourceRuns: sourceRunsSchema,
       })
       .strict(),
   })
@@ -504,9 +502,25 @@ export const branchCommandSchema = z
   .object({
     idempotencyKey: id,
     expectedRevision: z.number().int().min(0).max(99999999),
-    payload: z.object({ branchId: id }).strict(),
+    payload: z
+      .object({
+        branchId: id,
+        storyId: id.optional(),
+        versionId: id.optional(),
+        importConsent: z.boolean().optional(),
+        sourceRuns: sourceRunsSchema,
+      })
+      .strict(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (c) =>
+      (c.payload.importConsent === undefined ||
+        (!!c.payload.versionId && !!c.payload.storyId)) &&
+      (!c.payload.sourceRuns?.length ||
+        (c.payload.importConsent === true && !!c.payload.versionId)),
+    "Imported keys require consent and a pinned destination edition.",
+  );
 export type ErrorCode =
   | "UNAUTHENTICATED"
   | "FORBIDDEN"
