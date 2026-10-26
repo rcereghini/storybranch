@@ -168,6 +168,110 @@ try {
       .getByLabel("Cost 1 existing item", { exact: true })
       .selectOption(`${story.id}:relic`);
     await apply.click();
+    await tab
+      .locator(".studio-panel .studio-tabs")
+      .getByRole("button", { name: "StoryTrunk", exact: true })
+      .click();
+    const catalogue = tab.getByRole("region", {
+      name: "Story item catalogue",
+      exact: true,
+    });
+    await catalogue
+      .getByRole("button", {
+        name: "Describe " + story.id + ":relic",
+        exact: true,
+      })
+      .click();
+    const name = catalogue.getByLabel("Item " + story.id + ":relic name", {
+      exact: true,
+    });
+    await name.fill("Golden relic");
+    await catalogue
+      .getByLabel("Item " + story.id + ":relic description", { exact: true })
+      .fill("Found on the first route.");
+    assert(
+      await catalogue
+        .getByRole("button", {
+          name: "Remove " + story.id + ":relic",
+          exact: true,
+        })
+        .isDisabled(),
+    );
+    await catalogue.getByText("Where used (2)", { exact: true }).click();
+    assert.match(await catalogue.innerText(), /Earn relic/);
+    assert.match(await catalogue.innerText(), /Spend relic/);
+    await catalogue
+      .getByLabel("New item ID suffix", { exact: true })
+      .fill("unused");
+    await catalogue
+      .getByRole("button", { name: "Add catalogue item", exact: true })
+      .click();
+    await catalogue
+      .getByRole("button", {
+        name: "Remove " + story.id + ":unused",
+        exact: true,
+      })
+      .click();
+    await catalogue
+      .getByRole("button", { name: "Apply catalogue", exact: true })
+      .click();
+    await name.fill("Unapplied name");
+    await catalogue
+      .getByRole("button", { name: "Reset catalogue", exact: true })
+      .click();
+    assert.equal(await name.inputValue(), "Golden relic");
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate((t) => {
+        document.documentElement.dataset.theme = t;
+      }, theme);
+      await name.scrollIntoViewIfNeeded();
+      assert(
+        await tab.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await tab.screenshot({
+        path: "test-results/item-catalogue-" + width + "-" + theme + ".png",
+        animations: "disabled",
+      });
+    }
+    await tab
+      .locator(".studio-panel .studio-tabs")
+      .getByRole("button", { name: "StoryNode", exact: true })
+      .click();
+    await tab
+      .getByLabel("Edit StoryNode", { exact: true })
+      .selectOption("middle");
+    await tab.getByText("Edit option 2 items", { exact: true }).click();
+    assert.match(
+      await editor
+        .getByLabel("Cost 1 existing item", { exact: true })
+        .innerText(),
+      /Golden relic/,
+    );
+    await tab.getByText("Build option 2 conditions", { exact: true }).click();
+    const conditions = tab.getByRole("region", {
+      name: "Option 2 condition builder",
+      exact: true,
+    });
+    await conditions
+      .getByRole("button", { name: "Add condition", exact: true })
+      .click();
+    await conditions
+      .getByLabel("Condition 1 match", { exact: true })
+      .selectOption("item");
+    await conditions
+      .getByLabel("Condition 1 existing item", { exact: true })
+      .selectOption(story.id + ":relic");
+    assert.match(
+      await conditions
+        .getByLabel("Condition 1 existing item", { exact: true })
+        .innerText(),
+      /Golden relic/,
+    );
+    await conditions
+      .getByRole("button", { name: "Reset condition edits", exact: true })
+      .click();
     for (const theme of ["light", "dark"]) {
       await tab.evaluate((t) => {
         document.documentElement.dataset.theme = t;
@@ -189,6 +293,7 @@ try {
       .getByText("All changes saved", { exact: true })
       .waitFor();
     const saved = await api(`/studio/${story.id}`);
+    assert.equal(saved.story.itemCatalogue.items[0].name, "Golden relic");
     assert.deepEqual(
       saved.story.storyNodes.opening.choices[1].outcome.route.effects[0],
       opening.choices[1].outcome.kind === "direct"
@@ -204,6 +309,13 @@ try {
     await open();
     await tab.getByRole("button", { name: "Preview", exact: true }).click();
     const preview = tab.getByRole("dialog", { name: "Private preview" });
+    await preview
+      .getByText("Test stats and inventory", { exact: true })
+      .click();
+    assert.match(
+      await preview.locator(".preview-state-editor").innerText(),
+      /Golden relic/,
+    );
     await preview.getByText("Why these options?", { exact: true }).click();
     assert.match(
       await preview

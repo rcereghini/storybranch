@@ -104,3 +104,7 @@ Introduce issuer-controlled expiring promotional rights for explicit same-creato
 ## S27 — Achievement-backed account key conditions
 
 Approved achievement definitions explicitly permit same-creator consumer Stories through a reviewed immutable list. Consumer editions bind typed achievement-source account aliases. Live evaluation requires a durable claim and current approval of both the bound and originally earned definitions, matched by stable achievement identity and issuer. Existing promotional aliases retain their default source. See [the key contract](keys.md#achievement-backed-account-keys-s27). No billing, claim migration or retroactive awards.
+
+## S28 — Edition-pinned Story item catalogue
+
+An optional version-1 catalogue adds names/descriptions to stable Story-local item IDs without granting inventory or requiring existing references to be catalogued. Save and publish validate bounded unique local definitions; published editions retain their own metadata. Shared authoring pickers preserve raw IDs, and Studio blocks metadata removal while draft references exist. Player projections omit the catalogue. No save migration, retroactive renaming, cross-Story inventory or account entitlement is introduced. See [Studio catalogue](../17-creator-studio.md#story-item-catalogue) and [StoryContext](story-context.md).

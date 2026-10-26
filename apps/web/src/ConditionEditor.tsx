@@ -1,3 +1,4 @@
+import { StoryItemPicker } from "./StoryItemPicker";
 import { describeCondition } from "../../../packages/domain/preview";
 import { useEffect, useState } from "react";
 import {
@@ -18,15 +19,16 @@ function Clause({
   keys,
   path,
   depth,
-  storyId,
+  story,
 }: {
   value: Condition;
   onChange: (c: Condition) => void;
   keys: ConditionKey[];
   path: string;
   depth: number;
-  storyId: string;
+  story: Story;
 }) {
+  const storyId = story.id;
   const newKey = (): Condition => ({
     kind: "key",
     keyId: keys[0]?.keyId ?? "",
@@ -137,19 +139,29 @@ function Clause({
               </select>
             </label>
           ) : (
-            <label>
-              Story item ID
-              <input
-                aria-label={`Condition ${path} item`}
+            <>
+              <StoryItemPicker
+                story={story}
                 value={value.itemId}
-                maxLength={100}
-                onChange={(e) => onChange({ ...value, itemId: e.target.value })}
+                label={`Condition ${path} existing item`}
+                onChange={(itemId) => onChange({ ...value, itemId })}
               />
-              <small>
-                Use this Story's namespace: {storyId}:item. Checks do not
-                consume items.
-              </small>
-            </label>
+              <label>
+                Story item ID
+                <input
+                  aria-label={`Condition ${path} item`}
+                  value={value.itemId}
+                  maxLength={100}
+                  onChange={(e) =>
+                    onChange({ ...value, itemId: e.target.value })
+                  }
+                />
+                <small>
+                  Use this Story's namespace: {storyId}:item. Checks do not
+                  consume items.
+                </small>
+              </label>
+            </>
           )}
           <label>
             Comparison
@@ -203,7 +215,7 @@ function Clause({
           keys={keys}
           path={`${path}.1`}
           depth={depth + 1}
-          storyId={storyId}
+          story={story}
         />
       )}
       {(value.kind === "all" || value.kind === "any") && (
@@ -223,7 +235,7 @@ function Clause({
                 keys={keys}
                 path={`${path}.${i + 1}`}
                 depth={depth + 1}
-                storyId={storyId}
+                story={story}
               />
               <button
                 className="btn btn-secondary"
@@ -311,7 +323,7 @@ export function ConditionEditor({
                 keys={keys}
                 path="1"
                 depth={0}
-                storyId={story.id}
+                story={story}
               />
             ) : (
               <p>No availability condition.</p>

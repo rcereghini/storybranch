@@ -5534,3 +5534,95 @@ it("uses earned achievements only through approved consumer permissions and live
     ).data(),
   ).not.toHaveProperty("accountKeys");
 });
+
+it("pins item catalogues to editions and keeps definitions out of player projections", async () => {
+  const story = starterStory(`catalogue-${randomUUID()}`);
+  const path = `/studio/${story.id}`;
+  story.itemCatalogue = {
+    version: 1,
+    items: [
+      {
+        itemId: `${story.id}:relic`,
+        name: "Secret relic",
+        description: "Not a player disclosure",
+      },
+    ],
+  };
+  const save = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    draft: { story, description: "Catalogue" },
+  };
+  expect(
+    (
+      await call(path, {
+        ...save,
+        draft: {
+          ...save.draft,
+          story: {
+            ...story,
+            itemCatalogue: {
+              version: 1,
+              items: [
+                { itemId: "foreign:item", name: "Foreign", description: "" },
+              ],
+            },
+          },
+        },
+      })
+    ).status,
+  ).toBe(400);
+  expect((await call(path, save)).status).toBe(200);
+  expect((await call(path)).data.story.itemCatalogue).toEqual(
+    story.itemCatalogue,
+  );
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  const original = (
+    await db.doc(`stories/${story.id}/versions/edition-1`).get()
+  ).data();
+  expect(original?.itemCatalogue).toEqual(story.itemCatalogue);
+  const started = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: story.id },
+  });
+  expect(started.status).toBe(200);
+  expect(JSON.stringify(started.data)).not.toContain("Secret relic");
+  expect(JSON.stringify(started.data)).not.toContain("itemCatalogue");
+  story.itemCatalogue.items[0].name = "Renamed relic";
+  expect(
+    (
+      await call(path, {
+        ...save,
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (await db.doc(`stories/${story.id}/versions/edition-1`).get()).data(),
+  ).toEqual(original);
+  expect(
+    (await db.doc(`stories/${story.id}/versions/edition-2`).get()).data()
+      ?.itemCatalogue.items[0].name,
+  ).toBe("Renamed relic");
+  expect(
+    (await call(`/playthroughs/${started.data.save.id}`)).data.save.versionId,
+  ).toBe("edition-1");
+});

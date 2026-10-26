@@ -1,3 +1,4 @@
+import { itemLabel } from "../../../packages/domain/story-items";
 import { useEffect, useState } from "react";
 import { statId, type Story } from "../../../packages/contracts/index";
 import {
@@ -65,15 +66,15 @@ export function PreviewStateEditor({
       <fieldset>
         <legend>Starting inventory</legend>
         <p>
-          Only items referenced by this Story. Zero means none; applying these
-          values does not grant real items.
+          Only catalogued or referenced Story items. Zero means none; applying
+          these values does not grant real items.
         </p>
         {itemIds.length === 0 && (
-          <p>No item references in this Story.</p>
+          <p>No catalogue entries or item references in this Story.</p>
         )}
         {itemIds.map((id) => (
           <label key={id}>
-            {id}
+            {itemLabel(story, id)}
             <input
               aria-label={`Starting quantity ${id}`}
               type="number"

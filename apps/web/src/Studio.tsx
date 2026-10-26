@@ -1,4 +1,5 @@
 import { ConditionEditor } from "./ConditionEditor";
+import { StoryItemCatalogue } from "./StoryItemCatalogue";
 import { BranchItemsEditor } from "./BranchItemsEditor";
 import { EarnedAccountKeys } from "./EarnedAccountKeys";
 import { renderStoryNode } from "../../../packages/domain/player";
@@ -1264,6 +1265,11 @@ export function Studio({
                   Local to each new run. Use lowercase names with hyphens; these
                   keys cannot grant account access.
                 </p>
+                <StoryItemCatalogue
+                  key={draft.story.id}
+                  story={draft.story}
+                  onChange={change}
+                />
                 <StoryProgressEditor story={draft.story} onChange={change} />
                 <PromotionalKeyEditor
                   key={draft.story.id}

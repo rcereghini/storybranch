@@ -815,6 +815,23 @@ html.studio-editing .tab-bar {
   height: 8em;
   overflow-y: auto;
 }
+.story-item-catalogue {
+  overflow-wrap: anywhere;
+}
+.story-item-catalogue fieldset {
+  min-width: 0;
+  margin-block: 12px;
+}
+.story-item-catalogue .btn,
+.story-item-catalogue summary {
+  min-height: 44px;
+  white-space: normal;
+  margin-block: 6px;
+}
+.story-item-catalogue .key-history-status {
+  height: 8em;
+  overflow-y: auto;
+}
 .preview-state-editor input[type="number"] {
   display: block;
   width: 100%;

@@ -1,3 +1,4 @@
+import { storyItems } from "./story-items";
 import {
   GameError,
   type Story,
@@ -12,19 +13,7 @@ import { start, baseStats, evaluate, routesOf } from "./index";
 import { renderStoryNode } from "./player";
 
 export function previewItemIds(story: Story): string[] {
-  const ids = new Set<string>();
-  const visit = (value: unknown) => {
-    if (!value || typeof value !== "object") return;
-    if (
-      "itemId" in value &&
-      typeof value.itemId === "string" &&
-      value.itemId.startsWith(story.id + ":")
-    )
-      ids.add(value.itemId);
-    Object.values(value).forEach(visit);
-  };
-  visit(story.storyNodes);
-  return [...ids].sort();
+  return storyItems(story).map((i) => i.itemId);
 }
 
 export function previewPreset(
@@ -55,7 +44,7 @@ export function startPreview(
   if (Object.keys(scenario.items ?? {}).some((id) => !items.includes(id)))
     throw new GameError(
       "VALIDATION_FAILED",
-      "Preview items must be referenced by this Story.",
+      "Preview items must be catalogued or referenced by this Story.",
     );
   if (
     scenario.accountKeys.some(

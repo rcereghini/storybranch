@@ -1,3 +1,4 @@
+import { StoryItemPicker } from "./StoryItemPicker";
 import { useEffect, useState } from "react";
 import type { Choice, Story } from "../../../packages/contracts/index";
 import { previewItemIds } from "../../../packages/domain/preview";
@@ -6,33 +7,22 @@ import { itemRoutes, validateBranchItems } from "./branch-items-model";
 function ItemField({
   value,
   onChange,
-  ids,
+  story,
   label,
 }: {
   value: string;
   onChange: (id: string) => void;
-  ids: string[];
+  story: Story;
   label: string;
 }) {
   return (
     <>
-      <label>
-        Existing Story item
-        <select
-          aria-label={`${label} existing item`}
-          value={ids.includes(value) ? value : ""}
-          onChange={(e) => {
-            if (e.target.value) onChange(e.target.value);
-          }}
-        >
-          <option value="">Choose an existing item</option>
-          {ids.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
-        </select>
-      </label>
+      <StoryItemPicker
+        story={story}
+        value={value}
+        onChange={onChange}
+        label={`${label} existing item`}
+      />
       <label>
         Item ID
         <input
@@ -96,7 +86,7 @@ export function BranchItemsEditor({
             <div key={i}>
               <ItemField
                 value={cost.itemId}
-                ids={ids}
+                story={story}
                 label={`Cost ${i + 1}`}
                 onChange={(id) =>
                   edit((next) => {
@@ -152,7 +142,7 @@ export function BranchItemsEditor({
                 <div key={effect.id}>
                   <ItemField
                     value={effect.itemId}
-                    ids={ids}
+                    story={story}
                     label={`${label} effect ${i + 1}`}
                     onChange={(id) =>
                       edit((next) => {
