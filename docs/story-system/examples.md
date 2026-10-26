@@ -67,6 +67,8 @@ The edition declares the mapping from the scouting result to initiative and the 
 
 ## Sequel and account context
 
+S20 now implements a bounded version of this example for local boolean keys. Harbor's source edition exports `harbor:saved-captain` to its sequel. The sequel pins that edition and declares a `completed-run` import with its own local alias. The player selects one completed Harbor journey. A rescued-captain run yields true; a different ending without the key yields false, even if the account rescued the captain in another run. The source run's durable completion is the evidence; this slice creates no separate account achievement/export grant. Both Stories must belong to the same creator. Other value types and cross-creator permissions remain future work.
+
 ```mermaid
 flowchart TD
   User[User account] --> One[Story one run]

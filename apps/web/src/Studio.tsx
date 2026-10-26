@@ -31,7 +31,7 @@ import { StoryNode } from "./StoryNode";
 import { StoryLeafEditor } from "./StoryLeafEditor";
 import { AchievementSubmission } from "./Achievements";
 import { StoryProgressEditor } from "./StoryProgressEditor";
-import { StoryKeyImports } from "./StoryKeyImports";
+import { StoryKeyImports, StoryRunExports } from "./StoryKeyImports";
 import { StoryInvitations } from "./StoryInvitations";
 import { ClipPicker } from "./ClipPicker";
 import { StoryNodeLibrary } from "./Library";
@@ -1251,6 +1251,7 @@ export function Studio({
                 </p>
                 <StoryProgressEditor story={draft.story} onChange={change} />
                 <StoryKeyImports story={draft.story} onChange={change} />
+                <StoryRunExports story={draft.story} onChange={change} />
                 {draft.revision > 0 && (
                   <StoryInvitations
                     key={`${draft.story.id}-${!!draft.publishedVersionId}`}

@@ -64,6 +64,36 @@ try {
         },
       ],
     };
+    source.runKeyExports = {
+      version: 1,
+      keys: [
+        {
+          keyId: `${source.id}:rescued`,
+          label: "Rescued the captain",
+          exportToStoryIds: [target.id],
+        },
+      ],
+    };
+    source.storyNodes.opening.storyNodeType = "text-options";
+    source.storyNodes.rescued = {
+      ...structuredClone(source.storyNodes.ending),
+      id: "rescued",
+      title: "Captain rescued",
+      leaf: {
+        version: 1,
+        summary: "A friend survives.",
+        rewards: [{ keyId: `${source.id}:rescued`, label: "Captain rescued" }],
+      },
+    };
+    source.storyNodes.opening.choices.push({
+      ...structuredClone(source.storyNodes.opening.choices[0]),
+      id: "rescue",
+      label: "Rescue the captain",
+      outcome: {
+        kind: "direct",
+        route: { targetStoryNodeId: "rescued", effects: [] },
+      },
+    });
     await save(source, 0);
     await publish(source, 1);
     target.keyImports = {
@@ -213,11 +243,121 @@ try {
       await tab.getByRole("button", { name: /Welcome back, hero/ }).count(),
       0,
     );
+    // A new edition asks for an explicit completed source journey instead.
+    target.keyImports!.keys[0] = {
+      ...target.keyImports!.keys[0],
+      selection: "completed-run",
+      sourceKeyId: `${source.id}:rescued`,
+      required: true,
+    };
+    await save(target, 3);
+    await publish(target, 4);
+    const rescue = await api("/playthroughs", {
+      idempotencyKey: randomUUID(),
+      payload: { storyId: source.id },
+    });
+    await api(`/playthroughs/${rescue.player.save.id}/choices`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: 0,
+      payload: { choiceId: "rescue" },
+    });
+    await tab.goto("http://127.0.0.1:5173/studio");
+    await tab.getByRole("button", { name: new RegExp(target.title) }).click();
+    assert.equal(
+      await tab
+        .getByLabel("Imported key 1 source mode", { exact: true })
+        .inputValue(),
+      "completed-run",
+    );
+    await tab
+      .getByLabel("Imported key 1 source mode", { exact: true })
+      .selectOption("ever-earned");
+    await tab
+      .getByLabel("Imported key 1 source mode", { exact: true })
+      .selectOption("completed-run");
+    await tab.getByRole("button", { name: "Save draft", exact: true }).click();
+    await tab
+      .locator(".studio-status")
+      .getByText("All changes saved", { exact: true })
+      .waitFor();
+    await tab.goto(`http://127.0.0.1:5173/s/${target.id}`);
+    let failPicker = true;
+    await tab.route("**/story-imports/*/*/runs?*", (route) => {
+      if (failPicker) {
+        return route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: { code: "UNAVAILABLE", message: "Test unavailable" },
+          }),
+        });
+      }
+      return route.continue();
+    });
+    await tab
+      .getByRole("button", { name: "Start a new journey", exact: true })
+      .click();
+    await tab.getByRole("button", { name: "Retry loading journeys" }).waitFor();
+    failPicker = false;
+    await tab.getByRole("button", { name: "Retry loading journeys" }).click();
+    const picker = tab.getByLabel(`Source journey for ${source.title}`);
+    await picker
+      .locator(`option[value="${rescue.player.save.id}"]`)
+      .waitFor({ state: "attached" });
+    assert.equal(await picker.inputValue(), "");
+    assert(
+      await tab
+        .getByRole("button", { name: "Use selected journeys", exact: true })
+        .isDisabled(),
+    );
+    await picker.selectOption(begun.player.save.id);
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate(
+        (t) => (document.documentElement.dataset.theme = t),
+        theme,
+      );
+      await tab.screenshot({
+        animations: "disabled",
+        path: `test-results/continuity-picker-${width}-${theme}.png`,
+      });
+      assert(
+        await tab.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+    }
+    await tab
+      .getByRole("button", { name: "Use selected journeys", exact: true })
+      .click();
+    await tab.getByRole("heading", { name: "A sequel begins" }).waitFor();
+    assert.equal(
+      await tab.getByRole("button", { name: /Welcome back, hero/ }).count(),
+      0,
+    );
+    const falseContinuityUrl = tab.url();
+    await tab.goto(`http://127.0.0.1:5173/s/${target.id}`);
+    await tab
+      .getByRole("button", { name: "Start a new journey", exact: true })
+      .click();
+    await picker.selectOption(rescue.player.save.id);
+    await tab
+      .getByRole("button", { name: "Use selected journeys", exact: true })
+      .click();
+    await tab.getByRole("button", { name: /Welcome back, hero/ }).waitFor();
+    await tab.reload();
+    await tab.getByRole("button", { name: /Welcome back, hero/ }).click();
+    await tab.getByRole("heading", { name: "The end", exact: true }).waitFor();
+    await tab.goto(falseContinuityUrl);
+    await tab.getByRole("heading", { name: "A sequel begins" }).waitFor();
+    assert.equal(
+      await tab.getByRole("button", { name: /Welcome back, hero/ }).count(),
+      0,
+    );
     assert.deepEqual(errors, []);
     await tab.close();
   }
   console.log(
-    "PASS: imported-key authoring persistence, consent/decline, missing/earned keys, immutable snapshots, reload and shared StoryNode completion at 390/1440 in both themes.",
+    "PASS: ever-earned imports and selected-run continuity, authoring persistence, consent/decline, missing/earned keys, picker retry, explicit conflicting-run selection, immutable snapshots, reload and shared StoryNode completion at 390/1440 in both themes.",
   );
 } finally {
   await browser.close();

@@ -13,13 +13,15 @@ Status: target design, with current `Save` as its foundation. Decisions S04–S0
 | Interaction | Pending dice, form response draft, battle turn/state, bound node input | `lastRoll`; other type state deferred |
 | Effects and history | Once-per-run/visit markers, immutable transition events, claim refs | `appliedEntryEffects` and event log; generalized cadence deferred |
 | Parent relation | Parent run and entry revision, explicit import policy | `parentPlaythroughId`, `parentRevision`; no local-state merge |
-| Completion | Ending ID, completion time, export/reward receipt refs | Completed status and versioned `completion` receipt for local keys, approved account achievement outcome and newly earned persistent Story keys; cross-Story exports deferred |
+| Completion | Ending ID, completion time, export/reward receipt refs | Completed status and versioned `completion` receipt for local keys, approved account achievement outcome and newly earned persistent Story keys; S20 can use this run as evidence for declared local boolean exports |
 
 Current names remain valid until a versioned change implements the target. Do not put future fields into existing strict schemas without migration/version planning.
 
 ## Starting and resuming
 
-S19 adds optional server-only `keyImportSnapshot` for consented, ever-earned persistent Story keys. Values and grant provenance are frozen at root start, separate from mutable local keys and same-Story progress. Old saves without the snapshot resolve imports as false; resume never reads another Story's grants. See [imports](keys.md#persistent-key-imports-s19). Selected-run continuity is still deferred.
+S20's completed-run imports add optional per-key `sourceRun` provenance (run ID, completion revision/time and ending ID) to `keyImportSnapshot`. One chosen run supplies all local facts from a source edition. A new source replay never changes a saved sequel. The selection is command intent, validated against the actor's completed save and both editions' declarations; the browser cannot provide trusted values. See [selected-run continuity](keys.md#selected-completed-run-imports-s20).
+
+S19 adds optional server-only `keyImportSnapshot` for consented, ever-earned persistent Story keys. Values and grant provenance are frozen at root start, separate from mutable local keys and same-Story progress. Old saves without the snapshot resolve imports as false; resume never reads another Story's grants. See [imports](keys.md#persistent-key-imports-s19). Selected-run local facts are supported by S20; generalized values remain deferred.
 
 Persistent Player + Story progress is separate from this single-run context (S17). New runs receive a server-only `storyProgressSnapshot` containing only the pinned edition's declared, previously granted permanent keys. Existing saves without it resolve those keys as absent; another run's awards never change an active run. Child runs snapshot their own Story's progress, without inheriting the parent's keys. See [persistent Story progress](keys.md#first-implementation-persistent-story-progress).
 

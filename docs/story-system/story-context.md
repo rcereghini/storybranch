@@ -24,6 +24,8 @@ For S17 permanent narrative keys, optional version-1 `progression` declares Stor
 
 ## Lifecycle
 
+S20 adds edition-pinned `runKeyExports` and optional `selection: completed-run` to import definitions. These declare local boolean facts and explicit destination permissions; they do not hold player values or choose a source run. See [selected-run imports](keys.md#selected-completed-run-imports-s20).
+
 S19 editions may declare persistent-key exports on progression definitions and `keyImports` with pinned source edition/key IDs and local aliases. Definitions stay in StoryContext; resolved values/provenance belong only to the new run's PlayerContext. Permission and consent rules are owned by [keys](keys.md#persistent-key-imports-s19).
 
 Load an authorized edition, verify its supported schema/rules/type versions, and construct a read-only projection. A run retains this identity until completion. New publication creates a new edition; resuming an old save reads its old edition. If an edition becomes unavailable, show recovery/support/replay options without replacing its content behind the player's back.

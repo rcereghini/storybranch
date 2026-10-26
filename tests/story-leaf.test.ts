@@ -1,5 +1,9 @@
 import { expect, it } from "vitest";
-import { completionSchema, storyLeafSchema } from "../packages/contracts/index";
+import {
+  completionSchema,
+  storyLeafSchema,
+  startSchema,
+} from "../packages/contracts/index";
 import {
   start,
   transition,
@@ -9,6 +13,61 @@ import {
 import { validatePublication } from "../packages/domain/authoring";
 import { playerRun, renderStoryNode } from "../packages/domain/player";
 import { starterStory } from "../apps/web/src/studio-model";
+
+it("requires unique, consented source-run selections and bounded local exports", () => {
+  const payload = {
+    storyId: "sequel",
+    versionId: "edition-1",
+    importConsent: true,
+    sourceRuns: [
+      {
+        sourceStoryId: "prequel",
+        sourceVersionId: "edition-1",
+        runId: "run-a",
+      },
+    ],
+  };
+  const command = { idempotencyKey: "start", payload };
+  expect(startSchema.safeParse(command).success).toBe(true);
+  expect(
+    startSchema.safeParse({
+      ...command,
+      payload: { ...payload, importConsent: false },
+    }).success,
+  ).toBe(false);
+  expect(
+    startSchema.safeParse({
+      ...command,
+      payload: { ...payload, versionId: undefined },
+    }).success,
+  ).toBe(false);
+  expect(
+    startSchema.safeParse({
+      ...command,
+      payload: {
+        ...payload,
+        sourceRuns: [
+          ...payload.sourceRuns,
+          { ...payload.sourceRuns[0], runId: "run-b" },
+        ],
+      },
+    }).success,
+  ).toBe(false);
+  const story = starterStory("prequel");
+  story.runKeyExports = {
+    version: 1,
+    keys: [
+      {
+        keyId: "prequel:rescuer",
+        label: "Rescuer",
+        exportToStoryIds: ["sequel"],
+      },
+    ],
+  };
+  expect(validatePublication(story).runKeyExports).toEqual(story.runKeyExports);
+  story.runKeyExports.keys[0].keyId = "foreign:rescuer";
+  expect(() => validateStory(story)).toThrow(/Foreign namespace/);
+});
 
 it("isolates imported aliases from local effects and hides their provenance", () => {
   const story = starterStory("sequel");

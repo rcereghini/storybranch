@@ -72,3 +72,7 @@ Implement beta invitations as creator-issued account keys scoped exclusively to 
 ## S19 — Consented permanent key imports within one creator's Stories
 
 Start with explicit ever-earned persistent Story keys, pinned export permission and local destination aliases. Both Stories must have the same creator. The player approves checks before a root run; the server snapshots verified values/provenance in that run, isolated from local effects and hidden from player projections. Optional missing/declined keys default false; required keys block start. Permission errors never become defaults. Immutable exports are permanent narrative permissions, not revocable access rights. Cross-creator imports, selected-run continuity, child import consent and live integrity revocation remain deferred. See [the implementation contract](keys.md#persistent-key-imports-s19).
+
+## S20 — Explicit completed-run continuity
+
+Allow edition-declared run-local boolean exports through the S19 permission boundary. Players explicitly select one completed run per source Story/edition; never choose latest implicitly or combine contradictory runs from one edition. Required continuity requires a source run, while false remains a valid imported fact. A bounded private picker exposes completion labels, not inventory. Start revalidates and freezes facts/provenance transactionally; source selection is part of command identity. Older saves and editions are untouched. See [selected-run imports](keys.md#selected-completed-run-imports-s20).

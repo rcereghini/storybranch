@@ -440,7 +440,10 @@ export function validateStory(value: unknown): Story {
   checkNamespaces(story);
   if (
     new Set(
-      story.progression?.keys.flatMap((k) => k.exportToStoryIds ?? []) ?? [],
+      [
+        ...(story.progression?.keys ?? []),
+        ...(story.runKeyExports?.keys ?? []),
+      ].flatMap((k) => k.exportToStoryIds ?? []),
     ).size > 20
   )
     throw new Error("At most 20 distinct key export destinations per Story.");

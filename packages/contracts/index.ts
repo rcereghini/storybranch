@@ -297,6 +297,33 @@ export const storySchema = z
     title: z.string(),
     entryStoryNodeId: id,
     trunkContext: storyTrunkContextSchema.optional(),
+    runKeyExports: z
+      .object({
+        version: z.literal(1),
+        keys: z
+          .array(
+            z
+              .object({
+                keyId: namespaced,
+                label: z.string().trim().min(1).max(80),
+                exportToStoryIds: z
+                  .array(id)
+                  .max(20)
+                  .refine(
+                    (ids) => new Set(ids).size === ids.length,
+                    "Export destinations must be unique.",
+                  ),
+              })
+              .strict(),
+          )
+          .max(20)
+          .refine(
+            (keys) => new Set(keys.map((k) => k.keyId)).size === keys.length,
+            "Run export keys must be unique.",
+          ),
+      })
+      .strict()
+      .optional(),
     keyImports: z
       .object({
         version: z.literal(1),
@@ -309,6 +336,7 @@ export const storySchema = z
                 sourceStoryId: id,
                 sourceVersionId: id,
                 sourceKeyId: namespaced,
+                selection: z.enum(["ever-earned", "completed-run"]).optional(),
                 required: z.boolean(),
               })
               .strict(),
@@ -410,6 +438,12 @@ export type Save = LocalState & {
       sourceVersionId: string;
       sourceKeyId: string;
       grant?: { runId: string; versionId: string; at: number };
+      sourceRun?: {
+        runId: string;
+        revision: number;
+        completedAt: number;
+        storyNodeId: string;
+      };
     }>;
   };
   lastRoll?: {
@@ -429,10 +463,34 @@ export const startSchema = z
         storyId: id,
         versionId: id.optional(),
         importConsent: z.boolean().optional(),
+        sourceRuns: z
+          .array(
+            z
+              .object({ sourceStoryId: id, sourceVersionId: id, runId: id })
+              .strict(),
+          )
+          .max(20)
+          .refine(
+            (runs) =>
+              new Set(
+                runs.map((r) => `${r.sourceStoryId}/${r.sourceVersionId}`),
+              ).size === runs.length,
+            "Choose one run per source Story edition.",
+          )
+          .optional(),
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (c) =>
+      !c.payload.sourceRuns?.length ||
+      (c.payload.importConsent === true && !!c.payload.versionId),
+    "Selected source runs require consent and a pinned destination edition.",
+  );
+export type SourceRunSelection = NonNullable<
+  z.infer<typeof startSchema>["payload"]["sourceRuns"]
+>[number];
 export const choiceCommandSchema = z
   .object({
     idempotencyKey: id,

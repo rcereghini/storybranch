@@ -36,7 +36,11 @@ import { admin } from "./admin";
 import { profileRoutes } from "./profile";
 import { achievementRoutes, awardAchievement } from "./achievements";
 import { prepareStoryProgress, storyProgressSnapshot } from "./story-progress";
-import { resolveKeyImports, storyImportOffer } from "./key-imports";
+import {
+  resolveKeyImports,
+  storyImportOffer,
+  storySourceRuns,
+} from "./key-imports";
 import { assertStoryEntry, invitationRoutes } from "./invitations";
 import { edition } from "./story-store";
 import * as paths from "./paths";
@@ -216,6 +220,19 @@ async function handleCanonical(request: Request): Promise<Response> {
       );
     // Gated features read the account's flags from the profile just loaded.
     const features = accountFeatures(profile.data());
+    if (
+      request.method === "GET" &&
+      segments[1] === "story-imports" &&
+      segments.length === 5 &&
+      segments[4] === "runs"
+    ) {
+      const keyId = url.searchParams.get("keyId") ?? "";
+      if (!/^[a-z0-9-]+:[a-z0-9-]+$/.test(keyId) || keyId.length > 100)
+        throw new GameError("VALIDATION_FAILED", "Invalid imported key alias.");
+      return json(
+        await storySourceRuns(uid, segments[2], segments[3], keyId, cursor),
+      );
+    }
     if (
       request.method === "GET" &&
       segments[1] === "story-imports" &&
@@ -399,6 +416,7 @@ async function handleCanonical(request: Request): Promise<Response> {
             story,
             c.payload.importConsent === true,
             now,
+            c.payload.sourceRuns,
           ),
         );
         event = {
