@@ -1,4 +1,5 @@
 import { playerRun } from "../packages/domain/player";
+import { branchDataStory } from "../fixtures/branch-data";
 import { blankStory, starterStory } from "../apps/web/src/studio-model";
 import {
   playerContractHeader,
@@ -5891,4 +5892,125 @@ it("pins item catalogues to editions and keeps definitions out of player project
   expect(
     (await call(`/playthroughs/${started.data.save.id}`)).data.save.versionId,
   ).toBe("edition-1");
+});
+
+it("persists authoritative StoryBranch inputs without player disclosure or retry changes", async () => {
+  const story = branchDataStory(`inputs-${randomUUID()}`);
+  const path = `/studio/${story.id}`;
+  const draft = { story, description: "Input test" };
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        draft,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  const originalEdition = (
+    await db.doc(`stories/${story.id}/versions/edition-1`).get()
+  ).data();
+  const started = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: story.id },
+  });
+  expect(started.status).toBe(200);
+  const run = `/playthroughs/${started.data.save.id}`;
+  const stored = db.doc(`users/player/playthroughs/${started.data.save.id}`);
+  expect((await stored.get()).data()?.nodeInputs.values).toEqual({
+    attempt: 1,
+  });
+  const roll = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: { choiceId: "roll", action: "roll" },
+  };
+  expect((await call(`${run}/choices`, roll)).status).toBe(200);
+  const pending = (await stored.get()).data()!;
+  expect(pending.nodeInputs.revision).toBe(0);
+  const next = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    payload: { choiceId: "roll" },
+  };
+  expect(
+    (
+      await call(`${run}/choices`, {
+        ...next,
+        payload: { ...next.payload, nodeInputs: { roll: 20 } },
+      })
+    ).status,
+  ).toBe(400);
+  expect((await call(`${run}/choices`, next, "progressed")).status).not.toBe(
+    200,
+  );
+  const advanced = await call(`${run}/choices`, next);
+  expect(advanced.status).toBe(200);
+  const snapshot = (await stored.get()).data()!;
+  expect(snapshot.nodeInputs).toEqual({
+    version: 1,
+    storyNodeId: "summary",
+    revision: 2,
+    values: {
+      roll: pending.lastRoll.value,
+      passed: pending.lastRoll.passed,
+      secret: "private-input-marker",
+    },
+  });
+  expect((await call(`${run}/choices`, next)).data).toEqual(advanced.data);
+  expect((await stored.get()).data()).toEqual(snapshot);
+  const reloaded = await call(run);
+  expect(reloaded.status).toBe(200);
+  for (const response of [
+    started.data,
+    advanced.data,
+    reloaded.data,
+    (await call(`${run}/events`)).data,
+  ]) {
+    expect(JSON.stringify(response)).not.toMatch(
+      /nodeInputs|inputBindings|private-input-marker/,
+    );
+  }
+  story.storyNodes.summary.inputs!.fields[2].default = "new-edition-marker";
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (await db.doc(`stories/${story.id}/versions/edition-1`).get()).data(),
+  ).toEqual(originalEdition);
+  expect((await stored.get()).data()?.nodeInputs).toEqual(snapshot.nodeInputs);
+  expect(
+    (
+      await call(`${run}/choices`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        payload: { choiceId: "Finish" },
+      })
+    ).status,
+  ).toBe(200);
+  expect((await stored.get()).data()).not.toHaveProperty("nodeInputs");
 });

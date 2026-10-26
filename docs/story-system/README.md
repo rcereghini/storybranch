@@ -8,6 +8,8 @@ StoryNode renderers run inside the shared `StoryNode` component and `Story` prov
 
 ## Authority and status
 
+For present-day delivery status and remaining work, use [the maintained roadmap](../roadmap.md). The October 23 review is a historical checkpoint. [S32 StoryBranch data](branch-data.md) owns the bounded constant/Dice input-binding implementation and its remaining gaps.
+
 | Document set | Owns | Interpretation |
 | --- | --- | --- |
 | Root/scoped `AGENTS.md`, [CONTRIBUTING](../../CONTRIBUTING.md), [workflow](../development-workflow.md) | How developers and agents discover and review contracts | Required working agreement |

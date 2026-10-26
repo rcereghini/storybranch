@@ -60,7 +60,7 @@ Use stable semantic output IDs such as `start`, `next`, `surrender`, `risk`, `fa
 
 A DiceRoll can produce `{ value: 14, sides: 20, threshold: 16, passed: false }` and select output `fail` (display branch 0). It does not send the number 0 as an untyped substitute for the roll. The next node may receive a bounded typed projection of that persisted result. Carrying a result forward requires an explicit binding; a later node does not get unrestricted access to all prior node state.
 
-Current dice keeps `lastRoll`; arbitrary typed edge payloads and persistent visit histories are future work. New output IDs and result bindings must map to current commands only where the semantics actually match, with a versioned format change where needed.
+Current dice keeps `lastRoll`; [S32](branch-data.md) adds bounded explicit constant/current-Dice bindings into server-only entry snapshots. Arbitrary payloads, generic variables and persistent visit histories remain future work. New output IDs and additional result sources require explicit contracts.
 
 Conditions decide availability or a server-selected output. Costs and effects are declared and validated, not embedded in render callbacks. Entry-effect frequency must be explicit: once per run, per visit or a separately defined cadence. Account rewards have their own non-repeatable claim rules. Changing frequency changes ruleset semantics; do not reinterpret existing `appliedEntryEffects` markers.
 
@@ -144,3 +144,7 @@ Reviewer: self-review; independent review pending.
 Verification: `pnpm check` passed TypeScript, 113 unit tests and the production build (existing bundle-size warning). All 41 emulator integration tests passed, including blank persistence, safe publication, linked-library output suppression, forged-choice denial, starting-key isolation, retry replay and unchanged pinned editions. Chrome StoryTrunk flows passed at 1440px/390px with both themes, plus Studio save/reload/preview/publish/upload/AI regression, graph layout/navigation, quiz and reusable StoryNode checks. Representative screenshots were inspected. The new StoryTrunk flow is included in CI's browser runner. Local documentation targets (168 links across 11 changed Markdown files) and diff whitespace checks passed; Mermaid rendering was not rerun because diagrams were unchanged.
 
 Production smoke check on the already-deployed player: resumed The Storm Signal, selected the dice branch, rolled 5, reloaded with the same pending result/revision, then explicitly selected Next and reached the saved ending with replay/discovery exits. This used the user's signed-in session and advanced that existing run. No production authoring or publication was performed; the new implementation remains local. Timing diagnostics were not collected in the production browser, so this is functional evidence, not a latency benchmark. Physical mobile/Safari verification remains outstanding.
+
+## Bounded input mappings (S32)
+
+[S32](branch-data.md) implements optional placement input declarations, authored constants and current-Dice field bindings, resolved and persisted on entry. It supersedes earlier statements that all typed bindings are future work. Generic variables/imports, additional result types, renderer consumers and visual binding controls remain deferred.

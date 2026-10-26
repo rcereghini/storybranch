@@ -52,3 +52,5 @@ StoryKeys.tsx also provides `StoryEntryKeys`, a separate redeemed invitation lis
 `StoryItemCatalogue.tsx`, `StoryItemPicker.tsx` and `packages/domain/story-items.ts` share catalogue metadata and reference discovery across authoring/preview. Read [Studio's catalogue contract](../../../docs/17-creator-studio.md#story-item-catalogue) and StoryContext. Metadata never grants inventory; preserve raw IDs, uncatalogued references, immutable editions and player disclosure boundaries.
 
 `PlayerInventory.tsx` displays only owned server-projected items inside Story context. `main.tsx` shows persisted net item changes in the Story log. Follow [S29 inventory](../../../docs/story-system/player-runtime.md#owned-inventory-and-item-history-s29): pinned names, raw-ID fallback, fixed modal geometry, focus restoration and no full-catalogue disclosure.
+
+S32's Inputs/Outputs JSON controls in Studio use [StoryBranch data](../../../docs/story-system/branch-data.md). Inputs are server-only snapshots; they must not be spread into player render props or reusable library content. Existing renderers have no input consumer in this slice.

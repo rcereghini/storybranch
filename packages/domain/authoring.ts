@@ -5,6 +5,7 @@ import {
   GameError,
 } from "../contracts/index";
 import { routesOf, validateStory } from "./index";
+import { choiceInputIssue } from "./branch-data";
 
 export type StoryDiagnostic = {
   storyNodeId?: string;
@@ -26,6 +27,7 @@ export function reviewPublication(input: unknown): PublicationReview {
     const safe = new Set<string>();
     const nodes = Object.values(draft.storyNodes);
     const routesSafe = (c: Choice) =>
+      !choiceInputIssue(c, draft.storyNodes) &&
       routesOf(c).every((r) => safe.has(r.targetStoryNodeId)) &&
       (c.outcome.kind !== "reveal" ||
         c.outcome.results.every(
@@ -46,8 +48,14 @@ export function reviewPublication(input: unknown): PublicationReview {
         let leafId = "validation-leaf";
         while (draft.storyNodes[leafId]) leafId += "-x";
         const clone = structuredClone(n);
+        // The synthetic local check cannot resolve real destination inputs.
+        // Original bindings are checked per edge before admitting safe routes.
+        delete clone.inputs;
         for (const c of clone.choices)
-          for (const r of routesOf(c)) r.targetStoryNodeId = leafId;
+          for (const r of routesOf(c)) {
+            r.targetStoryNodeId = leafId;
+            delete r.inputBindings;
+          }
         validateStory({
           ...draft,
           entryStoryNodeId: n.id,
@@ -122,7 +130,7 @@ export function reviewPublication(input: unknown): PublicationReview {
           diagnostics.push({
             storyNodeId: n.id,
             choiceId: c.id,
-            message: `“${c.label}” is hidden: a required destination is missing or unsafe.`,
+            message: `“${c.label}” is hidden: ${choiceInputIssue(c, draft.storyNodes) ?? "a required destination is missing or unsafe."}`,
           });
         return allowed;
       });
