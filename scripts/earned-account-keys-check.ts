@@ -127,11 +127,9 @@ try {
     const definition = await (await submitted).json();
     assert.deepEqual(definition.consumerStoryIds, [consumer.id]);
     await tab.goto("http://127.0.0.1:5173/admin/achievements");
-    const review = tab
-      .locator("article")
-      .filter({
-        has: tab.getByRole("heading", { name: definition.title, exact: true }),
-      });
+    const review = tab.locator("article").filter({
+      has: tab.getByRole("heading", { name: definition.title, exact: true }),
+    });
     await review
       .getByText(`Account key consumers: ${consumer.id}`, { exact: true })
       .waitFor();
@@ -140,13 +138,76 @@ try {
       .fill("Approved sequel key");
     await review.getByRole("button", { name: "Approve", exact: true }).click();
     await review.getByText("Status: approved", { exact: true }).waitFor();
+    let failMore = true;
+    const listed = { ...definition, status: "approved" };
+    await tab.route("**/api/achievement-submissions*", async (route) => {
+      const url = new URL(route.request().url());
+      if (
+        url.pathname !== "/api/achievement-submissions" ||
+        route.request().method() !== "GET"
+      )
+        return route.continue();
+      if (!url.searchParams.has("cursor"))
+        return route.fulfill({
+          json: {
+            items: [
+              {
+                ...listed,
+                id: "retained-choice",
+                title: "Earlier eligible choice",
+              },
+              {
+                ...listed,
+                id: "pending-choice",
+                title: "Pending choice",
+                status: "pending",
+              },
+              {
+                ...listed,
+                id: "unpermitted-choice",
+                title: "Other Story choice",
+                consumerStoryIds: [],
+              },
+            ],
+            nextCursor: "picker-next",
+          },
+        });
+      assert.equal(url.searchParams.get("cursor"), "picker-next");
+      if (failMore) {
+        failMore = false;
+        return route.fulfill({
+          status: 503,
+          json: {
+            error: {
+              code: "UNAVAILABLE",
+              message: "Temporary listing failure",
+            },
+          },
+        });
+      }
+      return route.fulfill({ json: { items: [listed], nextCursor: null } });
+    });
     await open(consumer);
     const earned = tab.getByRole("region", {
       name: "Earned account key settings",
     });
+    const picker = earned.getByLabel("Approved achievement");
+    await picker.selectOption("retained-choice");
+    assert.equal(
+      await picker
+        .getByRole("option", { name: /Pending choice|Other Story choice/ })
+        .count(),
+      0,
+    );
     await earned
-      .getByLabel("Earned achievement definition ID")
-      .fill(definition.id);
+      .getByRole("button", { name: "Load more achievements" })
+      .click();
+    await earned.getByText(/Temporary listing failure/).waitFor();
+    assert.equal(await picker.inputValue(), "retained-choice");
+    await earned
+      .getByRole("button", { name: "Load more achievements" })
+      .click();
+    await earned.getByLabel("Approved achievement").selectOption(definition.id);
     await earned
       .getByRole("button", { name: "Bind earned account key" })
       .click();
