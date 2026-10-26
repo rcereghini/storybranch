@@ -88,3 +88,7 @@ Bind a persistent narrative key to a published StoryLeaf achievement as an alter
 ## S23 — Private earned Story key history
 
 Expose bounded allowlisted projections of the actor's existing progress and grants in Adventures. Show earned provenance and link to the owned source journey without exposing unearned definitions or import permissions. Preserve historical keys independently of current definitions and review status. See [key history](keys.md#earned-story-key-history-s23).
+
+## S24 — Private invitation entry key history
+
+List the actor's permanent redeemed entry keys separately from narrative rewards, with bounded display-only projections and links to Story details. Snapshot the published title on new redemption; retain legacy grants without backfill. History is not a current availability check and never exposes invitation secrets or introduces commercial rights. See [invitation history](keys.md#private-invitation-key-history-s24).

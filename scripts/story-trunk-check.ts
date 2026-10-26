@@ -544,6 +544,100 @@ try {
         { exact: true },
       )
       .waitFor();
+    let failEntryKeys = true;
+    let failMoreEntryKeys = true;
+    let entryCursor = "";
+    await guest.route("**/api/story-entry-keys*", async (route) => {
+      const after = new URL(route.request().url()).searchParams.get("cursor");
+      if (after) assert.equal(after, entryCursor);
+      if (failEntryKeys || (after && failMoreEntryKeys))
+        return route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: { code: "UNAVAILABLE", message: "Test failure" },
+          }),
+        });
+      const response = await route.fetch();
+      const data = await response.json();
+      // Force a second batch to verify retry preserves already loaded grants.
+      if (!after && data.items.length)
+        data.nextCursor = entryCursor = data.items.at(-1).storyId;
+      return route.fulfill({ response, json: data });
+    });
+    await guest.goto("http://127.0.0.1:5173/adventures");
+    const entryHistory = guest.getByRole("region", {
+      name: "My Story entry keys",
+    });
+    await entryHistory
+      .getByRole("button", { name: "Retry entry keys", exact: true })
+      .waitFor();
+    failEntryKeys = false;
+    await entryHistory
+      .getByRole("button", { name: "Retry entry keys", exact: true })
+      .click();
+    await entryHistory.getByText(title, { exact: true }).waitFor();
+    await entryHistory
+      .getByRole("button", { name: "More entry keys", exact: true })
+      .click();
+    await entryHistory
+      .getByRole("button", { name: "Retry entry keys", exact: true })
+      .waitFor();
+    assert.equal(
+      await entryHistory.getByText(title, { exact: true }).count(),
+      1,
+    );
+    failMoreEntryKeys = false;
+    await entryHistory
+      .getByRole("button", { name: "Retry entry keys", exact: true })
+      .click();
+    await entryHistory
+      .getByRole("button", { name: "Retry entry keys", exact: true })
+      .waitFor({ state: "hidden" });
+    await entryHistory
+      .getByText(
+        "Invitation deadlines apply to redemption. Your saved entry keys do not expire.",
+        { exact: true },
+      )
+      .waitFor();
+    await entryHistory
+      .getByRole("button", { name: "More entry keys", exact: true })
+      .waitFor({ state: "hidden" });
+    const entryCard = entryHistory
+      .getByRole("listitem")
+      .filter({ hasText: title });
+    assert.equal(await entryCard.count(), 1);
+    assert(
+      (await entryCard
+        .getByRole("button", { name: "Open Story details" })
+        .boundingBox())!.height >= 44,
+    );
+    for (const theme of ["light", "dark"]) {
+      await guest.evaluate(
+        (t) => (document.documentElement.dataset.theme = t),
+        theme,
+      );
+      await entryHistory.scrollIntoViewIfNeeded();
+      assert(
+        await guest.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await entryHistory.screenshot({
+        path: `test-results/entry-key-history-${width}-${theme}.png`,
+        animations: "disabled",
+      });
+    }
+    await entryCard
+      .getByRole("button", { name: "Open Story details", exact: true })
+      .click();
+    await guest.waitForURL(`**/s/${submission.storyId}`);
+    await guest
+      .getByText(
+        "Your permanent entry key is saved. You can start this Story.",
+        { exact: true },
+      )
+      .waitFor();
     await guest
       .getByRole("button", { name: "Start a new journey", exact: true })
       .click();

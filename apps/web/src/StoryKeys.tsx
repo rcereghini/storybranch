@@ -1,10 +1,63 @@
 import { useEffect, useRef, useState } from "react";
 import type { createApi } from "../../../packages/api-client/index";
+import type { StoryEntryKeyHistory } from "../../../packages/contracts/invitations";
 import type {
   StoryProgressHistory,
   StoryKeyHistory,
 } from "../../../packages/contracts/story-progress";
 type Api = ReturnType<typeof createApi>;
+
+export function StoryEntryKeys({
+  api,
+  onOpen,
+}: {
+  api: Api;
+  onOpen: (storyId: string) => void;
+}) {
+  const { items, cursor, busy, error, more } = useHistory<
+    StoryEntryKeyHistory["items"][number]
+  >(api, "/story-entry-keys", "cursor", (key) => key.storyId);
+  return (
+    <section
+      className="panel story-key-history"
+      aria-label="My Story entry keys"
+    >
+      <h2>Story entry keys</h2>
+      <p>
+        Your redeemed invitations. These permanent keys let you start their
+        Stories when available.
+      </p>
+      <ul className="earned-key-list">
+        {items.map((key) => (
+          <li key={key.storyId}>
+            <strong>{key.title}</strong>
+            <p>Redeemed {new Date(key.grantedAt).toLocaleDateString()}</p>
+            <button
+              className="btn btn-secondary btn-small"
+              onClick={() => onOpen(key.storyId)}
+            >
+              Open Story details
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="key-history-status" role="status">
+        {busy
+          ? "Loading entry keys…"
+          : error
+            ? "Could not load entry keys."
+            : !items.length
+              ? "Redeem a creator invitation from Story details to save an entry key."
+              : "Invitation deadlines apply to redemption. Your saved entry keys do not expire."}
+      </div>
+      {(cursor || error) && (
+        <button className="btn btn-secondary" disabled={busy} onClick={more}>
+          {error ? "Retry entry keys" : "More entry keys"}
+        </button>
+      )}
+    </section>
+  );
+}
 
 // Each mounted list belongs to one account/Story. Ignore obsolete requests,
 // including the first effect request discarded by React StrictMode.

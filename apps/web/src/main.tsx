@@ -1,4 +1,4 @@
-import { StoryKeys } from "./StoryKeys";
+import { StoryKeys, StoryEntryKeys } from "./StoryKeys";
 import { transitionTiming } from "./transition-timing";
 import {
   PlayerSession,
@@ -969,6 +969,10 @@ function App() {
               user && (
                 <React.Fragment key={user.uid}>
                   <AccountAchievements api={api} />
+                  <StoryEntryKeys
+                    api={api}
+                    onOpen={(id) => navigate(`/s/${id}`)}
+                  />
                   <StoryKeys
                     api={api}
                     onResume={(id) => navigate(`/play/${id}`)}
