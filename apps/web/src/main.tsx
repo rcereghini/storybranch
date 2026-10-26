@@ -1,3 +1,4 @@
+import { StoryKeys } from "./StoryKeys";
 import { transitionTiming } from "./transition-timing";
 import {
   PlayerSession,
@@ -964,7 +965,17 @@ function App() {
             onResume={(saveId) => navigate(`/play/${saveId}`)}
             onSignIn={() => setLogin(true)}
             onDiscover={() => navigate("/discover")}
-            children={user && <AccountAchievements key={user.uid} api={api} />}
+            children={
+              user && (
+                <React.Fragment key={user.uid}>
+                  <AccountAchievements api={api} />
+                  <StoryKeys
+                    api={api}
+                    onResume={(id) => navigate(`/play/${id}`)}
+                  />
+                </React.Fragment>
+              )
+            }
           />
         ) : (
           <Discover

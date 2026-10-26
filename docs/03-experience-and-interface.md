@@ -63,3 +63,5 @@ Every core screen needs loading, empty, error, permission-denied, and offline pr
 ## Proposed visual tokens
 
 Use charcoal backgrounds, warm near-white body text, electric teal for primary action, muted violet for community content, and amber for credit costs. These are starting directions to test for contrast, not final brand colors. Use a modern sans-serif for reading and a restrained pixel or monospace accent for small labels. Keep body copy and subtitles out of pixel fonts. Motion should suggest a game menu through short focus transitions rather than persistent flashing effects.
+
+Adventures includes Earned Story keys (S23): choose an owned Story, browse permanent earned rewards, inspect award source/date and open the earning journey. Story and key lists have bounded pagination, empty/error/retry states and reserved loading status. This history excludes run-local inventory and unearned conditions. Revoked achievement status does not remove already-earned permanent keys.

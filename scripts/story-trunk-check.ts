@@ -353,6 +353,27 @@ try {
       .getByRole("region", { name: "StoryLeaf completion" })
       .getByText(/Already earned/)
       .waitFor();
+    let failKeys = true;
+    let failMoreKeys = true;
+    let keyCursor = "";
+    await tab.route("**/api/story-progress/*/keys*", async (route) => {
+      const after = new URL(route.request().url()).searchParams.get("afterKey");
+      if (after) assert.equal(after, keyCursor);
+      if (failKeys || (after && failMoreKeys))
+        return route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: { code: "UNAVAILABLE", message: "Test failure" },
+          }),
+        });
+      const response = await route.fetch();
+      const data = await response.json();
+      // Use a one-key batch to exercise pagination/retry without earning 20 rewards.
+      if (!after && data.items.length)
+        data.nextCursor = keyCursor = data.items.at(-1).keyId;
+      return route.fulfill({ response, json: data });
+    });
     await tab.goto("http://127.0.0.1:5173/adventures");
     await tab
       .getByRole("region", { name: "My account achievements" })
@@ -369,6 +390,68 @@ try {
     await tab.screenshot({
       path: `test-results/achievement-account-${width}.png`,
     });
+    const keyHistory = tab.getByRole("region", {
+      name: "My earned Story keys",
+    });
+    await keyHistory.getByRole("button", { name: title, exact: true }).click();
+    await keyHistory
+      .getByRole("button", { name: "Retry earned keys", exact: true })
+      .waitFor();
+    failKeys = false;
+    await keyHistory
+      .getByRole("button", { name: "Retry earned keys", exact: true })
+      .click();
+    await keyHistory.getByText("Returning explorer", { exact: true }).waitFor();
+    await keyHistory.getByText(/Approved achievement/).waitFor();
+    await keyHistory
+      .getByRole("button", { name: "More earned keys", exact: true })
+      .click();
+    await keyHistory
+      .getByRole("button", { name: "Retry earned keys", exact: true })
+      .waitFor();
+    assert.equal(
+      await keyHistory.getByText("Returning explorer", { exact: true }).count(),
+      1,
+    );
+    failMoreKeys = false;
+    await keyHistory
+      .getByRole("button", { name: "Retry earned keys", exact: true })
+      .click();
+    await keyHistory
+      .getByRole("button", { name: "Retry earned keys", exact: true })
+      .waitFor({ state: "hidden" });
+    assert.equal(
+      await keyHistory.getByText("Returning explorer", { exact: true }).count(),
+      1,
+    );
+    assert(
+      (await keyHistory
+        .getByRole("button", { name: "View earning journey", exact: true })
+        .boundingBox())!.height >= 44,
+    );
+
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate(
+        (t) => (document.documentElement.dataset.theme = t),
+        theme,
+      );
+      await keyHistory.scrollIntoViewIfNeeded();
+      assert(
+        await tab.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await tab.screenshot({
+        animations: "disabled",
+        path: `test-results/key-history-${width}-${theme}.png`,
+      });
+    }
+    await keyHistory
+      .getByRole("button", { name: "View earning journey", exact: true })
+      .click();
+    await tab
+      .getByRole("heading", { name: "Safe ending", exact: true })
+      .waitFor();
     await tab.goto("http://127.0.0.1:5173/admin/achievements");
     await review
       .getByLabel(`Review reason for ${achievementTitle}`)
@@ -382,6 +465,8 @@ try {
       .filter({ hasText: achievementTitle })
       .getByText(/Revoked/)
       .waitFor();
+    await keyHistory.getByRole("button", { name: title, exact: true }).click();
+    await keyHistory.getByText("Returning explorer", { exact: true }).waitFor();
     await tab.goto("http://127.0.0.1:5173/studio");
     await tab.getByRole("button", { name: new RegExp(title) }).click();
     await pane("StoryTrunk");

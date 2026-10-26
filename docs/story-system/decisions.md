@@ -84,3 +84,7 @@ Adopt S19/S20 consent for community side Stories. Authorize offer, source listin
 ## S22 — Approved achievement bindings grant permanent Story keys
 
 Bind a persistent narrative key to a published StoryLeaf achievement as an alternative to a completion threshold. The server derives bindings for admin review, then commits approved grants with completion and durable deduplication receipts. Preserve earned keys on approval revocation; no historical backfill or account/paid rights. See [achievement keys](keys.md#achievement-bound-persistent-keys-s22).
+
+## S23 — Private earned Story key history
+
+Expose bounded allowlisted projections of the actor's existing progress and grants in Adventures. Show earned provenance and link to the owned source journey without exposing unearned definitions or import permissions. Preserve historical keys independently of current definitions and review status. See [key history](keys.md#earned-story-key-history-s23).

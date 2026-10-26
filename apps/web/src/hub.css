@@ -580,3 +580,42 @@ body {
     animation: none;
   }
 }
+
+.story-key-history {
+  margin-top: 24px;
+}
+.key-story-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.key-story-list button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.key-story-list button[aria-pressed="true"] {
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+  border-color: var(--primary);
+}
+.key-history-status {
+  min-height: 4.5em;
+  padding-block: 12px;
+  color: var(--muted);
+}
+.earned-key-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.earned-key-list li {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow-wrap: anywhere;
+}
+.story-key-history .btn {
+  min-height: 44px;
+}
