@@ -13,21 +13,70 @@ export function EarnedAccountKeys({
   onChange: (story: Story) => void;
 }) {
   const [definitionId, setDefinitionId] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
+  const [items, setItems] = useState<AchievementDefinition[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const alive = useRef(false);
   const locked = useRef(false);
+  const request = useRef(0);
   const current = useRef(story);
   current.current = story;
+  const load = async (after?: string) => {
+    const token = ++request.current;
+    setBusy(true);
+    try {
+      const result = await api<{
+        items: AchievementDefinition[];
+        nextCursor: string | null;
+      }>(
+        `/achievement-submissions${after ? `?cursor=${encodeURIComponent(after)}` : ""}`,
+      );
+      if (!alive.current || token !== request.current) return;
+      setItems((old) =>
+        after
+          ? [
+              ...new Map(
+                [...old, ...result.items].map((item) => [item.id, item]),
+              ).values(),
+            ]
+          : result.items,
+      );
+      setCursor(result.nextCursor);
+      setMessage(
+        result.nextCursor
+          ? "More achievements are available. Load more if yours is not listed."
+          : "Achievements loaded.",
+      );
+    } catch (e) {
+      if (alive.current && token === request.current)
+        setMessage(
+          `${(e as Error).message} Try loading again; your existing choices are kept.`,
+        );
+    } finally {
+      if (alive.current && token === request.current) setBusy(false);
+    }
+  };
   useEffect(() => {
     alive.current = true;
+    void load();
     return () => {
       alive.current = false;
+      request.current++;
     };
-  }, []);
+  }, [api, story.id]);
   const bindings = story.accountKeys?.keys ?? [];
+  const eligible = items.filter(
+    (d) =>
+      d.status === "approved" &&
+      d.consumerStoryIds?.includes(story.id) &&
+      !bindings.some(
+        (k) => k.source === "achievement" && k.definitionId === d.id,
+      ),
+  );
   const bind = async () => {
-    if (locked.current) return;
+    if (locked.current || busy || !eligible.some((d) => d.id === definitionId))
+      return;
     locked.current = true;
     setBusy(true);
     setMessage("");
@@ -86,29 +135,60 @@ export function EarnedAccountKeys({
       <h3>Earned account keys</h3>
       <p>
         Use an approved achievement from one of your Stories. Its reviewed
-        permissions must include this Story. Copy its definition ID from the
-        source ending's account achievement settings.
+        permissions must include this Story.
       </p>
       <label>
-        Achievement definition ID
-        <input
-          aria-label="Earned achievement definition ID"
+        Approved achievement
+        <select
+          aria-label="Approved achievement"
           value={definitionId}
           disabled={busy}
-          maxLength={128}
           onChange={(e) => setDefinitionId(e.target.value)}
-        />
+        >
+          <option value="">Choose an achievement</option>
+          {eligible.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.title} · {d.versionId}
+            </option>
+          ))}
+        </select>
       </label>
       <button
         className="btn btn-secondary"
-        disabled={busy || !definitionId.trim() || bindings.length >= 20}
+        disabled={
+          busy ||
+          !eligible.some((d) => d.id === definitionId) ||
+          bindings.length >= 20
+        }
         onClick={() => void bind()}
       >
         Bind earned account key
       </button>
       <p className="key-history-status" role="status">
-        {busy ? "Checking achievement…" : message}
+        {busy ? "Loading or checking achievements…" : message}
       </p>
+      {!busy && !eligible.length && (
+        <p>
+          No eligible achievements in the loaded results. Submit consumer
+          permissions for approval, or load more results.
+        </p>
+      )}
+      <button
+        className="btn btn-secondary"
+        disabled={busy}
+        onClick={() => void load()}
+      >
+        Reload eligible achievements
+      </button>
+      {cursor && (
+        <button
+          className="btn btn-secondary"
+          disabled={busy}
+          onClick={() => void load(cursor)}
+        >
+          Load more achievements
+        </button>
+      )}
       {bindings
         .filter((k) => k.source === "achievement")
         .map((key) => (
