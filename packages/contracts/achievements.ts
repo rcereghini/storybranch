@@ -20,6 +20,7 @@ export const achievementReviewSchema = z
   })
   .strict();
 export type AchievementDefinition = {
+  rewardKeys?: Array<{ keyId: string; label: string }>;
   ending: { title: string; transcript: string; storyNodeType: string };
   id: string;
   achievementId: string;

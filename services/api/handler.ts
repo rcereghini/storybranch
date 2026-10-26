@@ -35,7 +35,7 @@ import { copilot } from "./copilot";
 import { assist } from "./assist";
 import { admin } from "./admin";
 import { profileRoutes } from "./profile";
-import { achievementRoutes, awardAchievement } from "./achievements";
+import { achievementRoutes, prepareAchievement } from "./achievements";
 import { prepareStoryProgress, storyProgressSnapshot } from "./story-progress";
 import {
   resolveKeyImports,
@@ -540,13 +540,15 @@ async function handleCanonical(request: Request): Promise<Response> {
           };
         }
       }
+      const achievement = await prepareAchievement(tx, uid, save);
       const writeProgress = await prepareStoryProgress(
         tx,
         uid,
         progressStory,
         save,
+        achievement.approved,
       );
-      await awardAchievement(tx, uid, save);
+      achievement.write();
       writeProgress();
       if (save.completion?.revision === save.revision)
         event.completion = save.completion;

@@ -168,6 +168,12 @@ try {
       .getByRole("region", { name: "Publication review" })
       .getByText(/Secret unfinished route/)
       .waitFor();
+    await tab
+      .getByLabel("Persistent key 1 trigger", { exact: true })
+      .selectOption("achievement");
+    await tab
+      .getByLabel("Persistent key 1 achievement ending", { exact: true })
+      .selectOption(ending);
     for (const theme of ["light", "dark"]) {
       await tab.evaluate(
         (t) => (document.documentElement.dataset.theme = t),
@@ -191,6 +197,18 @@ try {
     await save();
     await tab.reload();
     await tab.getByRole("button", { name: new RegExp(title) }).click();
+    assert.equal(
+      await tab
+        .getByLabel("Persistent key 1 trigger", { exact: true })
+        .inputValue(),
+      "achievement",
+    );
+    assert.equal(
+      await tab
+        .getByLabel("Persistent key 1 achievement ending", { exact: true })
+        .inputValue(),
+      ending,
+    );
     await pane("StoryNode");
     await tab
       .getByLabel("Edit StoryNode", { exact: true })
@@ -255,6 +273,10 @@ try {
     const review = tab.locator("article").filter({
       has: tab.getByRole("heading", { name: achievementTitle, exact: true }),
     });
+    await review
+      .getByRole("region", { name: "Achievement key rewards" })
+      .getByText(/Returning explorer/)
+      .waitFor();
     await review
       .getByLabel(`Review reason for ${achievementTitle}`)
       .fill("Verified the published StoryLeaf and its eligibility.");

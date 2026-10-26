@@ -438,6 +438,14 @@ export function validateStory(value: unknown): Story {
     }
   }
   checkNamespaces(story);
+  for (const key of story.progression?.keys ?? [])
+    if (
+      key.achievementStoryNodeId &&
+      story.storyNodes[key.achievementStoryNodeId]?.kind !== "ending"
+    )
+      throw new Error(
+        "Achievement key bindings require a StoryLeaf in this edition.",
+      );
   if (
     new Set(
       [

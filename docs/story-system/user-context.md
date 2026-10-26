@@ -59,3 +59,5 @@ Refund/revocation behavior, offline access leases and whether an already-started
 ## Checks
 
 Verify minimal projections, no credentials in portable contracts, cross-user denial, rejected forged flags, idempotent unique claims, concurrent grants, expiry/revocation and continued preservation of owned saves. Do not assume the UI hiding a control is authorization.
+
+S22 keeps achievement claims and awarded permanent Story keys distinct. An approved completion can grant a declared Story key, deduplicated per account/Story/key. Revocation marks the historical achievement according to its existing policy and stops new rewards, but does not erase narrative keys or saved snapshots. Existing claims alone do not trigger retroactive grants; see [binding policy](keys.md#achievement-bound-persistent-keys-s22).

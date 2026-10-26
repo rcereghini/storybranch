@@ -196,6 +196,9 @@ export async function achievementRoutes(
         "Approved achievement definitions cannot be edited.",
       );
     const next: AchievementDefinition = {
+      rewardKeys: (story.progression?.keys ?? [])
+        .filter((k) => k.achievementStoryNodeId === command.storyNodeId)
+        .map(({ keyId, label }) => ({ keyId, label })),
       ending: {
         title: story.storyNodes[command.storyNodeId].title,
         transcript: story.storyNodes[command.storyNodeId].transcript,
@@ -226,26 +229,32 @@ export async function achievementRoutes(
 
 // Called before any command writes. Claims, completion and command receipts
 // commit together, including first-placement leaves and isolated child runs.
-export async function awardAchievement(
+export async function prepareAchievement(
   tx: Transaction,
   uid: string,
   save: Save,
 ) {
-  if (!save.completion || save.completion.revision !== save.revision) return;
+  const none = {
+    write: () => {},
+    approved: undefined as AchievementDefinition | undefined,
+  };
+  if (!save.completion || save.completion.revision !== save.revision)
+    return none;
   const definition = await tx.get(
     definitions().doc(
       definitionId(save.storyId, save.versionId, save.storyNodeId),
     ),
   );
-  if (!definition.exists) return;
+  if (!definition.exists) return none;
   const approved = definition.data() as AchievementDefinition;
-  if (approved.status !== "approved") return;
+  if (approved.status !== "approved") return none;
   const ref = db.doc(
     `users/${uid}/achievementClaims/${approved.achievementId}`,
   );
   const existing = await tx.get(ref);
+  let claim: AchievementClaim | undefined;
   if (!existing.exists) {
-    const claim: AchievementClaim = {
+    claim = {
       id: ref.id,
       definitionId: approved.id,
       definitionRevision: approved.revision,
@@ -257,11 +266,16 @@ export async function awardAchievement(
       description: approved.description,
       at: save.completion.at,
     };
-    tx.create(ref, claim);
   }
   save.completion.accountAchievement = {
     id: approved.achievementId,
     title: approved.title,
     newlyGranted: !existing.exists,
+  };
+  return {
+    approved,
+    write: () => {
+      if (claim) tx.create(ref, claim);
+    },
   };
 }
