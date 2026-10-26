@@ -86,6 +86,8 @@ Command receipts are finite-lived. Their TTL is not sufficient for permanent rew
 
 ## Publication and versioning
 
+S19 key imports add only optional edition declarations and a bounded embedded `Save.keyImportSnapshot`; no new collection, index, client read/write grant or migration is needed. Snapshot provenance records the source export edition separately from the edition/run that earned the persistent grant. Publication checks both roots' creator and pinned export permission. A new root start repeats permission checks and resolves only approved grants inside its existing save/event/receipt transaction. Old editions/saves remain unchanged. See [the import contract](keys.md#persistent-key-imports-s19).
+
 Draft and published schemas are separate validation stages. A blank/incomplete draft is valid authoring state. The target pipeline can publish its safe effective graph only when a valid start survives; unfinished paths never enter the playable edition. Publication validates included node types, required input mappings, routes, termination policies, conditions/effects, import/export permissions, content revisions and asset ownership/readiness before exposing the edition pointer. Suppression of unfinished paths cannot bypass permissions, schema bounds or asset checks on included content.
 
 Small editions can commit atomically. Larger staged publication must keep all parts hidden until a complete manifest is ready. Neither partially staged content nor a concurrent draft edit can leak into the published snapshot. Publishing the same source revision is idempotent. Existing code bounds draft graphs to 80 StoryNodes; target scalability must be measured and versioned, not achieved by removing bounds.

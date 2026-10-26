@@ -20,6 +20,7 @@ import {
   readStoryData,
 } from "../../packages/contracts/legacy-story-format";
 import { libraryRecord } from "./story-storage";
+import { validateKeyExports, validateKeyImports } from "./key-imports";
 
 export async function authoring(
   request: Request,
@@ -121,6 +122,8 @@ export async function authoring(
       if (!old) throw new GameError("NOT_FOUND", "Save your draft first.");
       const versionId = `edition-${old.revision}`;
       const story = validatePublication({ ...old.story, versionId });
+      await validateKeyExports(tx, story, uid);
+      await validateKeyImports(tx, story, uid);
       // Only the publisher's own finished clips and photos; the edition records
       // each file so players never read the creator's clip records.
       const clips = new Map<string, DocumentReference>();

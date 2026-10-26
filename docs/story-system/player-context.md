@@ -19,6 +19,8 @@ Current names remain valid until a versioned change implements the target. Do no
 
 ## Starting and resuming
 
+S19 adds optional server-only `keyImportSnapshot` for consented, ever-earned persistent Story keys. Values and grant provenance are frozen at root start, separate from mutable local keys and same-Story progress. Old saves without the snapshot resolve imports as false; resume never reads another Story's grants. See [imports](keys.md#persistent-key-imports-s19). Selected-run continuity is still deferred.
+
 Persistent Player + Story progress is separate from this single-run context (S17). New runs receive a server-only `storyProgressSnapshot` containing only the pinned edition's declared, previously granted permanent keys. Existing saves without it resolve those keys as absent; another run's awards never change an active run. Child runs snapshot their own Story's progress, without inheriting the parent's keys. See [persistent Story progress](keys.md#first-implementation-persistent-story-progress).
 
 Starting a root run validates user access, selects a published edition, snapshots account stats, resolves declared imports and applies entry effects once. A missing optional import gets its declared default; a missing required import produces a clear eligibility message before creating the run. Each new run has a separate ID and inventory. A restart never resets account-level reward claims or creates new paid rights.

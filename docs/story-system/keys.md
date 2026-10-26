@@ -1,6 +1,6 @@
 # Keys, items, achievements and cross-story imports
 
-Status: target contract with implemented local state, persistent Player + Story keys and approved account achievements. Decisions S04, S06, S09, S16 and S17. Current runtime supports story-namespaced local keys/items/milestones/scores, completion-threshold keys across runs, and approved account achievements. Foreign namespaces, cross-story imports and commercial entitlements remain unsupported.
+Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S19. General foreign namespace access, selected-run continuity, cross-creator imports and commercial entitlements remain unsupported.
 
 “Key” is a creator-facing idea for a fact or right used in a condition. Storage and authorization distinguish several kinds; a single unrestricted boolean map is not sufficient.
 
@@ -30,7 +30,7 @@ On each new root/child run, the service snapshots only declared granted keys int
 
 Completion atomically increments `users/{uid}/storyProgress/{storyId}.completions`, creates missing permanent grants under its `keys/{keyId}` subcollection with source run/edition/definition snapshot, and records `completions/{runId}` as a durable no-TTL deduplication receipt. These writes commit with the run/event/command receipt and any approved achievement. Thresholds use the completing run's pinned edition. Completion exposes only newly granted labels/IDs through optional `completion.storyKeys`; normal player responses omit the progress snapshot and total. No client writes or generic grant endpoint exist. Definition removal stops future snapshots/grants without deleting history. Reintroduction of the same ID recognizes its prior grant.
 
-Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations are implemented separately below. Mid-run persistent awards, achievement-to-key bindings, sequel imports, consumption, shops and subscriptions remain follow-on work.
+Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations are implemented separately below. Mid-run persistent awards, achievement-to-key bindings, selected-run sequel imports, consumption, shops and subscriptions remain follow-on work.
 
 ```mermaid
 flowchart LR
@@ -69,7 +69,7 @@ Creator API: `POST /api/achievement-submissions` accepts `{idempotencyKey, expec
 
 The completion's optional `accountAchievement` is a historical grant/already-earned display snapshot, not a live entitlement assertion. Approved definitions are consulted inside the completion transaction, including direct-entry leaves and child runs. There is no post-completion claim endpoint or retroactive scan. Private Studio previews do not invoke this grant service. Source claims and completion receipts are never deleted on revocation, and existing editions and saves are not migrated.
 
-StoryLeaf's authored reward configuration supports labeled local keys, with a versioned configuration and an embedded durable completion receipt in the run. The server grants them once on completion, recording which were already held; replay is a distinct run and child rewards stay isolated. Approved account achievements use the separate registry above; sequel exports remain deferred. See [the local completion contract](story-nodes.md#local-completion-contract).
+StoryLeaf's authored reward configuration supports labeled local keys, with a versioned configuration and an embedded durable completion receipt in the run. The server grants them once on completion, recording which were already held; replay is a distinct run and child rewards stay isolated. Approved account achievements use the separate registry above; run-local sequel exports remain deferred. See [the local completion contract](story-nodes.md#local-completion-contract).
 
 Target definitions declare a stable ID/namespace, definition version, kind/value schema, scope, issuer, eligibility, stacking/consumption, expiry/revocation behavior and export/import policy. Grants record subject, definition version, source run/event or verified provider reference, time, value/quantity, claim ID and current status. Separate the definition from each grant.
 
@@ -78,6 +78,28 @@ Use namespaces owned by the story or approved issuer. Current IDs use `story-id:
 An exported achievement is a verified fact with provenance, not a pointer allowing another story to read an entire save. Avoid putting raw form responses, private narrative choices or payment data in export values. Public display and programmatic import are separate permissions.
 
 ## Sequel import contract
+
+### Persistent-key imports (S19)
+
+The first implementation imports permanent Player + Story keys between Stories owned by the same creator. It does not import run-local items, endings, approved account achievements, invitations or paid rights. Its explicit selection rule is **ever earned**, not latest run. Narrative continuity still requires the future source-run picker below.
+
+A source edition's progression key may declare `exportToStoryIds` (at most 20 distinct saved Story IDs). A destination edition declares `keyImports: {version: 1, keys: [{keyId, label, sourceStoryId, sourceVersionId, sourceKeyId, required}]}` (at most 20 unique local aliases). The source edition and key identity are pinned; the source key must explicitly permit the destination, and both roots must belong to the same creator. Publication and new starts validate those permissions. Reserve/save the destination ID first, then publish the source export, then publish the importing destination. Export consent in an immutable edition is permanent for this narrative-fact contract; a later edition does not revoke older declarations or saved snapshots. Cross-creator sharing and integrity revocation need a separate live policy before release.
+
+Before a root start, `GET /api/story-imports/{storyId}` checks catalogue visibility and entry access and returns only the current edition, title and declared import labels/source titles/required flags. It never reads grants or reveals inventory. The player explicitly chooses **Use earned keys** or, if all imports are optional, **Start without imported keys**. Start pins that displayed `versionId` and sends `importConsent: true` only for approval. The server resolves grants transactionally at start, never accepts client values, and rejects a missing required grant/consent before creating any run. Optional absent or declined imports default false. A stale displayed edition remains the explicitly selected immutable edition.
+
+`Save.keyImportSnapshot` stores bounded local aliases, boolean values, pinned export references, resolution time, and grant source run/edition/time when present. It is server-only and separate from mutable local keys and persistent same-Story keys. `kind: key, scope: import` conditions require a declared local alias; local effects cannot forge the imported value. Permission failures fail closed even for optional imports; only a valid declaration's missing grant defaults false. Resuming and idempotent retries reuse the committed snapshot. Existing saves without it have no imported keys; no backfill or migration occurs. Preview starts with no imports and awards nothing.
+
+This slice supports root starts. Imported editions cannot start as community child Stories yet: reject before creating a child rather than silently inheriting consent or parent state. Other child Stories retain current behavior. Branches still require an unconditional safe route. No raw source saves, grant provenance or imported values enter player, catalogue, share or AI projections. Creators configure declarations in StoryTrunk and can use imported aliases in option conditions.
+
+```mermaid
+flowchart LR
+  Export[Source edition permits destination] --> Check[Server checks pinned declarations and creator]
+  Import[Destination declares local alias] --> Check
+  Consent[Player approves ever-earned checks] --> Check
+  Grant[Private persistent Story grant] --> Check
+  Check --> Snapshot[New run stores boolean and provenance]
+  Snapshot --> Branch[Server evaluates imported-key condition]
+```
 
 An edition declares every external dependency: source issuer/story, exported definition/version, allowed value type, target local alias, required/optional status, default if optional, source-selection rule and freshness policy. The service checks both the source's export permission and the destination's import permission. Creators cannot inspect arbitrary account facts.
 

@@ -8,7 +8,13 @@ import {
   playerContractVersion,
 } from "../../../packages/contracts/player";
 import { storyPreviewPath } from "../../../packages/contracts/legacy-story-format";
-import React, { useEffect, useState, useSyncExternalStore } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import type { StoryImportOffer } from "../../../packages/contracts/key-imports";
 import { createRoot } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
 import { analyticsUrl } from "./analytics";
@@ -60,6 +66,8 @@ const playerApi = createApi(
   async () => (auth.currentUser ? auth.currentUser.getIdToken() : null),
 );
 function App() {
+  const starting = useRef(false);
+  const [importOffer, setImportOffer] = useState<StoryImportOffer | null>(null);
   const [session] = useState(
     () =>
       new PlayerSession(
@@ -127,10 +135,13 @@ function App() {
     window.scrollTo(0, 0);
   };
   useEffect(() => {
-    if (!login) return;
+    if (!login && !importOffer) return;
     const previous = document.activeElement as HTMLElement | null;
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setLogin(false);
+      if (event.key === "Escape") {
+        setLogin(false);
+        setImportOffer(null);
+      }
       if (event.key !== "Tab") return;
       const elements = Array.from(
         document.querySelectorAll<HTMLElement>(
@@ -152,7 +163,10 @@ function App() {
       document.removeEventListener("keydown", keyboard);
       previous?.focus();
     };
-  }, [login]);
+  }, [login, importOffer]);
+  useEffect(() => {
+    setImportOffer(null);
+  }, [path, user]);
   useEffect(() => {
     const pop = () => setPath(storyPreviewPath(location.pathname));
     const online = () => setOffline(!navigator.onLine);
@@ -289,16 +303,45 @@ function App() {
         setBusy(false);
     }
   };
-  const start = (storyId = player?.save.storyId ?? "glass-harbor") => {
+  const start = async (storyId = player?.save.storyId ?? "glass-harbor") => {
     if (!user) {
       setLogin(true);
       return;
     }
+    if (busy || offline || pending || starting.current) return;
+    starting.current = true;
+    const scope = auth.currentUser?.uid + "|" + location.pathname;
+    setBusy(true);
+    setError("");
+    try {
+      const offer = await api<StoryImportOffer>(`/story-imports/${storyId}`);
+      if (scope !== auth.currentUser?.uid + "|" + location.pathname) return;
+      if (offer.keys.length) setImportOffer(offer);
+      else
+        await command({
+          path: "/playthroughs",
+          body: {
+            idempotencyKey: crypto.randomUUID(),
+            payload: { storyId, versionId: offer.versionId },
+          },
+        });
+    } catch (e) {
+      if (scope === auth.currentUser?.uid + "|" + location.pathname) report(e);
+    } finally {
+      starting.current = false;
+      if (scope === auth.currentUser?.uid + "|" + location.pathname)
+        setBusy(false);
+    }
+  };
+  const startWithImports = (consent: boolean) => {
+    if (!importOffer) return;
+    const { storyId, versionId } = importOffer;
+    setImportOffer(null);
     void command({
       path: "/playthroughs",
       body: {
         idempotencyKey: crypto.randomUUID(),
-        payload: { storyId },
+        payload: { storyId, versionId, importConsent: consent },
       },
     });
   };
@@ -947,6 +990,56 @@ function App() {
               ×
             </button>
             <AuthForm offline={offline} onSuccess={() => setLogin(false)} />
+          </section>
+        </div>
+      )}
+      {importOffer && (
+        <div className="modal-backdrop">
+          <section
+            className="modal key-import-consent"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-title"
+          >
+            <button
+              autoFocus
+              className="modal-close"
+              aria-label="Cancel key imports"
+              onClick={() => setImportOffer(null)}
+            >
+              ×
+            </button>
+            <h2 id="import-title">Bring your earned keys?</h2>
+            <p>
+              {importOffer.title} can check these permanent keys from other
+              Stories by this creator. The result stays fixed for this journey.
+            </p>
+            <ul>
+              {importOffer.keys.map((k) => (
+                <li key={k.keyId}>
+                  {k.label} — {k.sourceTitle}
+                  {k.required ? " (required to start)" : " (optional)"}
+                </li>
+              ))}
+            </ul>
+            <p>
+              This checks keys you have ever earned. It does not share your past
+              choices or select a previous journey.
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => startWithImports(true)}
+            >
+              Use earned keys
+            </button>
+            {!importOffer.keys.some((k) => k.required) && (
+              <button
+                className="btn btn-secondary"
+                onClick={() => startWithImports(false)}
+              >
+                Start without imported keys
+              </button>
+            )}
           </section>
         </div>
       )}

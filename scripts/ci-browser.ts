@@ -25,6 +25,7 @@ try {
   await import("./admin-check");
   await import("./email-check");
   await import("./story-trunk-check");
+  await import("./key-imports-check");
 } finally {
   server.kill();
 }

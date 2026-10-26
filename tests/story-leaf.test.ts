@@ -10,6 +10,76 @@ import { validatePublication } from "../packages/domain/authoring";
 import { playerRun, renderStoryNode } from "../packages/domain/player";
 import { starterStory } from "../apps/web/src/studio-model";
 
+it("isolates imported aliases from local effects and hides their provenance", () => {
+  const story = starterStory("sequel");
+  story.keyImports = {
+    version: 1,
+    keys: [
+      {
+        keyId: "sequel:hero",
+        label: "Hero",
+        sourceStoryId: "prequel",
+        sourceVersionId: "edition-1",
+        sourceKeyId: "prequel:hero",
+        required: false,
+      },
+    ],
+  };
+  story.trunkContext = { version: 1, initialKeys: ["sequel:hero"] };
+  const opening = story.storyNodes.opening;
+  opening.storyNodeType = "text-options";
+  opening.choices.push({
+    ...structuredClone(opening.choices[0]),
+    id: "imported",
+    label: "Imported",
+    unavailableDisplay: "hidden",
+    availableWhen: {
+      kind: "key",
+      scope: "import",
+      keyId: "sequel:hero",
+      present: true,
+    },
+  });
+  const published = validatePublication(story);
+  const empty = start(published, "run", "user", baseStats, 1);
+  expect(
+    renderStoryNode(opening, empty).outputs.map((o) => o.id),
+  ).not.toContain("imported");
+  expect(() => transition(published, empty, "imported", 0, 2)).toThrow();
+  const snapshot = {
+    version: 1 as const,
+    consented: true,
+    at: 1,
+    keys: [
+      {
+        keyId: "sequel:hero",
+        present: true,
+        sourceStoryId: "prequel",
+        sourceVersionId: "edition-1",
+        sourceKeyId: "prequel:hero",
+        grant: { runId: "source-run", versionId: "edition-1", at: 0 },
+      },
+    ],
+  };
+  const granted = start(
+    published,
+    "granted",
+    "user",
+    baseStats,
+    1,
+    undefined,
+    undefined,
+    snapshot,
+  );
+  snapshot.keys[0].present = false;
+  expect(transition(published, granted, "imported", 0, 2).save.status).toBe(
+    "completed",
+  );
+  expect(playerRun(granted)).not.toHaveProperty("keyImportSnapshot");
+  delete story.keyImports;
+  expect(() => validateStory(story)).toThrow(/declared alias/);
+});
+
 it("keeps persistent key conditions separate from run keys and omits the snapshot from player data", () => {
   const story = starterStory("progress-test");
   story.progression = {

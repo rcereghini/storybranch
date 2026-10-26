@@ -34,6 +34,8 @@ The client projection helps presentation but cannot authorize commands. Each ser
 
 ## Global progress and key boundaries
 
+S19 permits a narrow exception to Story isolation: with player approval and explicit edition-pinned export/import declarations, Stories owned by the same creator may check permanent Story progress keys. Only declared boolean facts enter the destination's server-only snapshot, with provenance. The offer screen reads declarations rather than grants; creators and renderers receive no raw inventory. Cross-creator and selected-run imports remain deferred. See [persistent-key imports](keys.md#persistent-key-imports-s19).
+
 S18 invitation entry keys are private account grants under `storyEntryKeys`, scoped to starting exactly one Story. They are permanent after redemption; code deadlines and disabled status affect future redemptions only. The account receives only a minimal `invitationRequired/hasKey/canStart` projection through `/api/story-entry/{storyId}`. These keys do not enter generic StoryBranch conditions, authorize paid access or appear in another Story's user projection. See [the invitation contract](keys.md#invitation-entry-contract).
 
 UserContext also owns per-player, per-Story progress across runs: completion counts and permanent narrative key grants. This is private to the account and the named Story, not shared StoryContext state or a platform achievement. The server resolves declared keys at run start and keeps the snapshot out of ordinary player payloads; only authorized branch results and newly earned completion labels are disclosed. See S17 in [keys](keys.md#shared-key-model-s17).

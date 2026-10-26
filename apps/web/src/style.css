@@ -405,6 +405,18 @@ hr {
   color: var(--muted);
   font-size: 14px;
 }
+.key-import-consent {
+  overflow-wrap: anywhere;
+}
+.key-import-consent > .btn {
+  margin-top: 8px;
+  margin-right: 8px;
+}
+.key-import-consent > .btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
 .modal label {
   display: block;
   margin: 14px 0;

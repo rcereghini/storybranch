@@ -73,6 +73,29 @@ export function StoryProgressEditor({
           <button onClick={() => update(keys.filter((_, n) => n !== i))}>
             Remove persistent key {i + 1}
           </button>
+          <label>
+            Allow checks from your other Stories (comma-separated Story IDs)
+            <input
+              aria-label={`Persistent key ${i + 1} export destinations`}
+              key={(key.exportToStoryIds ?? []).join(",")}
+              defaultValue={(key.exportToStoryIds ?? []).join(", ")}
+              onBlur={(e) =>
+                update(
+                  keys.map((k, n) =>
+                    n === i
+                      ? {
+                          ...k,
+                          exportToStoryIds: e.target.value
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        }
+                      : k,
+                  ),
+                )
+              }
+            />
+          </label>
         </fieldset>
       ))}
       <button
@@ -95,7 +118,9 @@ export function StoryProgressEditor({
       </button>
       <p>
         Use stable lowercase names with hyphens. Changing a name creates a
-        different key; publish a new edition to apply changes.
+        different key; publish a new edition to apply changes. Save destination
+        Stories first. Export permission in a published edition is permanent for
+        that edition; it does not grant paid access.
       </p>
     </section>
   );

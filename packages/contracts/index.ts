@@ -16,7 +16,12 @@ export type Condition =
       value: number;
     }
   | { kind: "stat"; stat: StatId; op: "gte" | "lte" | "eq"; value: number }
-  | { kind: "key"; keyId: string; present: boolean; scope?: "run" | "story" }
+  | {
+      kind: "key";
+      keyId: string;
+      present: boolean;
+      scope?: "run" | "story" | "import";
+    }
   | { kind: "item"; itemId: string; op: "gte" | "lte" | "eq"; quantity: number }
   | { kind: "all" | "any"; conditions: Condition[] }
   | { kind: "not"; condition: Condition };
@@ -48,7 +53,7 @@ function conditionAt(depth: number): z.ZodType<Condition> {
         kind: z.literal("key"),
         keyId: namespaced,
         present: z.boolean(),
-        scope: z.enum(["run", "story"]).optional(),
+        scope: z.enum(["run", "story", "import"]).optional(),
       })
       .strict(),
     z
@@ -292,6 +297,30 @@ export const storySchema = z
     title: z.string(),
     entryStoryNodeId: id,
     trunkContext: storyTrunkContextSchema.optional(),
+    keyImports: z
+      .object({
+        version: z.literal(1),
+        keys: z
+          .array(
+            z
+              .object({
+                keyId: namespaced,
+                label: z.string().trim().min(1).max(80),
+                sourceStoryId: id,
+                sourceVersionId: id,
+                sourceKeyId: namespaced,
+                required: z.boolean(),
+              })
+              .strict(),
+          )
+          .max(20)
+          .refine(
+            (keys) => new Set(keys.map((k) => k.keyId)).size === keys.length,
+            "Imported key aliases must be unique.",
+          ),
+      })
+      .strict()
+      .optional(),
     progression: z
       .object({
         version: z.literal(1),
@@ -302,6 +331,14 @@ export const storySchema = z
                 keyId: namespaced,
                 label: z.string().trim().min(1).max(80),
                 afterCompletions: z.number().int().min(1).max(999),
+                exportToStoryIds: z
+                  .array(id)
+                  .max(20)
+                  .refine(
+                    (ids) => new Set(ids).size === ids.length,
+                    "Export destinations must be unique.",
+                  )
+                  .optional(),
               })
               .strict(),
           )
@@ -362,6 +399,19 @@ export type Save = LocalState & {
   completion?: StoryCompletion;
   // Server-only starting facts; never refreshed from another active run.
   storyProgressSnapshot?: { version: 1; keys: string[] };
+  keyImportSnapshot?: {
+    version: 1;
+    consented: boolean;
+    at: number;
+    keys: Array<{
+      keyId: string;
+      present: boolean;
+      sourceStoryId: string;
+      sourceVersionId: string;
+      sourceKeyId: string;
+      grant?: { runId: string; versionId: string; at: number };
+    }>;
+  };
   lastRoll?: {
     storyNodeId: string;
     value: number;
@@ -374,7 +424,13 @@ export type Save = LocalState & {
 export const startSchema = z
   .object({
     idempotencyKey: id,
-    payload: z.object({ storyId: id, versionId: id.optional() }).strict(),
+    payload: z
+      .object({
+        storyId: id,
+        versionId: id.optional(),
+        importConsent: z.boolean().optional(),
+      })
+      .strict(),
   })
   .strict();
 export const choiceCommandSchema = z
