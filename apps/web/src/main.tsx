@@ -8,7 +8,15 @@ import {
   playerContractVersion,
 } from "../../../packages/contracts/player";
 import { storyPreviewPath } from "../../../packages/contracts/legacy-story-format";
-import React, { useEffect, useState, useSyncExternalStore } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import type { StoryImportOffer } from "../../../packages/contracts/key-imports";
+import type { SourceRunSelection } from "../../../packages/contracts/index";
+import { StoryImportConsent } from "./StoryImportConsent";
 import { createRoot } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
 import { analyticsUrl } from "./analytics";
@@ -60,6 +68,8 @@ const playerApi = createApi(
   async () => (auth.currentUser ? auth.currentUser.getIdToken() : null),
 );
 function App() {
+  const starting = useRef(false);
+  const [importOffer, setImportOffer] = useState<StoryImportOffer | null>(null);
   const [session] = useState(
     () =>
       new PlayerSession(
@@ -127,14 +137,17 @@ function App() {
     window.scrollTo(0, 0);
   };
   useEffect(() => {
-    if (!login) return;
+    if (!login && !importOffer) return;
     const previous = document.activeElement as HTMLElement | null;
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setLogin(false);
+      if (event.key === "Escape") {
+        setLogin(false);
+        setImportOffer(null);
+      }
       if (event.key !== "Tab") return;
       const elements = Array.from(
         document.querySelectorAll<HTMLElement>(
-          '[role="dialog"] button:not(:disabled), [role="dialog"] input:not(:disabled)',
+          '[role="dialog"] button:not(:disabled), [role="dialog"] input:not(:disabled), [role="dialog"] select:not(:disabled)',
         ),
       );
       const first = elements[0],
@@ -152,7 +165,10 @@ function App() {
       document.removeEventListener("keydown", keyboard);
       previous?.focus();
     };
-  }, [login]);
+  }, [login, importOffer]);
+  useEffect(() => {
+    setImportOffer(null);
+  }, [path, user]);
   useEffect(() => {
     const pop = () => setPath(storyPreviewPath(location.pathname));
     const online = () => setOffline(!navigator.onLine);
@@ -289,16 +305,53 @@ function App() {
         setBusy(false);
     }
   };
-  const start = (storyId = player?.save.storyId ?? "glass-harbor") => {
+  const start = async (storyId = player?.save.storyId ?? "glass-harbor") => {
     if (!user) {
       setLogin(true);
       return;
     }
+    if (busy || offline || pending || starting.current) return;
+    starting.current = true;
+    const scope = auth.currentUser?.uid + "|" + location.pathname;
+    setBusy(true);
+    setError("");
+    try {
+      const offer = await api<StoryImportOffer>(`/story-imports/${storyId}`);
+      if (scope !== auth.currentUser?.uid + "|" + location.pathname) return;
+      if (offer.keys.length) setImportOffer(offer);
+      else
+        await command({
+          path: "/playthroughs",
+          body: {
+            idempotencyKey: crypto.randomUUID(),
+            payload: { storyId, versionId: offer.versionId },
+          },
+        });
+    } catch (e) {
+      if (scope === auth.currentUser?.uid + "|" + location.pathname) report(e);
+    } finally {
+      starting.current = false;
+      if (scope === auth.currentUser?.uid + "|" + location.pathname)
+        setBusy(false);
+    }
+  };
+  const startWithImports = (
+    consent: boolean,
+    sourceRuns: SourceRunSelection[],
+  ) => {
+    if (!importOffer) return;
+    const { storyId, versionId } = importOffer;
+    setImportOffer(null);
     void command({
       path: "/playthroughs",
       body: {
         idempotencyKey: crypto.randomUUID(),
-        payload: { storyId },
+        payload: {
+          storyId,
+          versionId,
+          importConsent: consent,
+          ...(sourceRuns.length ? { sourceRuns } : {}),
+        },
       },
     });
   };
@@ -949,6 +1002,16 @@ function App() {
             <AuthForm offline={offline} onSuccess={() => setLogin(false)} />
           </section>
         </div>
+      )}
+      {importOffer && (
+        <StoryImportConsent
+          key={`${importOffer.storyId}/${importOffer.versionId}`}
+          api={api}
+          offer={importOffer}
+          disabled={busy || offline}
+          onCancel={() => setImportOffer(null)}
+          onStart={startWithImports}
+        />
       )}
     </>
   );

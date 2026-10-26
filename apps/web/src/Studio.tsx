@@ -31,6 +31,7 @@ import { StoryNode } from "./StoryNode";
 import { StoryLeafEditor } from "./StoryLeafEditor";
 import { AchievementSubmission } from "./Achievements";
 import { StoryProgressEditor } from "./StoryProgressEditor";
+import { StoryKeyImports, StoryRunExports } from "./StoryKeyImports";
 import { StoryInvitations } from "./StoryInvitations";
 import { ClipPicker } from "./ClipPicker";
 import { StoryNodeLibrary } from "./Library";
@@ -1249,6 +1250,8 @@ export function Studio({
                   keys cannot grant account access.
                 </p>
                 <StoryProgressEditor story={draft.story} onChange={change} />
+                <StoryKeyImports story={draft.story} onChange={change} />
+                <StoryRunExports story={draft.story} onChange={change} />
                 {draft.revision > 0 && (
                   <StoryInvitations
                     key={`${draft.story.id}-${!!draft.publishedVersionId}`}
@@ -1754,9 +1757,10 @@ export function Studio({
                                 !c.availableWhen
                                   ? ""
                                   : c.availableWhen.kind === "key" &&
-                                      c.availableWhen.scope === "story" &&
+                                      (c.availableWhen.scope === "story" ||
+                                        c.availableWhen.scope === "import") &&
                                       c.availableWhen.present
-                                    ? c.availableWhen.keyId
+                                    ? `${c.availableWhen.scope}|${c.availableWhen.keyId}`
                                     : "advanced"
                               }
                               onChange={(e) => {
@@ -1768,8 +1772,12 @@ export function Studio({
                                         ...rest,
                                         availableWhen: {
                                           kind: "key",
-                                          scope: "story",
-                                          keyId: e.target.value,
+                                          scope: e.target.value.startsWith(
+                                            "import|",
+                                          )
+                                            ? "import"
+                                            : "story",
+                                          keyId: e.target.value.split("|")[1],
                                           present: true,
                                         },
                                         unavailableDisplay: "hidden",
@@ -1784,11 +1792,22 @@ export function Studio({
                               </option>
                               {(draft.story.progression?.keys ?? []).map(
                                 (k) => (
-                                  <option key={k.keyId} value={k.keyId}>
+                                  <option
+                                    key={k.keyId}
+                                    value={`story|${k.keyId}`}
+                                  >
                                     {k.label}
                                   </option>
                                 ),
                               )}
+                              {(draft.story.keyImports?.keys ?? []).map((k) => (
+                                <option
+                                  key={`import-${k.keyId}`}
+                                  value={`import|${k.keyId}`}
+                                >
+                                  {k.label} (imported)
+                                </option>
+                              ))}
                             </select>
                           </label>
                         )}

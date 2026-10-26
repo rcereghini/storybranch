@@ -19,4 +19,8 @@ Record the relevant documents and invariants in the plan/work summary and the [p
 
 `StoryProgressEditor.tsx` authors persistent Player + Story key definitions in StoryTrunk. Read [keys](../../../docs/story-system/keys.md#first-implementation-persistent-story-progress) and [Creator Studio](../../../docs/17-creator-studio.md) before changing it or its branch-condition controls.
 
+`StoryKeyImports.tsx` authors pinned persistent-key imports; `StoryProgressEditor.tsx` declares export destinations, and `main.tsx` presents start-time consent. Read [S19 imports](../../../docs/story-system/keys.md#persistent-key-imports-s19) before changing these paths. Imported snapshots stay server-only and are separate from local effects.
+
+`StoryKeyImports.tsx` also exposes run-local exports and import selection mode. `StoryImportConsent.tsx` owns consent and the bounded completed-source-journey picker, launched by `main.tsx`. Read [S20 continuity](../../../docs/story-system/keys.md#selected-completed-run-imports-s20); keep source inventory/provenance out of browser responses and never preselect a source run.
+
 `StoryInvitations.tsx` provides creator invitation controls and Story-detail redemption. Follow [invitation entry](../../../docs/story-system/keys.md#invitation-entry-contract), [UserContext](../../../docs/story-system/user-context.md) and Studio guidance. This live entry policy is separate from draft/edition changes and never promises media confidentiality or subscription enforcement.

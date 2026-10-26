@@ -56,6 +56,458 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("selects one owned completed source run, freezes its false or true facts, and paginates without inventory disclosure", async () => {
+  const source = starterStory(`run-source-${randomUUID()}`);
+  const target = starterStory(`run-target-${randomUUID()}`);
+  const keyId = `${source.id}:rescuer`;
+  const alias = `${target.id}:rescuer`;
+  const save = (story: typeof source, expectedRevision: number) =>
+    call(`/studio/${story.id}`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision,
+      draft: { story, description: "Run continuity" },
+    });
+  const publish = (story: typeof source, expectedRevision: number) =>
+    call(`/studio/${story.id}/publish`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision,
+      policyVersion: "creator-alpha-1",
+    });
+  expect((await save(target, 0)).status).toBe(200);
+  source.runKeyExports = {
+    version: 1,
+    keys: [{ keyId, label: "Rescuer", exportToStoryIds: [target.id] }],
+  };
+  source.storyNodes.opening.storyNodeType = "text-options";
+  source.storyNodes.opening.choices.push({
+    ...structuredClone(source.storyNodes.opening.choices[0]),
+    id: "rescue",
+    label: "Rescue",
+    outcome: {
+      kind: "direct",
+      route: {
+        targetStoryNodeId: "ending",
+        effects: [{ id: "rescue-key", kind: "key", keyId, present: true }],
+      },
+    },
+  });
+  expect((await save(source, 0)).status).toBe(200);
+  expect((await publish(source, 1)).status).toBe(200);
+  target.keyImports = {
+    version: 1,
+    keys: [
+      {
+        keyId: alias,
+        label: "Prequel rescue",
+        sourceStoryId: source.id,
+        sourceVersionId: "edition-1",
+        sourceKeyId: keyId,
+        selection: "completed-run",
+        required: true,
+      },
+    ],
+  };
+  target.storyNodes.opening.storyNodeType = "text-options";
+  target.storyNodes.opening.choices.push({
+    ...structuredClone(target.storyNodes.opening.choices[0]),
+    id: "bonus",
+    label: "Rescue reunion",
+    unavailableDisplay: "hidden",
+    availableWhen: {
+      kind: "key",
+      scope: "import",
+      keyId: alias,
+      present: true,
+    },
+  });
+  expect((await save(target, 1)).status).toBe(200);
+  expect((await publish(target, 2)).status).toBe(200);
+  const run = async (rescue: boolean, who = "player") => {
+    const begun = await call(
+      "/playthroughs",
+      { idempotencyKey: randomUUID(), payload: { storyId: source.id } },
+      who,
+    );
+    const result = await call(
+      `/playthroughs/${begun.data.save.id}/choices`,
+      choice(
+        begun.data.save,
+        rescue ? "rescue" : source.storyNodes.opening.choices[0].id,
+      ),
+      who,
+    );
+    expect(result.status).toBe(200);
+    return result.data.save;
+  };
+  const no = await run(false),
+    yes = await run(true),
+    foreign = await run(true, "progressed");
+  const active = (
+    await call("/playthroughs", {
+      idempotencyKey: randomUUID(),
+      payload: { storyId: source.id },
+    })
+  ).data.save;
+  const selection = (runId: string) => ({
+    sourceStoryId: source.id,
+    sourceVersionId: "edition-1",
+    runId,
+  });
+  const command = (runId?: string) => ({
+    idempotencyKey: randomUUID(),
+    payload: {
+      storyId: target.id,
+      versionId: "edition-2",
+      importConsent: true,
+      sourceRuns: runId ? [selection(runId)] : [],
+    },
+  });
+  const listPath = `/story-imports/${target.id}/edition-2/runs?keyId=${encodeURIComponent(alias)}`;
+  const listed = await call(listPath);
+  expect(listed.status).toBe(200);
+  expect(
+    listed.data.items.map((r: { runId: string }) => r.runId).sort(),
+  ).toEqual([no.id, yes.id].sort());
+  expect(Object.keys(listed.data.items[0]).sort()).toEqual([
+    "completedAt",
+    "endingTitle",
+    "runId",
+  ]);
+  expect(JSON.stringify(listed.data)).not.toContain(keyId);
+  expect((await call("/playthroughs", command())).status).toBe(403);
+  expect((await call("/playthroughs", command(foreign.id))).status).toBe(403);
+  expect((await call("/playthroughs", command(active.id))).status).toBe(403);
+  const falseStart = await call("/playthroughs", command(no.id));
+  expect(falseStart.status).toBe(200);
+  expect(
+    falseStart.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).not.toContain("bonus");
+  const trueCommand = command(yes.id);
+  const trueStart = await call("/playthroughs", trueCommand);
+  expect(trueStart.status).toBe(200);
+  expect(
+    trueStart.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).toContain("bonus");
+  expect(JSON.stringify(trueStart.data)).not.toContain(yes.id);
+  const snapshot = (await db.doc(saveOf(trueStart.data.save.id)).get()).data()!
+    .keyImportSnapshot;
+  expect(snapshot.keys[0]).toMatchObject({
+    present: true,
+    sourceRun: {
+      runId: yes.id,
+      revision: yes.revision,
+      storyNodeId: "ending",
+      completedAt: yes.completion.at,
+    },
+  });
+  expect((await call("/playthroughs", trueCommand)).data).toEqual(
+    trueStart.data,
+  );
+  expect(
+    (
+      await call("/playthroughs", {
+        ...trueCommand,
+        payload: { ...trueCommand.payload, sourceRuns: [selection(no.id)] },
+      })
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await call("/playthroughs", {
+        ...command(yes.id),
+        payload: {
+          ...command(yes.id).payload,
+          sourceRuns: [selection(yes.id), selection(no.id)],
+        },
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await call("/playthroughs", {
+        ...command(yes.id),
+        payload: {
+          ...command(yes.id).payload,
+          sourceRuns: [
+            { ...selection(yes.id), sourceVersionId: "edition-other" },
+          ],
+        },
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await call(
+        `/story-imports/${target.id}/edition-2/runs?keyId=${target.id}:undeclared`,
+      )
+    ).status,
+  ).toBe(400);
+  // Bounded scans can return empty batches; cursors still advance to valid runs.
+  const batch = db.batch();
+  const original = (await db.doc(saveOf(active.id)).get()).data()!;
+  for (let i = 0; i < 21; i++) {
+    const id = `000-${source.id}-${i}`;
+    batch.create(db.doc(saveOf(id)), { ...original, id });
+  }
+  await batch.commit();
+  const first = await call(listPath);
+  expect(first.data.items).toEqual([]);
+  expect(first.data.nextCursor).toBeTruthy();
+  const second = await call(`${listPath}&cursor=${first.data.nextCursor}`);
+  expect(
+    second.data.items.map((r: { runId: string }) => r.runId).sort(),
+  ).toEqual([no.id, yes.id].sort());
+  // A source replay cannot change either committed sequel snapshot.
+  await run(true);
+  const { completion: ignoredCompletion, ...legacySource } = (
+    await db.doc(saveOf(no.id)).get()
+  ).data()!;
+  const legacyId = `legacy-source-${randomUUID()}`;
+  await db.doc(saveOf(legacyId)).create({ ...legacySource, id: legacyId });
+  expect((await call("/playthroughs", command(legacyId))).status).toBe(403);
+  expect((await save(source, 1)).status).toBe(200);
+  expect((await publish(source, 2)).status).toBe(200);
+  const differentEdition = await run(true);
+  expect(differentEdition.versionId).toBe("edition-2");
+  expect(
+    (await call("/playthroughs", command(differentEdition.id))).status,
+  ).toBe(403);
+  expect(
+    (await db.doc(saveOf(trueStart.data.save.id)).get()).data()!
+      .keyImportSnapshot,
+  ).toEqual(snapshot);
+  expect(
+    (
+      await call(
+        `/playthroughs/${falseStart.data.save.id}/choices`,
+        choice(falseStart.data.save, "bonus"),
+      )
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await call(
+        `/playthroughs/${trueStart.data.save.id}/choices`,
+        choice(trueStart.data.save, "bonus"),
+      )
+    ).status,
+  ).toBe(200);
+  // Run-local export permission cannot stand in for a persistent-key export.
+  target.keyImports!.keys[0].selection = "ever-earned";
+  expect((await save(target, 2)).status).toBe(200);
+  expect((await publish(target, 3)).status).toBe(403);
+});
+it("imports only consented, explicitly exported persistent keys and pins private provenance", async () => {
+  const source = starterStory(`source-${randomUUID()}`);
+  const target = starterStory(`target-${randomUUID()}`);
+  const saveDraft = (story: typeof source, revision: number) =>
+    call(`/studio/${story.id}`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: revision,
+      draft: { story, description: "Imports test" },
+    });
+  const publish = (story: typeof source, revision: number) =>
+    call(`/studio/${story.id}/publish`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: revision,
+      policyVersion: "creator-alpha-1",
+    });
+  expect((await saveDraft(target, 0)).status).toBe(200);
+  source.progression = {
+    version: 1,
+    keys: [
+      {
+        keyId: `${source.id}:hero`,
+        label: "Hero",
+        afterCompletions: 1,
+        exportToStoryIds: [target.id],
+      },
+    ],
+  };
+  expect((await saveDraft(source, 0)).status).toBe(200);
+  expect((await publish(source, 1)).status).toBe(200);
+  target.keyImports = {
+    version: 1,
+    keys: [
+      {
+        keyId: `${target.id}:hero`,
+        label: "Returning hero",
+        sourceStoryId: source.id,
+        sourceVersionId: "edition-1",
+        sourceKeyId: `${source.id}:hero`,
+        required: false,
+      },
+    ],
+  };
+  target.storyNodes.opening.storyNodeType = "text-options";
+  target.storyNodes.opening.choices.push({
+    ...structuredClone(target.storyNodes.opening.choices[0]),
+    id: "bonus",
+    label: "Secret sequel",
+    unavailableDisplay: "hidden",
+    availableWhen: {
+      kind: "key",
+      scope: "import",
+      keyId: `${target.id}:hero`,
+      present: true,
+    },
+  });
+  expect((await saveDraft(target, 1)).status).toBe(200);
+  expect((await publish(target, 2)).status).toBe(200);
+  const offer = await call(`/story-imports/${target.id}`);
+  expect(offer.status).toBe(200);
+  expect(offer.data).toEqual({
+    storyId: target.id,
+    versionId: "edition-2",
+    title: target.title,
+    keys: [
+      {
+        keyId: `${target.id}:hero`,
+        label: "Returning hero",
+        sourceTitle: source.title,
+        required: false,
+      },
+    ],
+  });
+  const begin = (consent: boolean, who = "player", versionId = "edition-2") =>
+    call(
+      "/playthroughs",
+      {
+        idempotencyKey: randomUUID(),
+        payload: { storyId: target.id, versionId, importConsent: consent },
+      },
+      who,
+    );
+  const outputs = (r: Awaited<ReturnType<typeof call>>) =>
+    r.data.player.storyNode.outputs.map((o: { id: string }) => o.id);
+  const before = await begin(true);
+  expect(before.status).toBe(200);
+  expect(outputs(before)).not.toContain("bonus");
+  const sourceRun = (
+    await call("/playthroughs", {
+      idempotencyKey: randomUUID(),
+      payload: { storyId: source.id },
+    })
+  ).data.save;
+  expect(
+    (
+      await call(
+        `/playthroughs/${sourceRun.id}/choices`,
+        choice(sourceRun, source.storyNodes.opening.choices[0].id),
+      )
+    ).status,
+  ).toBe(200);
+  expect(outputs(await begin(false))).not.toContain("bonus");
+  expect(outputs(await begin(true, "progressed"))).not.toContain("bonus");
+  expect(
+    (
+      await call(
+        `/playthroughs/${before.data.save.id}/choices`,
+        choice(before.data.save, "bonus"),
+      )
+    ).status,
+  ).toBe(400);
+  const command = {
+    idempotencyKey: randomUUID(),
+    payload: {
+      storyId: target.id,
+      versionId: "edition-2",
+      importConsent: true,
+    },
+  };
+  const after = await call("/playthroughs", command);
+  expect(after.status).toBe(200);
+  expect(outputs(after)).toContain("bonus");
+  expect(JSON.stringify(after.data)).not.toContain("keyImportSnapshot");
+  expect(JSON.stringify(after.data)).not.toContain(source.id);
+  const stored = (await db.doc(saveOf(after.data.save.id)).get()).data()!;
+  expect(stored.keyImportSnapshot).toMatchObject({
+    consented: true,
+    keys: [
+      {
+        keyId: `${target.id}:hero`,
+        present: true,
+        sourceVersionId: "edition-1",
+        grant: { runId: sourceRun.id, versionId: "edition-1" },
+      },
+    ],
+  });
+  expect((await call("/playthroughs", command)).data).toEqual(after.data);
+  expect(
+    (
+      await call("/playthroughs", {
+        ...command,
+        payload: { ...command.payload, importConsent: false },
+      })
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await call("/playthroughs", {
+        ...command,
+        idempotencyKey: randomUUID(),
+        payload: {
+          ...command.payload,
+          keyImportSnapshot: stored.keyImportSnapshot,
+        },
+      })
+    ).status,
+  ).toBe(400);
+  // Export permission is pinned, not implicitly revoked by a later edition.
+  source.progression.keys[0].exportToStoryIds = [];
+  expect((await saveDraft(source, 1)).status).toBe(200);
+  expect((await publish(source, 2)).status).toBe(200);
+  expect(outputs(await begin(true))).toContain("bonus");
+  target.keyImports.keys[0].sourceVersionId = "edition-2";
+  expect((await saveDraft(target, 2)).status).toBe(200);
+  expect((await publish(target, 3)).status).toBe(403);
+  target.keyImports.keys[0].sourceVersionId = "edition-1";
+  target.keyImports.keys[0].required = true;
+  expect((await saveDraft(target, 3)).status).toBe(200);
+  expect((await publish(target, 4)).status).toBe(200);
+  expect((await begin(false, "player", "edition-4")).status).toBe(403);
+  expect((await begin(true, "progressed", "edition-4")).status).toBe(403);
+  expect(outputs(await begin(true, "player", "edition-4"))).toContain("bonus");
+  // Child starts cannot silently borrow consent or import parent state.
+  let parent = (
+    await call("/playthroughs", {
+      idempotencyKey: randomUUID(),
+      payload: { storyId: "glass-harbor" },
+    })
+  ).data.save;
+  parent = (
+    await call(`/playthroughs/${parent.id}/choices`, choice(parent, "market"))
+  ).data.save;
+  const branchId = `import-child-${randomUUID()}`;
+  const location = (await db.doc("branches/bell-diver").get()).data()!;
+  await db
+    .doc(`branches/${branchId}`)
+    .set({ ...location, storyId: target.id, versionId: "edition-2" });
+  expect(
+    (
+      await call(`/playthroughs/${parent.id}/branches`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: parent.revision,
+        payload: { branchId },
+      })
+    ).status,
+  ).toBe(403);
+  // Live ownership changes fail closed, even for an optional old import.
+  await db.doc(`stories/${source.id}`).update({ creatorUid: "progressed" });
+  expect((await begin(true)).status).toBe(403);
+  expect((await begin(false)).status).toBe(403);
+  expect((await call(`/story-imports/${target.id}`)).status).toBe(403);
+  // Existing journeys continue from the committed fact, without source reads.
+  expect(
+    (
+      await call(
+        `/playthroughs/${after.data.save.id}/choices`,
+        choice(after.data.save, "bonus"),
+      )
+    ).status,
+  ).toBe(200);
+  expect((await call("/playthroughs", command)).data).toEqual(after.data);
+});
 it("issues invitation entry keys with atomic limits, private records, retries and permanent redeemed access", async () => {
   const storyId = `invite-${randomUUID()}`;
   const story = starterStory(storyId);

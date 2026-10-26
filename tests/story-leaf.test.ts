@@ -1,5 +1,9 @@
 import { expect, it } from "vitest";
-import { completionSchema, storyLeafSchema } from "../packages/contracts/index";
+import {
+  completionSchema,
+  storyLeafSchema,
+  startSchema,
+} from "../packages/contracts/index";
 import {
   start,
   transition,
@@ -9,6 +13,131 @@ import {
 import { validatePublication } from "../packages/domain/authoring";
 import { playerRun, renderStoryNode } from "../packages/domain/player";
 import { starterStory } from "../apps/web/src/studio-model";
+
+it("requires unique, consented source-run selections and bounded local exports", () => {
+  const payload = {
+    storyId: "sequel",
+    versionId: "edition-1",
+    importConsent: true,
+    sourceRuns: [
+      {
+        sourceStoryId: "prequel",
+        sourceVersionId: "edition-1",
+        runId: "run-a",
+      },
+    ],
+  };
+  const command = { idempotencyKey: "start", payload };
+  expect(startSchema.safeParse(command).success).toBe(true);
+  expect(
+    startSchema.safeParse({
+      ...command,
+      payload: { ...payload, importConsent: false },
+    }).success,
+  ).toBe(false);
+  expect(
+    startSchema.safeParse({
+      ...command,
+      payload: { ...payload, versionId: undefined },
+    }).success,
+  ).toBe(false);
+  expect(
+    startSchema.safeParse({
+      ...command,
+      payload: {
+        ...payload,
+        sourceRuns: [
+          ...payload.sourceRuns,
+          { ...payload.sourceRuns[0], runId: "run-b" },
+        ],
+      },
+    }).success,
+  ).toBe(false);
+  const story = starterStory("prequel");
+  story.runKeyExports = {
+    version: 1,
+    keys: [
+      {
+        keyId: "prequel:rescuer",
+        label: "Rescuer",
+        exportToStoryIds: ["sequel"],
+      },
+    ],
+  };
+  expect(validatePublication(story).runKeyExports).toEqual(story.runKeyExports);
+  story.runKeyExports.keys[0].keyId = "foreign:rescuer";
+  expect(() => validateStory(story)).toThrow(/Foreign namespace/);
+});
+
+it("isolates imported aliases from local effects and hides their provenance", () => {
+  const story = starterStory("sequel");
+  story.keyImports = {
+    version: 1,
+    keys: [
+      {
+        keyId: "sequel:hero",
+        label: "Hero",
+        sourceStoryId: "prequel",
+        sourceVersionId: "edition-1",
+        sourceKeyId: "prequel:hero",
+        required: false,
+      },
+    ],
+  };
+  story.trunkContext = { version: 1, initialKeys: ["sequel:hero"] };
+  const opening = story.storyNodes.opening;
+  opening.storyNodeType = "text-options";
+  opening.choices.push({
+    ...structuredClone(opening.choices[0]),
+    id: "imported",
+    label: "Imported",
+    unavailableDisplay: "hidden",
+    availableWhen: {
+      kind: "key",
+      scope: "import",
+      keyId: "sequel:hero",
+      present: true,
+    },
+  });
+  const published = validatePublication(story);
+  const empty = start(published, "run", "user", baseStats, 1);
+  expect(
+    renderStoryNode(opening, empty).outputs.map((o) => o.id),
+  ).not.toContain("imported");
+  expect(() => transition(published, empty, "imported", 0, 2)).toThrow();
+  const snapshot = {
+    version: 1 as const,
+    consented: true,
+    at: 1,
+    keys: [
+      {
+        keyId: "sequel:hero",
+        present: true,
+        sourceStoryId: "prequel",
+        sourceVersionId: "edition-1",
+        sourceKeyId: "prequel:hero",
+        grant: { runId: "source-run", versionId: "edition-1", at: 0 },
+      },
+    ],
+  };
+  const granted = start(
+    published,
+    "granted",
+    "user",
+    baseStats,
+    1,
+    undefined,
+    undefined,
+    snapshot,
+  );
+  snapshot.keys[0].present = false;
+  expect(transition(published, granted, "imported", 0, 2).save.status).toBe(
+    "completed",
+  );
+  expect(playerRun(granted)).not.toHaveProperty("keyImportSnapshot");
+  delete story.keyImports;
+  expect(() => validateStory(story)).toThrow(/declared alias/);
+});
 
 it("keeps persistent key conditions separate from run keys and omits the snapshot from player data", () => {
   const story = starterStory("progress-test");

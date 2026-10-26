@@ -55,6 +55,12 @@ export function evaluate(c: Condition, s: Save): boolean {
     case "stat":
       return compare(s.stats[c.stat], c.op, c.value);
     case "key":
+      if (c.scope === "import")
+        return (
+          (s.keyImportSnapshot?.keys.some(
+            (k) => k.keyId === c.keyId && k.present,
+          ) ?? false) === c.present
+        );
       return (
         (c.scope === "story"
           ? (s.storyProgressSnapshot?.keys ?? [])
@@ -146,6 +152,7 @@ export function start(
   now: number,
   parent?: Save,
   progress?: Save["storyProgressSnapshot"],
+  imports?: Save["keyImportSnapshot"],
 ): Save {
   return enter(
     {
@@ -160,6 +167,7 @@ export function start(
       statsSnapshot: { ...stats },
       stats: { ...stats },
       keys: [...(story.trunkContext?.initialKeys ?? [])],
+      ...(imports ? { keyImportSnapshot: structuredClone(imports) } : {}),
       ...(progress
         ? {
             storyProgressSnapshot: {
@@ -403,6 +411,15 @@ export function validateStory(value: unknown): Story {
       "kind" in v &&
       v.kind === "key" &&
       "scope" in v &&
+      v.scope === "import" &&
+      (!("keyId" in v) ||
+        !story.keyImports?.keys.some((k) => k.keyId === v.keyId))
+    )
+      throw new Error("Imported key conditions require a declared alias.");
+    if (
+      "kind" in v &&
+      v.kind === "key" &&
+      "scope" in v &&
       v.scope === "story" &&
       (!("keyId" in v) ||
         !story.progression?.keys.some((k) => k.keyId === v.keyId))
@@ -421,6 +438,22 @@ export function validateStory(value: unknown): Story {
     }
   }
   checkNamespaces(story);
+  if (
+    new Set(
+      [
+        ...(story.progression?.keys ?? []),
+        ...(story.runKeyExports?.keys ?? []),
+      ].flatMap((k) => k.exportToStoryIds ?? []),
+    ).size > 20
+  )
+    throw new Error("At most 20 distinct key export destinations per Story.");
+  for (const k of story.keyImports?.keys ?? []) {
+    if (
+      k.sourceStoryId === story.id ||
+      !k.sourceKeyId.startsWith(k.sourceStoryId + ":")
+    )
+      throw new Error("Imports require another Story's namespaced key.");
+  }
   const seen = new Set<string>();
   function visit(id: string) {
     if (seen.has(id)) return;
