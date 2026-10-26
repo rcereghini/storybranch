@@ -168,6 +168,8 @@ export function start(
   parent?: Save,
   progress?: Save["storyProgressSnapshot"],
   imports?: Save["keyImportSnapshot"],
+  // Trusted initial inventory; only disposable preview currently supplies it.
+  initialItems: Save["items"] = {},
 ): Save {
   return enter(
     {
@@ -191,7 +193,7 @@ export function start(
             },
           }
         : {}),
-      items: {},
+      items: { ...initialItems },
       health: 100,
       milestones: [],
       appliedEntryEffects: [],

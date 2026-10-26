@@ -11,6 +11,22 @@ import {
 import { start, baseStats, evaluate } from "./index";
 import { renderStoryNode } from "./player";
 
+export function previewItemIds(story: Story): string[] {
+  const ids = new Set<string>();
+  const visit = (value: unknown) => {
+    if (!value || typeof value !== "object") return;
+    if (
+      "itemId" in value &&
+      typeof value.itemId === "string" &&
+      value.itemId.startsWith(story.id + ":")
+    )
+      ids.add(value.itemId);
+    Object.values(value).forEach(visit);
+  };
+  visit(story.storyNodes);
+  return [...ids].sort();
+}
+
 export function previewPreset(
   story: Story,
   preset: "first" | "returning" | "sequel",
@@ -35,6 +51,12 @@ export function startPreview(
   now: number,
 ): Save {
   const scenario = previewScenarioSchema.parse(input);
+  const items = previewItemIds(story);
+  if (Object.keys(scenario.items ?? {}).some((id) => !items.includes(id)))
+    throw new GameError(
+      "VALIDATION_FAILED",
+      "Preview items must be referenced by this Story.",
+    );
   if (
     scenario.accountKeys.some(
       (id) => !story.accountKeys?.keys.some((k) => k.keyId === id),
@@ -54,7 +76,7 @@ export function startPreview(
     story,
     "preview",
     "preview",
-    baseStats,
+    scenario.stats ?? baseStats,
     now,
     undefined,
     { version: 1, keys: [...scenario.storyKeys] },
@@ -70,6 +92,7 @@ export function startPreview(
         sourceKeyId: k.sourceKeyId,
       })),
     },
+    scenario.items,
   );
 }
 
