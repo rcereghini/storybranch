@@ -80,3 +80,7 @@ Allow edition-declared run-local boolean exports through the S19 permission boun
 ## S21 — Explicit community child import consent
 
 Adopt S19/S20 consent for community side Stories. Authorize offer, source listing and entry against the owned active parent's revision/location and exact child edition; recheck live entry policy at each boundary. Freeze only declared facts in the new child, never inherit consent or merge local state. Legacy no-import child commands remain valid. See [keys](keys.md#community-side-story-imports-s21).
+
+## S22 — Approved achievement bindings grant permanent Story keys
+
+Bind a persistent narrative key to a published StoryLeaf achievement as an alternative to a completion threshold. The server derives bindings for admin review, then commits approved grants with completion and durable deduplication receipts. Preserve earned keys on approval revocation; no historical backfill or account/paid rights. See [achievement keys](keys.md#achievement-bound-persistent-keys-s22).

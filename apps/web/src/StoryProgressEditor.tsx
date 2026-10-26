@@ -52,24 +52,99 @@ export function StoryProgressEditor({
             />
           </label>
           <label>
-            Completed journeys required
-            <input
-              aria-label={`Persistent key ${i + 1} completions`}
-              type="number"
-              min={1}
-              max={999}
-              value={key.afterCompletions}
+            Award trigger
+            <select
+              aria-label={`Persistent key ${i + 1} trigger`}
+              value={
+                key.achievementStoryNodeId !== undefined
+                  ? "achievement"
+                  : "completions"
+              }
               onChange={(e) =>
                 update(
                   keys.map((k, n) =>
-                    n === i
-                      ? { ...k, afterCompletions: Number(e.target.value) }
-                      : k,
+                    n !== i
+                      ? k
+                      : e.target.value === "achievement"
+                        ? {
+                            ...k,
+                            afterCompletions: undefined,
+                            achievementStoryNodeId:
+                              Object.values(story.storyNodes).find(
+                                (n) => n.kind === "ending",
+                              )?.id ?? "",
+                          }
+                        : {
+                            ...k,
+                            achievementStoryNodeId: undefined,
+                            afterCompletions: 1,
+                          },
                   ),
                 )
               }
-            />
+            >
+              <option value="completions">Completed journeys</option>
+              <option value="achievement">
+                Approved StoryLeaf achievement
+              </option>
+            </select>
           </label>
+          {key.achievementStoryNodeId !== undefined ? (
+            <>
+              <label>
+                Achievement ending
+                <select
+                  aria-label={`Persistent key ${i + 1} achievement ending`}
+                  value={key.achievementStoryNodeId}
+                  onChange={(e) =>
+                    update(
+                      keys.map((k, n) =>
+                        n === i
+                          ? { ...k, achievementStoryNodeId: e.target.value }
+                          : k,
+                      ),
+                    )
+                  }
+                >
+                  <option value="">Choose a StoryLeaf</option>
+                  {Object.values(story.storyNodes)
+                    .filter((n) => n.kind === "ending")
+                    .map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.title}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <p>
+                Publish this binding, then submit that edition's ending for
+                approval. Only future approved completions award this permanent
+                key. Revoking approval stops new awards; earned keys remain.
+              </p>
+            </>
+          ) : (
+            <>
+              <label>
+                Completed journeys required
+                <input
+                  aria-label={`Persistent key ${i + 1} completions`}
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={key.afterCompletions}
+                  onChange={(e) =>
+                    update(
+                      keys.map((k, n) =>
+                        n === i
+                          ? { ...k, afterCompletions: Number(e.target.value) }
+                          : k,
+                      ),
+                    )
+                  }
+                />
+              </label>
+            </>
+          )}
           <button onClick={() => update(keys.filter((_, n) => n !== i))}>
             Remove persistent key {i + 1}
           </button>

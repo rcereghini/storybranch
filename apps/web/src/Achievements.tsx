@@ -67,6 +67,11 @@ export function AchievementSubmission({
           : "Loading achievement…"}
       </p>
       {definition?.reviewReason && <p>Review: {definition.reviewReason}</p>}
+      <p>
+        Persistent key bindings come from the published StoryTrunk. Changing
+        them requires a new edition and approval.
+      </p>
+      {definition && <AchievementKeyRewards keys={definition.rewardKeys} />}
       <label>
         Achievement title
         <input
@@ -216,6 +221,7 @@ export function AdminAchievements({
         <article className="panel" key={item.id}>
           <h2>{item.title}</h2>
           <p>{item.description}</p>
+          <AchievementKeyRewards keys={item.rewardKeys} />
           <details>
             <summary>Published ending: {item.ending.title}</summary>
             <p>{item.ending.storyNodeType}</p>
@@ -335,6 +341,35 @@ export function AccountAchievements({ api }: { api: Api }) {
         <button disabled={busy} onClick={() => void load(next)}>
           More achievements
         </button>
+      )}
+    </section>
+  );
+}
+
+function AchievementKeyRewards({
+  keys,
+}: {
+  keys: AchievementDefinition["rewardKeys"];
+}) {
+  return (
+    <section aria-label="Achievement key rewards">
+      <h3>Permanent Story key rewards</h3>
+      {keys?.length ? (
+        <ul>
+          {keys.map((k) => (
+            <li key={k.keyId}>
+              {k.label} ({k.keyId})
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No bound key rewards.</p>
+      )}
+      {!!keys?.length && (
+        <p>
+          Granted on future approved completions, once per player and key.
+          Earned keys remain after revocation. No paid access is granted.
+        </p>
       )}
     </section>
   );

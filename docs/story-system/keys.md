@@ -1,6 +1,6 @@
 # Keys, items, achievements and cross-story imports
 
-Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key and selected-run local-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S20. General foreign namespace access, arbitrary value imports, cross-creator imports and commercial entitlements remain unsupported.
+Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key and selected-run local-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S22. General foreign namespace access, arbitrary value imports, cross-creator imports and commercial entitlements remain unsupported.
 
 “Key” is a creator-facing idea for a fact or right used in a condition. Storage and authorization distinguish several kinds; a single unrestricted boolean map is not sufficient.
 
@@ -30,7 +30,7 @@ On each new root/child run, the service snapshots only declared granted keys int
 
 Completion atomically increments `users/{uid}/storyProgress/{storyId}.completions`, creates missing permanent grants under its `keys/{keyId}` subcollection with source run/edition/definition snapshot, and records `completions/{runId}` as a durable no-TTL deduplication receipt. These writes commit with the run/event/command receipt and any approved achievement. Thresholds use the completing run's pinned edition. Completion exposes only newly granted labels/IDs through optional `completion.storyKeys`; normal player responses omit the progress snapshot and total. No client writes or generic grant endpoint exist. Definition removal stops future snapshots/grants without deleting history. Reintroduction of the same ID recognizes its prior grant.
 
-Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations are implemented separately below. Mid-run persistent awards, achievement-to-key bindings, arbitrary typed imports, consumption, shops and subscriptions remain follow-on work.
+Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations are implemented separately below. S22 adds achievement-bound persistent keys below. Mid-run persistent awards, arbitrary typed imports, consumption, shops and subscriptions remain follow-on work.
 
 ```mermaid
 flowchart LR
@@ -202,3 +202,13 @@ Community child runs cannot automatically export platform progress or mutate the
 ## Verification scenarios
 
 Verify local isolation across users and runs; rejected namespace spoofing; two concurrent claims yielding one grant; explicit source selection across conflicting prequel endings; optional defaults versus required import failure; incompatible definition versions; revoked/expired rights; replay without reward farming; and private exports excluded from catalogue/share/AI payloads.
+
+## Achievement-bound persistent keys (S22)
+
+A persistent key definition declares exactly one trigger: existing `afterCompletions`, or `achievementStoryNodeId` naming a StoryLeaf in the same edition. The latter grants only on an approved completion at that leaf. It remains a permanent Player + Story narrative key, not a general account entitlement. Existing namespace, 40-key bound, safe-output and explicit export/import rules apply. Studio authors the trigger in StoryTrunk.
+
+Submission derives a bounded `rewardKeys` projection (key ID and label) from the published edition; the client cannot submit reward values. Creator and admin views show these bindings before approval. Approved definitions are immutable. Definitions predating S22 without reward bindings grant no keys; a new edition/submission is needed to add them.
+
+Completion reads the exact edition's approved definition, then prepares achievement claims and progress grants before writing. The matching approved binding and the edition must agree. Claim, permanent key, progress completion receipt, save, event and command receipt commit atomically. Each key is unique per account/Story/key ID, while achievement claims retain their existing account/Story/leaf uniqueness across editions. Replays, concurrent runs and exact retries cannot duplicate grants or change their provenance. A later approved edition may bind a new key: an account with the achievement already claimed earns that key only on a future qualifying completion, never by retroactive backfill.
+
+Pending/rejected/revoked definitions grant no achievement-bound keys. Revocation stops future awards but retains already earned permanent narrative keys and saved import snapshots. This is not a revocable subscription or paid-content mechanism. The completion shows newly granted keys through existing storyKeys; next runs snapshot them, existing runs keep their starting snapshot. Child completion grants only its own Story's keys, never parent keys. Preview cannot grant persistent state.

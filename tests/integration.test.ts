@@ -986,6 +986,25 @@ it("counts distinct completions and snapshots persistent Story keys without expo
 it("requires achievement approval and atomically deduplicates private account claims across runs and editions", async () => {
   const storyId = `achievement-${randomUUID()}`;
   const story = starterStory(storyId);
+  const keyId = `${storyId}:approved-rescuer`;
+  story.progression = {
+    version: 1,
+    keys: [
+      { keyId, label: "Approved rescuer", achievementStoryNodeId: "ending" },
+      { keyId: `${storyId}:regular`, label: "Regular", afterCompletions: 1 },
+    ],
+  };
+  story.storyNodes.opening.storyNodeType = "text-options";
+  story.storyNodes.opening.choices.push({
+    ...structuredClone(story.storyNodes.opening.choices[0]),
+    id: "bonus",
+    label: "Rescuer bonus",
+    unavailableDisplay: "hidden",
+    availableWhen: { kind: "key", scope: "story", keyId, present: true },
+  });
+  const grantRef = db.doc(
+    `users/player/storyProgress/${storyId}/keys/${keyId}`,
+  );
   const saveDraft = (revision: number) =>
     call(`/studio/${storyId}`, {
       idempotencyKey: randomUUID(),
@@ -1028,6 +1047,16 @@ it("requires achievement approval and atomically deduplicates private account cl
     submitted.data,
   );
   let definition = submitted.data;
+  expect(definition.rewardKeys).toEqual([{ keyId, label: "Approved rescuer" }]);
+  expect(
+    (
+      await call("/achievement-submissions", {
+        ...submission,
+        idempotencyKey: randomUUID(),
+        rewardKeys: [{ keyId: "platform:premium", label: "Forged" }],
+      })
+    ).status,
+  ).toBe(400);
   expect(
     (
       await call(
@@ -1062,6 +1091,8 @@ it("requires achievement approval and atomically deduplicates private account cl
   expect(
     (await finish(await begin())).data.save.completion.accountAchievement,
   ).toBeUndefined();
+  expect((await grantRef.get()).exists).toBe(false);
+  const earlierRun = await begin();
   definition = (await review("approved")).data;
   expect(definition.status).toBe("approved");
   expect(
@@ -1077,6 +1108,46 @@ it("requires achievement approval and atomically deduplicates private account cl
   const runs = await Promise.all([begin(), begin()]);
   const completed = await Promise.all(runs.map(finish));
   expect(completed.map((r) => r.status)).toEqual([200, 200]);
+  expect(
+    completed
+      .flatMap((r) => r.data.save.completion.storyKeys)
+      .filter((k) => k.keyId === keyId),
+  ).toHaveLength(1);
+  const originalGrant = (await grantRef.get()).data()!;
+  expect(originalGrant.achievement).toMatchObject({
+    definitionId: definition.id,
+    definitionRevision: definition.revision,
+    achievementId: definition.achievementId,
+  });
+  const oldView = (await call(`/playthroughs/${earlierRun.id}`)).data;
+  expect(
+    oldView.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).not.toContain("bonus");
+  expect(
+    (
+      await call(
+        `/playthroughs/${earlierRun.id}/choices`,
+        choice(earlierRun, "bonus"),
+      )
+    ).status,
+  ).toBe(400);
+  const unlocked = await begin();
+  expect(
+    (await call(`/playthroughs/${unlocked.id}`)).data.storyNode.outputs.map(
+      (o: { id: string }) => o.id,
+    ),
+  ).toContain("bonus");
+  const retryCommand = choice(unlocked, "bonus");
+  const firstFinish = await call(
+    `/playthroughs/${unlocked.id}/choices`,
+    retryCommand,
+  );
+  expect(
+    (await call(`/playthroughs/${unlocked.id}/choices`, retryCommand)).data,
+  ).toEqual(firstFinish.data);
+  expect(firstFinish.data.save.completion.storyKeys).toEqual([]);
+  expect((await grantRef.get()).data()).toEqual(originalGrant);
+
   expect(
     completed
       .map((r) => r.data.save.completion.accountAchievement.newlyGranted)
@@ -1107,6 +1178,28 @@ it("requires achievement approval and atomically deduplicates private account cl
     getDoc(doc(own, `achievementDefinitions/${definition.id}`)),
   );
   definition = (await review("revoked")).data;
+  const recipient = (
+    await call(
+      "/playthroughs",
+      { idempotencyKey: randomUUID(), payload: { storyId } },
+      "progressed",
+    )
+  ).data.save;
+  const revokedCompletion = await call(
+    `/playthroughs/${recipient.id}/choices`,
+    choice(recipient, story.storyNodes.opening.choices[0].id),
+    "progressed",
+  );
+  expect(revokedCompletion.status).toBe(200);
+  expect(
+    (
+      await db
+        .doc(`users/progressed/storyProgress/${storyId}/keys/${keyId}`)
+        .get()
+    ).exists,
+  ).toBe(false);
+  expect((await grantRef.get()).data()).toEqual(originalGrant);
+
   expect(
     (await call("/achievements")).data.items.find(
       (r: { id: string }) => r.id === definition.achievementId,
@@ -1121,6 +1214,12 @@ it("requires achievement approval and atomically deduplicates private account cl
     (await finish(await begin())).data.save.completion.accountAchievement
       .newlyGranted,
   ).toBe(false);
+  const newerKey = `${storyId}:new-edition`;
+  story.progression.keys.push({
+    keyId: newerKey,
+    label: "New edition rescuer",
+    achievementStoryNodeId: "ending",
+  });
   expect((await saveDraft(1)).status).toBe(200);
   const newer = await publish(2);
   const nextSubmission = await call("/achievement-submissions", {
@@ -1139,6 +1238,41 @@ it("requires achievement approval and atomically deduplicates private account cl
       .newlyGranted,
   ).toBe(false);
   expect((await ref.get()).data()).toEqual(originalClaim);
+  expect(
+    (
+      await db
+        .doc(`users/player/storyProgress/${storyId}/keys/${newerKey}`)
+        .get()
+    ).exists,
+  ).toBe(true);
+  expect((await grantRef.get()).data()).toEqual(originalGrant);
+  // An old registry definition without reviewed bindings cannot grant keys.
+  await db
+    .doc(`achievementDefinitions/${definition.id}`)
+    .set({ ...definition, rewardKeys: [] });
+  const legacyRun = (
+    await call(
+      "/playthroughs",
+      { idempotencyKey: randomUUID(), payload: { storyId } },
+      "progressed",
+    )
+  ).data.save;
+  expect(
+    (
+      await call(
+        `/playthroughs/${legacyRun.id}/choices`,
+        choice(legacyRun, story.storyNodes.opening.choices[0].id),
+        "progressed",
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await db
+        .doc(`users/progressed/storyProgress/${storyId}/keys/${keyId}`)
+        .get()
+    ).exists,
+  ).toBe(false);
 });
 it("commits StoryLeaf rewards once with durable completion, retries and pinned editions", async () => {
   const storyId = `leaf-${randomUUID()}`;

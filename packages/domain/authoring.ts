@@ -51,6 +51,20 @@ export function reviewPublication(input: unknown): PublicationReview {
         validateStory({
           ...draft,
           entryStoryNodeId: n.id,
+          // Isolated node validation cannot resolve references to other real leaves.
+          // The final effective graph below validates the original bindings.
+          ...(draft.progression
+            ? {
+                progression: {
+                  ...draft.progression,
+                  keys: draft.progression.keys.map((k) =>
+                    k.achievementStoryNodeId
+                      ? { ...k, achievementStoryNodeId: leafId }
+                      : k,
+                  ),
+                },
+              }
+            : {}),
           storyNodes: {
             [n.id]: clone,
             [leafId]: {

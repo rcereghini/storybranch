@@ -340,3 +340,28 @@ it("binds child consent to Story and edition without breaking no-import commands
       branchCommandSchema.safeParse({ ...base, payload: invalid }).success,
     ).toBe(false);
 });
+
+it("validates exclusive achievement key triggers and same-edition StoryLeaves", () => {
+  const story = starterStory("achievement-key");
+  story.progression = {
+    version: 1,
+    keys: [
+      {
+        keyId: "achievement-key:rescuer",
+        label: "Rescuer",
+        achievementStoryNodeId: "ending",
+      },
+    ],
+  };
+  expect(validatePublication(story).progression).toEqual(story.progression);
+  const key = story.progression.keys[0];
+  key.afterCompletions = 1;
+  expect(() => validateStory(story)).toThrow();
+  delete key.afterCompletions;
+  for (const invalid of ["opening", "missing"]) {
+    key.achievementStoryNodeId = invalid;
+    expect(() => validateStory(story)).toThrow(/StoryLeaf/);
+  }
+  delete key.achievementStoryNodeId;
+  expect(() => validateStory(story)).toThrow();
+});

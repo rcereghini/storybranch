@@ -358,7 +358,8 @@ export const storySchema = z
               .object({
                 keyId: namespaced,
                 label: z.string().trim().min(1).max(80),
-                afterCompletions: z.number().int().min(1).max(999),
+                afterCompletions: z.number().int().min(1).max(999).optional(),
+                achievementStoryNodeId: id.optional(),
                 exportToStoryIds: z
                   .array(id)
                   .max(20)
@@ -368,7 +369,13 @@ export const storySchema = z
                   )
                   .optional(),
               })
-              .strict(),
+              .strict()
+              .refine(
+                (k) =>
+                  (k.afterCompletions !== undefined) !==
+                  (k.achievementStoryNodeId !== undefined),
+                "Choose exactly one persistent key trigger.",
+              ),
           )
           .max(40)
           .refine(

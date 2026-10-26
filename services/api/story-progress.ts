@@ -1,5 +1,6 @@
 import type { Transaction } from "firebase-admin/firestore";
 import type { Save, Story } from "../../packages/contracts/index";
+import type { AchievementDefinition } from "../../packages/contracts/achievements";
 import { db } from "./firebase";
 
 const progressRef = (uid: string, storyId: string) =>
@@ -30,6 +31,7 @@ export async function prepareStoryProgress(
   uid: string,
   story: Story,
   save: Save,
+  achievement?: AchievementDefinition,
 ) {
   if (!save.completion || save.completion.revision !== save.revision)
     return () => {};
@@ -45,8 +47,17 @@ export async function prepareStoryProgress(
     Number.MAX_SAFE_INTEGER,
     (state.data()?.completions ?? 0) + 1,
   );
-  const eligible = (story.progression?.keys ?? []).filter(
-    (k) => k.afterCompletions <= completions,
+  const eligible = (story.progression?.keys ?? []).filter((k) =>
+    k.afterCompletions !== undefined
+      ? k.afterCompletions <= completions
+      : k.achievementStoryNodeId === save.storyNodeId &&
+        achievement?.status === "approved" &&
+        achievement.storyId === story.id &&
+        achievement.versionId === story.versionId &&
+        achievement.storyNodeId === save.storyNodeId &&
+        !!achievement.rewardKeys?.some(
+          (r) => r.keyId === k.keyId && r.label === k.label,
+        ),
   );
   const refs = eligible.map((k) => root.collection("keys").doc(k.keyId));
   const existing = await Promise.all(refs.map((ref) => tx.get(ref)));
@@ -67,6 +78,15 @@ export async function prepareStoryProgress(
         tx.create(refs[i], {
           version: 1,
           ...definition,
+          ...(definition.achievementStoryNodeId && achievement
+            ? {
+                achievement: {
+                  definitionId: achievement.id,
+                  definitionRevision: achievement.revision,
+                  achievementId: achievement.achievementId,
+                },
+              }
+            : {}),
           runId: save.id,
           versionId: save.versionId,
           at: save.updatedAt,
