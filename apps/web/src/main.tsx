@@ -69,7 +69,16 @@ const playerApi = createApi(
 );
 function App() {
   const starting = useRef(false);
-  const [importOffer, setImportOffer] = useState<StoryImportOffer | null>(null);
+  const [importOffer, setImportOffer] = useState<
+    | (StoryImportOffer & {
+        entry?: {
+          parentId: string;
+          branchId: string;
+          expectedRevision: number;
+        };
+      })
+    | null
+  >(null);
   const [session] = useState(
     () =>
       new PlayerSession(
@@ -340,14 +349,18 @@ function App() {
     sourceRuns: SourceRunSelection[],
   ) => {
     if (!importOffer) return;
-    const { storyId, versionId } = importOffer;
+    const { storyId, versionId, entry } = importOffer;
     setImportOffer(null);
     void command({
-      path: "/playthroughs",
+      path: entry
+        ? `/playthroughs/${entry.parentId}/branches`
+        : "/playthroughs",
       body: {
         idempotencyKey: crypto.randomUUID(),
+        ...(entry ? { expectedRevision: entry.expectedRevision } : {}),
         payload: {
           storyId,
+          ...(entry ? { branchId: entry.branchId } : {}),
           versionId,
           importConsent: consent,
           ...(sourceRuns.length ? { sourceRuns } : {}),
@@ -365,16 +378,45 @@ function App() {
         payload: { choiceId, ...(action ? { action } : {}) },
       },
     });
-  const branch = (branchId: string) =>
-    player &&
-    command({
-      path: `/playthroughs/${player.save.id}/branches`,
-      body: {
-        idempotencyKey: crypto.randomUUID(),
-        expectedRevision: player.save.revision,
-        payload: { branchId },
-      },
-    });
+  const branch = async (branchId: string) => {
+    if (!player || busy || offline || pending || stale || starting.current)
+      return;
+    starting.current = true;
+    const entry = {
+      parentId: player.save.id,
+      expectedRevision: player.save.revision,
+      branchId,
+    };
+    const scope = auth.currentUser?.uid + "|" + location.pathname;
+    setBusy(true);
+    setError("");
+    try {
+      const offer = await api<StoryImportOffer>(
+        `/playthroughs/${entry.parentId}/branches/${branchId}/imports?expectedRevision=${entry.expectedRevision}`,
+      );
+      if (scope !== auth.currentUser?.uid + "|" + location.pathname) return;
+      if (offer.keys.length) setImportOffer({ ...offer, entry });
+      else
+        await command({
+          path: `/playthroughs/${entry.parentId}/branches`,
+          body: {
+            idempotencyKey: crypto.randomUUID(),
+            expectedRevision: entry.expectedRevision,
+            payload: {
+              branchId,
+              storyId: offer.storyId,
+              versionId: offer.versionId,
+            },
+          },
+        });
+    } catch (e) {
+      if (scope === auth.currentUser?.uid + "|" + location.pathname) report(e);
+    } finally {
+      starting.current = false;
+      if (scope === auth.currentUser?.uid + "|" + location.pathname)
+        setBusy(false);
+    }
+  };
   const showLog = async (cursor?: string) => {
     if (!player) return;
     setLogOpen(true);
@@ -1008,6 +1050,11 @@ function App() {
           key={`${importOffer.storyId}/${importOffer.versionId}`}
           api={api}
           offer={importOffer}
+          sourceRunsEndpoint={
+            importOffer.entry
+              ? `/playthroughs/${importOffer.entry.parentId}/branches/${importOffer.entry.branchId}/imports/runs?expectedRevision=${importOffer.entry.expectedRevision}&storyId=${importOffer.storyId}&versionId=${importOffer.versionId}`
+              : undefined
+          }
           disabled={busy || offline}
           onCancel={() => setImportOffer(null)}
           onStart={startWithImports}

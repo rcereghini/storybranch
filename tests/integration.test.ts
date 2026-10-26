@@ -242,6 +242,119 @@ it("selects one owned completed source run, freezes its false or true facts, and
       )
     ).status,
   ).toBe(400);
+  // Side Story consent is authorized by a live parent location, not catalogue membership.
+  let parent = (
+    await call("/playthroughs", {
+      idempotencyKey: randomUUID(),
+      payload: { storyId: "glass-harbor" },
+    })
+  ).data.save;
+  parent = (
+    await call(`/playthroughs/${parent.id}/choices`, choice(parent, "market"))
+  ).data.save;
+  const parentBefore = (await db.doc(saveOf(parent.id)).get()).data();
+  const branchId = `continuity-child-${randomUUID()}`;
+  const branch = {
+    ...(await db.doc("branches/bell-diver").get()).data()!,
+    storyId: target.id,
+    versionId: "edition-2",
+  };
+  await db.doc(`branches/${branchId}`).create(branch);
+  const base = `/playthroughs/${parent.id}/branches/${branchId}/imports`;
+  const query = `expectedRevision=${parent.revision}`;
+  await db.doc(`catalogue/${target.id}`).update({ hidden: true });
+  expect((await call(`${base}?${query}`)).data.versionId).toBe("edition-2");
+  expect((await call(`${base}?${query}`, undefined, "progressed")).status).toBe(
+    404,
+  );
+  expect((await call(base)).status).toBe(400);
+  const childList = `${base}/runs?${query}&storyId=${target.id}&versionId=edition-2&keyId=${alias}`;
+  expect(
+    (await call(childList)).data.items
+      .map((r: { runId: string }) => r.runId)
+      .sort(),
+  ).toEqual([no.id, yes.id].sort());
+  const childCommand = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: parent.revision,
+    payload: { ...command(yes.id).payload, branchId },
+  };
+  const childPath = `/playthroughs/${parent.id}/branches`;
+  expect(
+    (
+      await call(childPath, {
+        ...childCommand,
+        payload: { ...childCommand.payload, sourceRuns: [] },
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await call(childPath, {
+        ...childCommand,
+        payload: {
+          ...childCommand.payload,
+          sourceRuns: [selection(foreign.id)],
+        },
+      })
+    ).status,
+  ).toBe(403);
+  await db.doc(`branches/${branchId}`).update({ storyId: source.id });
+  expect((await call(childPath, childCommand)).status).toBe(409);
+  expect((await call(childList)).status).toBe(409);
+  await db.doc(`branches/${branchId}`).set(branch);
+  const child = await call(childPath, childCommand);
+  expect(child.status).toBe(200);
+  expect(child.data.save.parentPlaythroughId).toBe(parent.id);
+  expect(
+    child.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).toContain("bonus");
+  expect((await db.doc(saveOf(parent.id)).get()).data()).toEqual(parentBefore);
+  expect(
+    (await db.doc(saveOf(child.data.save.id)).get()).data()!.keyImportSnapshot
+      .keys[0].sourceRun.runId,
+  ).toBe(yes.id);
+  expect(JSON.stringify(child.data)).not.toContain(yes.id);
+  expect((await call(childPath, childCommand)).data).toEqual(child.data);
+  expect(
+    (
+      await call(childPath, {
+        ...childCommand,
+        payload: { ...childCommand.payload, sourceRuns: [selection(no.id)] },
+      })
+    ).status,
+  ).toBe(409);
+  const falseChild = await call(childPath, {
+    ...childCommand,
+    idempotencyKey: randomUUID(),
+    payload: { ...childCommand.payload, sourceRuns: [selection(no.id)] },
+  });
+  expect(falseChild.status).toBe(200);
+  expect(
+    falseChild.data.player.storyNode.outputs.map((o: { id: string }) => o.id),
+  ).not.toContain("bonus");
+  const completedChild = await call(
+    `/playthroughs/${child.data.save.id}/choices`,
+    choice(child.data.save, "bonus"),
+  );
+  expect(completedChild.status).toBe(200);
+  expect((await db.doc(saveOf(parent.id)).get()).data()).toEqual(parentBefore);
+  // Advance the parent after consent; no new child may use the stale offer.
+  const parentView = (await call(`/playthroughs/${parent.id}`)).data;
+  await call(
+    `/playthroughs/${parent.id}/choices`,
+    choice(parent, parentView.storyNode.outputs[0].id),
+  );
+  expect((await call(`${base}?${query}`)).status).toBe(409);
+  expect((await call(childList)).status).toBe(409);
+  expect(
+    (await call(childPath, { ...childCommand, idempotencyKey: randomUUID() }))
+      .status,
+  ).toBe(409);
+  expect((await call(childPath, childCommand)).data.save.id).toBe(
+    child.data.save.id,
+  );
+  await db.doc(`catalogue/${target.id}`).update({ hidden: false });
   // Bounded scans can return empty batches; cursors still advance to valid runs.
   const batch = db.batch();
   const original = (await db.doc(saveOf(active.id)).get()).data()!;
@@ -491,7 +604,31 @@ it("imports only consented, explicitly exported persistent keys and pins private
         payload: { branchId },
       })
     ).status,
-  ).toBe(403);
+  ).toBe(400);
+  const childCommand = (consent: boolean) => ({
+    idempotencyKey: randomUUID(),
+    expectedRevision: parent.revision,
+    payload: {
+      branchId,
+      storyId: target.id,
+      versionId: "edition-2",
+      importConsent: consent,
+    },
+  });
+  const parentBefore = (await db.doc(saveOf(parent.id)).get()).data();
+  const declinedChild = await call(
+    `/playthroughs/${parent.id}/branches`,
+    childCommand(false),
+  );
+  expect(declinedChild.status).toBe(200);
+  expect(outputs(declinedChild)).not.toContain("bonus");
+  const approvedChild = await call(
+    `/playthroughs/${parent.id}/branches`,
+    childCommand(true),
+  );
+  expect(approvedChild.status).toBe(200);
+  expect(outputs(approvedChild)).toContain("bonus");
+  expect((await db.doc(saveOf(parent.id)).get()).data()).toEqual(parentBefore);
   // Live ownership changes fail closed, even for an optional old import.
   await db.doc(`stories/${source.id}`).update({ creatorUid: "progressed" });
   expect((await begin(true)).status).toBe(403);

@@ -3,6 +3,7 @@ import {
   completionSchema,
   storyLeafSchema,
   startSchema,
+  branchCommandSchema,
 } from "../packages/contracts/index";
 import {
   start,
@@ -302,4 +303,40 @@ it("rejects foreign, duplicate, excessive and non-leaf reward definitions", () =
   const invalid = fixture();
   invalid.storyNodes.opening.leaf = definition;
   expect(() => validateStory(invalid)).toThrow("Only a StoryLeaf");
+});
+
+it("binds child consent to Story and edition without breaking no-import commands", () => {
+  const base = {
+    idempotencyKey: "child",
+    expectedRevision: 1,
+    payload: { branchId: "side" },
+  };
+  expect(branchCommandSchema.safeParse(base).success).toBe(true);
+  expect(
+    branchCommandSchema.safeParse({
+      ...base,
+      payload: { ...base.payload, importConsent: true },
+    }).success,
+  ).toBe(false);
+  const payload = {
+    ...base.payload,
+    storyId: "child",
+    versionId: "edition-1",
+    importConsent: true,
+    sourceRuns: [
+      { sourceStoryId: "source", sourceVersionId: "edition-1", runId: "run" },
+    ],
+  };
+  expect(branchCommandSchema.safeParse({ ...base, payload }).success).toBe(
+    true,
+  );
+  for (const invalid of [
+    { ...payload, storyId: undefined },
+    { ...payload, versionId: undefined },
+    { ...payload, importConsent: false },
+    { ...payload, sourceRuns: [...payload.sourceRuns, ...payload.sourceRuns] },
+  ])
+    expect(
+      branchCommandSchema.safeParse({ ...base, payload: invalid }).success,
+    ).toBe(false);
 });

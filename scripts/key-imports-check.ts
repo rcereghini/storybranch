@@ -353,6 +353,103 @@ try {
       await tab.getByRole("button", { name: /Welcome back, hero/ }).count(),
       0,
     );
+    // The community directory has no creator API yet: add one emulator-only
+    // branch record pointing at the already-published, immutable target edition.
+    const firestore =
+      "http://127.0.0.1:8080/v1/projects/demo-storybranch/databases/(default)/documents";
+    const template = await (
+      await fetch(`${firestore}/branches/bell-diver`, {
+        headers: { authorization: "Bearer owner" },
+      })
+    ).json();
+    const branchId = `side-import-${randomUUID()}`;
+    const branchUrl = `${firestore}/branches/${branchId}`;
+    const childTitle = `Side continuity ${width}`;
+    const created = await fetch(branchUrl, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer owner",
+      },
+      body: JSON.stringify({
+        fields: {
+          ...template.fields,
+          id: { stringValue: branchId },
+          title: { stringValue: childTitle },
+          storyId: { stringValue: target.id },
+          versionId: { stringValue: "edition-4" },
+        },
+      }),
+    });
+    assert(created.ok, await created.text());
+    try {
+      const parentStart = await api("/playthroughs", {
+        idempotencyKey: randomUUID(),
+        payload: { storyId: "glass-harbor" },
+      });
+      const parent = await api(
+        `/playthroughs/${parentStart.player.save.id}/choices`,
+        {
+          idempotencyKey: randomUUID(),
+          expectedRevision: 0,
+          payload: { choiceId: "market" },
+        },
+      );
+      const parentUrl = `http://127.0.0.1:5173/play/${parent.player.save.id}`;
+      await tab.goto(parentUrl);
+      await tab
+        .locator("summary")
+        .filter({ hasText: "More community stories" })
+        .click();
+      await tab.getByRole("button", { name: childTitle, exact: false }).click();
+      await tab.getByRole("dialog").waitFor();
+      await tab.getByRole("button", { name: "Cancel key imports" }).click();
+      assert.equal(tab.url(), parentUrl);
+      await tab.getByRole("button", { name: childTitle, exact: false }).click();
+      const childPicker = tab.getByLabel(`Source journey for ${source.title}`);
+      await childPicker
+        .locator(`option[value="${rescue.player.save.id}"]`)
+        .waitFor({ state: "attached" });
+      assert.equal(await childPicker.inputValue(), "");
+      await childPicker.selectOption(rescue.player.save.id);
+      for (const theme of ["light", "dark"]) {
+        await tab.evaluate(
+          (t) => (document.documentElement.dataset.theme = t),
+          theme,
+        );
+        await tab.screenshot({
+          animations: "disabled",
+          path: `test-results/side-imports-${width}-${theme}.png`,
+        });
+        assert(
+          await tab.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        );
+      }
+      await tab
+        .getByRole("button", { name: "Use selected journeys", exact: true })
+        .click();
+      await tab.getByRole("button", { name: /Welcome back, hero/ }).waitFor();
+      await tab.reload();
+      await tab.getByRole("button", { name: /Welcome back, hero/ }).click();
+      await tab
+        .getByRole("heading", { name: "The end", exact: true })
+        .waitFor();
+      await tab
+        .getByRole("button", { name: "Return to main adventure", exact: false })
+        .click();
+      await tab.waitForURL(parentUrl);
+      assert.deepEqual(
+        (await api(`/playthroughs/${parent.player.save.id}`)).save,
+        parent.player.save,
+      );
+    } finally {
+      await fetch(branchUrl, {
+        method: "DELETE",
+        headers: { authorization: "Bearer owner" },
+      });
+    }
     assert.deepEqual(errors, []);
     await tab.close();
   }

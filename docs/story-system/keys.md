@@ -89,7 +89,7 @@ Before a root start, `GET /api/story-imports/{storyId}` checks catalogue visibil
 
 `Save.keyImportSnapshot` stores bounded local aliases, boolean values, pinned export references, resolution time, and grant source run/edition/time when present. It is server-only and separate from mutable local keys and persistent same-Story keys. `kind: key, scope: import` conditions require a declared local alias; local effects cannot forge the imported value. Permission failures fail closed even for optional imports; only a valid declaration's missing grant defaults false. Resuming and idempotent retries reuse the committed snapshot. Existing saves without it have no imported keys; no backfill or migration occurs. Preview starts with no imports and awards nothing.
 
-This slice supports root starts. Imported editions cannot start as community child Stories yet: reject before creating a child rather than silently inheriting consent or parent state. Other child Stories retain current behavior. Branches still require an unconditional safe route. No raw source saves, grant provenance or imported values enter player, catalogue, share or AI projections. Creators configure declarations in StoryTrunk and can use imported aliases in option conditions.
+S19 initially supported root starts; S21 now supports community child entry with separate explicit consent and parent-scoped authorization, without inheriting consent or parent state. Branches still require an unconditional safe route. No raw source saves, grant provenance or imported values enter player, catalogue, share or AI projections. Creators configure declarations in StoryTrunk and can use imported aliases in option conditions.
 
 ```mermaid
 flowchart LR
@@ -130,7 +130,7 @@ The player chooses one completed run for each source Story/edition pair; all imp
 
 Start accepts bounded unique `sourceRuns: [{sourceStoryId, sourceVersionId, runId}]` only with `importConsent: true` and an explicit destination `versionId`. The server rejects undeclared source pairs, another account's run, active/legacy-without-receipt runs, mismatched source editions and duplicate selections. It revalidates the owned source run in the new-run transaction and snapshots only declared boolean values plus run ID, completion revision/time and ending ID. Exact retries replay the original selection; a changed selection under the same command key conflicts. Reload and replay of the source cannot change an existing sequel snapshot. No historical saves or immutable editions are rewritten. Source runs from before export publication cannot satisfy a newer export edition.
 
-Studio exposes run-local exports and the import selection mode. Root start consent groups the run pickers by source Story/edition. Existing persistent imports preserve their behavior. Community child import consent, cross-creator sharing, quantities, paid rights, run-to-run mutation and integrity revocation remain deferred.
+Studio exposes run-local exports and the import selection mode. Start consent groups the run pickers by source Story/edition. Existing persistent imports preserve their behavior. S21 below adds community child consent. Cross-creator sharing, quantities, paid rights, run-to-run mutation and integrity revocation remain deferred.
 
 ```mermaid
 sequenceDiagram
@@ -145,6 +145,16 @@ sequenceDiagram
   API->>Saves: Atomically save sequel snapshot, event and receipt
   API-->>Player: Permitted StoryNode outputs
 ```
+
+### Community side Story imports (S21)
+
+Entering a community side Story uses the same S19/S20 declarations, explicit consent and owned completed-run selection as a root start. Consent is per new child run; it is never inherited from the parent. Same-creator permission relates the import source to the child Story, not to the parent creator. Parent keys, inventory and import snapshots are not copied or merged.
+
+The offer and source-journey listing are scoped to an owned active root run, its expected revision, current branch location and the selected community branch record. `GET /api/playthroughs/{parent}/branches/{branch}/imports?expectedRevision=` returns declarations for that branch's exact child edition. Appending `/runs` also requires child `storyId`, `versionId` and `keyId`, and retains S20's bounded private projection. Neither route requires the child to appear in the public catalogue. Both enforce the child's live entry policy.
+
+The branch command accepts optional child `storyId`, `versionId`, `importConsent` and `sourceRuns`; consent or selections require the displayed child Story and edition. Imported children require that pin even when consent is declined. The transaction repeats parent revision/location, branch edition and entry checks before resolving imports and creating the isolated child save, event and receipt. A changed parent or branch edition rejects the attempt so the player can reload and request a fresh offer. Exact committed retries return the original child even after the parent advances. Existing commands for children without imports remain accepted. Existing saves and editions are unchanged.
+
+The shared consent dialog uses an authorized child picker endpoint. Cancel creates no save. Loading uses the existing player overlay/reserved space; entering and returning still use the shared Story/StoryNode lifecycle. No cross-creator imports, paid rights or automatic parent fact transfer are introduced.
 
 ## Snapshot facts versus live rights
 
