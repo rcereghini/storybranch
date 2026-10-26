@@ -32,6 +32,12 @@ New committed run events carry optional `itemChanges`, each with item ID, pinned
 
 The inventory is a read-only modal drawer inside the Story provider, with Escape, focus containment/restoration and an empty state. It overlays playback without changing player geometry. Current inventory follows accepted server views; the Story log retains past changes even after an item reaches zero. Neither surface reveals future item definitions, routing, conditions or account-key evidence.
 
+## Visible option costs (S30)
+
+Visible outputs may include optional `itemCosts`: item ID, edition-pinned name (raw-ID fallback), aggregated required quantity and current owned quantity. Omit zero-total costs and all costs of hidden outputs. A visible cost intentionally reveals its item name even when unowned; descriptions, future rewards, condition expressions and destinations remain private. This is a narrow extension of S29, not a catalogue projection.
+
+The shared StoryNode controls show `Costs N Name · You have M` and an insufficient-inventory message when any displayed requirement exceeds ownership. Enough inventory does not imply eligibility: the server's `enabled` remains authoritative for other conditions. Commands still submit only intent and revalidate costs in the transaction. Quantities include duplicate cost rows summed exactly as affordability checks do (up to 20 × 999); older responses without itemCosts retain existing rendering. Studio uses the same projection with its disposable inventory and draft catalogue. No save/edition migration, new item action or reward disclosure is introduced.
+
 ## Implementation map
 
 - Portable presentation contract: packages/contracts/player.ts; pure projection: packages/domain/player.ts.

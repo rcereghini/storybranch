@@ -58,6 +58,7 @@ export function renderStoryNode(
   node: StoryNode,
   save: Save,
   accountKeys: readonly string[] = [],
+  itemCatalogue?: Story["itemCatalogue"],
 ) {
   const outputs = node.choices.flatMap((choice) => {
     const required = new Map<string, number>();
@@ -73,7 +74,25 @@ export function renderStoryNode(
         ([item, quantity]) => (save.items[item] ?? 0) >= quantity,
       );
     if (!enabled && choice.unavailableDisplay === "hidden") return [];
-    return [{ id: choice.id, label: choice.label, hint: choice.hint, enabled }];
+    const itemCosts = [...required]
+      .filter(([, quantity]) => quantity > 0)
+      .map(([itemId, quantity]) => ({
+        itemId,
+        name:
+          itemCatalogue?.items.find((item) => item.itemId === itemId)?.name ??
+          itemId,
+        required: quantity,
+        owned: save.items[itemId] ?? 0,
+      }));
+    return [
+      {
+        id: choice.id,
+        label: choice.label,
+        hint: choice.hint,
+        enabled,
+        ...(itemCosts.length ? { itemCosts } : {}),
+      },
+    ];
   });
   return renderStoryNodeSchema.parse({
     id: node.id,

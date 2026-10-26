@@ -50,6 +50,12 @@ try {
       choices: [
         structuredClone(safe),
         { ...structuredClone(safe), id: "spend", label: "Spend relic" },
+        {
+          ...structuredClone(safe),
+          id: "expensive",
+          label: "Spend three relics",
+          costs: [{ itemId: `${story.id}:relic`, quantity: 3 }],
+        },
       ],
     };
     opening.choices.push({
@@ -197,7 +203,7 @@ try {
         })
         .isDisabled(),
     );
-    await catalogue.getByText("Where used (2)", { exact: true }).click();
+    await catalogue.getByText("Where used (3)", { exact: true }).click();
     assert.match(await catalogue.innerText(), /Earn relic/);
     assert.match(await catalogue.innerText(), /Spend relic/);
     await catalogue
@@ -327,6 +333,14 @@ try {
     await preview
       .getByRole("heading", { name: "Inventory checkpoint", exact: true })
       .waitFor();
+    await preview
+      .getByText("Costs 1 Golden relic · You have 2", { exact: true })
+      .waitFor();
+    assert(
+      await preview
+        .getByRole("button", { name: /Spend three relics/ })
+        .isDisabled(),
+    );
     assert.match(
       await preview
         .getByRole("list", { name: "Preview option diagnostics", exact: true })
@@ -365,11 +379,48 @@ try {
     await tab
       .getByRole("heading", { name: "Inventory checkpoint", exact: true })
       .waitFor();
-    const geometry = await tab.locator(".player-grid").boundingBox();
+    await tab
+      .getByText("Costs 1 Golden relic · You have 2", { exact: true })
+      .waitFor();
+    await tab
+      .getByText("Costs 3 Golden relic · You have 2", { exact: true })
+      .waitFor();
+    assert(
+      await tab
+        .getByRole("button", { name: /Spend three relics/ })
+        .isDisabled(),
+    );
+    await tab.getByText("Not enough items", { exact: true }).waitFor();
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate((t) => {
+        document.documentElement.dataset.theme = t;
+      }, theme);
+      assert(
+        await tab.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await tab.screenshot({
+        path: `test-results/option-costs-${width}-${theme}.png`,
+        animations: "disabled",
+      });
+    }
+    // Focusing the toolbar can scroll the viewport; compare document layout.
+    const playerGeometry = () =>
+      tab.locator(".player-grid").evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          x: rect.x + scrollX,
+          y: rect.y + scrollY,
+          width: rect.width,
+          height: rect.height,
+        };
+      });
+    const geometry = await playerGeometry();
     await inventoryButton.click();
     await inventory.getByText("Golden relic", { exact: true }).waitFor();
     await inventory.getByLabel("Quantity 2", { exact: true }).waitFor();
-    assert.deepEqual(await tab.locator(".player-grid").boundingBox(), geometry);
+    assert.deepEqual(await playerGeometry(), geometry);
     await tab.keyboard.press("Tab");
     assert(
       await inventory.evaluate((el) => el.contains(document.activeElement)),

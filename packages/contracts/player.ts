@@ -70,6 +70,18 @@ export const renderStoryNodeSchema = storyNodeSchema
             label: z.string(),
             hint: z.string().optional(),
             enabled: z.boolean(),
+            itemCosts: z
+              .array(
+                itemDisplaySchema
+                  .pick({ itemId: true, name: true })
+                  .extend({
+                    required: z.number().int().min(1).max(19980),
+                    owned: z.number().int().min(0).max(999),
+                  })
+                  .strict(),
+              )
+              .max(20)
+              .optional(),
           })
           .strict(),
       )

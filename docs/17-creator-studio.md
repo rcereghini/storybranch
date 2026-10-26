@@ -193,6 +193,8 @@ Edit stats and inventory, then Apply to restart from the entry with those starti
 
 ### Visual StoryBranch items
 
+Shared preview output controls show aggregated item costs, current disposable quantities and insufficient-inventory feedback, using draft catalogue names. Published players receive the same presentation from their pinned edition and authoritative save. See [S30 disclosure](story-system/player-runtime.md#visible-option-costs-s30); creator-only diagnostics can still describe future rewards, which published output controls must not reveal.
+
 Each authored output has an item editor with explicit Apply/Reset. Costs are paid before the selected route's effects; insufficient inventory or quantities outside 0–999 reject the whole transition. Costs use integers 0–999 (up to 20 rows). Route item effects use integer changes -99–99 (within the existing 20-effect route limit, including non-item effects). New rewards default to +1; negative changes remove inventory. Existing Story-local item references are offered in a picker, and creators can introduce a new namespaced item ID. Items are run-local, never account entitlements.
 
 The editor preserves conditions, destinations, effect IDs/order and non-item effects. Direct, pass/fail and reveal routes have separate effect lists; no outcome is silently chosen. Creator preview diagnostics list costs and each route's potential item changes, without granting anything until a transition commits. Repeated traversal can repeat route rewards, subject to runtime bounds. Publication still requires an unconditional, cost-free, inventory-safe exit; use optional reward routes alongside that exit. Inventory-aware symbolic safety, item definitions/labels and visual entry-effect editing remain deferred.

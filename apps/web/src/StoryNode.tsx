@@ -130,6 +130,7 @@ export function StoryNode({
         return (
           <Button
             key={output.id}
+            className={locked ? "choice-locked" : undefined}
             disabled={disabled || locked}
             onClick={() =>
               emit({
@@ -146,6 +147,14 @@ export function StoryNode({
             <span>
               {type === "dice" && rolled ? "Next" : output.label}
               {output.hint && <small>{output.hint}</small>}
+              {output.itemCosts?.map((cost) => (
+                <small key={cost.itemId}>
+                  Costs {cost.required} {cost.name} · You have {cost.owned}
+                </small>
+              ))}
+              {output.itemCosts?.some((cost) => cost.owned < cost.required) && (
+                <small>Not enough items</small>
+              )}
             </span>
             <span>{locked ? "Locked" : "↗"}</span>
           </Button>

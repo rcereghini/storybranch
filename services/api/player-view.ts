@@ -70,7 +70,7 @@ export async function playerView(
       achievements: profile.achievements ?? [],
       saveSpots: [{ id: s.id, storyId: s.storyId, storyNodeId: s.storyNodeId }],
     },
-    storyNode: renderStoryNode(storyNode, s, accountKeys),
+    storyNode: renderStoryNode(storyNode, s, accountKeys, story.itemCatalogue),
     // Quiz results share as "my result" rather than an ending.
     result: isResultStoryNode(story, storyNode.id),
     media: storyNodeMedia(storyNode.video, clips),

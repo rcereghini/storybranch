@@ -5572,11 +5572,27 @@ it("records authoritative net inventory once and projects pinned owned metadata"
         ...structuredClone(safe),
         id: "spend",
         label: "Spend",
-        costs: [{ itemId, quantity: 2 }],
+        costs: [
+          { itemId, quantity: 1 },
+          { itemId, quantity: 1 },
+        ],
       },
     ],
   };
   const path = `/studio/${story.id}`;
+  story.storyNodes.middle.choices.push({
+    ...structuredClone(safe),
+    id: "expensive",
+    label: "Expensive",
+    costs: [{ itemId, quantity: 3 }],
+  });
+  story.storyNodes.middle.choices.push({
+    ...structuredClone(safe),
+    id: "hidden",
+    label: "Hidden cost",
+    unavailableDisplay: "hidden",
+    costs: [{ itemId: `${story.id}:secret`, quantity: 1 }],
+  });
   expect(
     (
       await call(path, {
@@ -5610,6 +5626,31 @@ it("records authoritative net inventory once and projects pinned owned metadata"
   };
   const earned = await call(`${run}/choices`, earn);
   expect(earned.status).toBe(200);
+  expect(
+    earned.data.player.storyNode.outputs.find(
+      (o: { id: string }) => o.id === "spend",
+    ).itemCosts,
+  ).toEqual([{ itemId, name: "Old coin", required: 2, owned: 2 }]);
+  expect(
+    earned.data.player.storyNode.outputs.find(
+      (o: { id: string }) => o.id === "expensive",
+    ),
+  ).toMatchObject({
+    enabled: false,
+    itemCosts: [{ itemId, name: "Old coin", required: 3, owned: 2 }],
+  });
+  expect(
+    earned.data.player.storyNode.outputs.some(
+      (o: { id: string }) => o.id === "hidden",
+    ),
+  ).toBe(false);
+  const rejected = await call(`${run}/choices`, {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    payload: { choiceId: "expensive" },
+  });
+  expect(rejected.status).toBe(400);
+  expect((await call(run)).data.save.revision).toBe(1);
   expect(earned.data.player.inventory).toEqual([
     { itemId, name: "Old coin", description: "A worn coin", quantity: 2 },
   ]);
