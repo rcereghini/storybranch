@@ -16,6 +16,8 @@ The first catalogue supports title prefix search and genre, rating, language, an
 
 ## Story details and creator profiles
 
+Story details offer invitation-code redemption for signed-in players (S18). A redeemed entry key permanently permits new journeys in that Story. The API rejects unauthorized starts, including direct and old-edition commands; returning players can still resume existing journeys. The creator controls the gate and manually distributes codes from StoryTrunk. Invitations do not make shared media private or implement subscription expiry.
+
 Story detail contains a trailer or poster, synopsis, creator attribution, content warnings, play or resume, community status, and share controls. Creator profiles provide a public library containing only published public stories and approved profile details. Private drafts, balances, and personal play history never appear there.
 
 Use stable links `/s/{storyId}/{optionalSlug}` and `/u/{publicHandle}`. The ID remains authoritative when titles change. Unlisted stories require a link and stay outside catalogue queries; unlisted does not mean access-controlled. Sharing uses the platform share surface when supported, a copy link fallback, and tested social compose links. Preview metadata must be rendered for crawlers at the canonical public URL. Never rely on client-only metadata for social cards.

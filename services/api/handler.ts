@@ -36,6 +36,7 @@ import { admin } from "./admin";
 import { profileRoutes } from "./profile";
 import { achievementRoutes, awardAchievement } from "./achievements";
 import { prepareStoryProgress, storyProgressSnapshot } from "./story-progress";
+import { assertStoryEntry, invitationRoutes } from "./invitations";
 import { edition } from "./story-store";
 import * as paths from "./paths";
 import {
@@ -216,6 +217,10 @@ async function handleCanonical(request: Request): Promise<Response> {
     const features = accountFeatures(profile.data());
     // Daily limits: the person's own, else the defaults in Settings.
     const limits = effectiveLimits(profile.data(), await appSettings());
+    if (["story-invitations", "story-entry"].includes(segments[1]))
+      return json(
+        await invitationRoutes(request, uid, segments, features, cursor),
+      );
     if (
       ["achievements", "achievement-submissions"].includes(segments[1]) ||
       (segments[1] === "admin" && segments[2] === "achievements")
@@ -371,6 +376,7 @@ async function handleCanonical(request: Request): Promise<Response> {
         const v = c.payload.versionId ?? latest.data()?.publishedVersionId;
         if (!v) throw new GameError("NOT_FOUND", "Story not found.");
         const { story } = await edition(tx, c.payload.storyId, v);
+        await assertStoryEntry(tx, uid, story.id);
         progressStory = story;
         save = start(
           story,
@@ -442,6 +448,7 @@ async function handleCanonical(request: Request): Promise<Response> {
             b.storyId,
             b.versionId,
           );
+          await assertStoryEntry(tx, uid, childStory.id);
           progressStory = childStory;
           save = start(
             childStory,

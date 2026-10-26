@@ -14,11 +14,11 @@ A key is an issuer-owned definition plus a verified grant to a subject. Achievem
 | --- | --- | --- |
 | Playthrough (`run`) | One player run; separate on replay | Found item or opened door |
 | Player + Story (`story`) | One account's progress in one Story across runs/editions | Five completions unlock bonus content on the sixth run |
-| Account (`account`, future) | One account; only declared authorized consumers may check | Creator beta invitation, paid option, expiring subscriber access |
+| Account (invitation entry implemented; general `account` conditions deferred) | One account; only declared authorized consumers may check | Creator beta invitation, future paid option or subscriber access |
 
 StoryContext owns definitions, never shared player ownership. Player + Story progress belongs to private UserContext storage; a run receives a bounded, immutable starting snapshot. Other accounts and Stories cannot read it. Stable key IDs retain their meaning across editions; renaming creates a new identity. Creators can define and award their own narrative keys without platform achievement approval. They cannot mint another issuer's keys or platform/premium rights.
 
-Beta invitations are future account grants scoped to entering the creator's Story. A shop purchase may grant permission for Option C in that issuer's Story. Game 1 items require explicit export/import permission and source-run selection when needed before Game 2 can check them. Subscription keys are live expiring rights checked at start, resume and protected actions; they are never made permanent by a run snapshot. Expiry preserves saves and offers a recoverable access screen; current content may finish, but further protected transitions require renewed access. Payment/refund/provider and offline-lease implementation remain deferred.
+Beta invitations now grant permanent permission to start the creator's Story; see the [invitation entry contract](#invitation-entry-contract). A future shop purchase may grant permission for Option C in that issuer's Story. Game 1 items require explicit export/import permission and source-run selection when needed before Game 2 can check them. Future subscription keys are live expiring rights checked at start, resume and protected actions; they are never made permanent by a run snapshot. Expiry preserves saves and offers a recoverable access screen; current content may finish, but further protected transitions require renewed access. Payment/refund/provider and offline-lease implementation remain deferred.
 
 The server evaluates branch conditions when presenting options and again when accepting intent. Unavailable hidden branches disclose neither their option nor protected content; locked presentation may expose only an authored non-sensitive label. A disabled/expired conditional branch must retain a safe alternative. A whole-Story entry gate offers recovery before any protected content is fetched. Monetized keys may also be earned through gameplay only when their issuer explicitly permits that grant source.
 
@@ -30,7 +30,7 @@ On each new root/child run, the service snapshots only declared granted keys int
 
 Completion atomically increments `users/{uid}/storyProgress/{storyId}.completions`, creates missing permanent grants under its `keys/{keyId}` subcollection with source run/edition/definition snapshot, and records `completions/{runId}` as a durable no-TTL deduplication receipt. These writes commit with the run/event/command receipt and any approved achievement. Thresholds use the completing run's pinned edition. Completion exposes only newly granted labels/IDs through optional `completion.storyKeys`; normal player responses omit the progress snapshot and total. No client writes or generic grant endpoint exist. Definition removal stops future snapshots/grants without deleting history. Reintroduction of the same ID recognizes its prior grant.
 
-Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations, mid-run persistent awards, achievement-to-key bindings, sequel imports, consumption, shops and subscriptions are follow-on implementations, not supported by this first slice.
+Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations are implemented separately below. Mid-run persistent awards, achievement-to-key bindings, sequel imports, consumption, shops and subscriptions remain follow-on work.
 
 ```mermaid
 flowchart LR
@@ -99,6 +99,32 @@ Example target declaration in plain terms: sequel input `captainHelped: boolean`
 Do not weaken today's foreign-namespace rejection until the full export/import permission, persistence and verification path exists. Cross-story reads through client-side save searches are not an acceptable interim implementation.
 
 ## Snapshot facts versus live rights
+
+### Invitation entry contract
+
+S18 implements one narrow account key: permanent permission to start a named Story. Its subject is the account and its issuer is the Story creator. Only the creator with publishing capability can configure entry policy or issue/disable invitations. This does not enable generic `scope: account` conditions or issue platform, premium or foreign rights.
+
+Live `stories/{storyId}.entryPolicy: {version: 1, revision, invitationRequired}` is separate from immutable narrative editions. The default is open. Creators can set it after saving a draft, before the first publication, so beta access need not have an open publication window. Gate changes require the expected policy revision and an idempotency key; they affect all new runs, including explicit old-edition starts and child starts. The owner bypasses their own entry gate. Saved runs remain readable/playable, and private Studio preview is unaffected. Catalogue metadata and public shares remain public.
+
+Creators issue a cryptographically random code with 1–1000 redemption slots and 1–30 days to redeem. The server stores only its SHA-256 digest as the invitation identity, plus issuer, Story, creation/expiry, limit, count, revision and disabled status. The creator command receipt temporarily retains the returned code for exact retry; list responses never reveal codes. Codes are manually copied/shared, never put in URL query strings or automatically sent to followers.
+
+Redemption requires an active signed-in account, the intended Story and the code. In one transaction the service validates issuer/Story, active status, deadline and remaining capacity; creates `users/{uid}/storyEntryKeys/{storyId}` with source invitation/issuer/time; and increments the invitation count. Grants have no TTL. An existing grant returns already-granted without consuming another slot. Different accounts racing for the final slot cannot both succeed. Bad/expired/disabled/exhausted codes receive the same safe error. There is no client-write path, transfer, billing, refund, consumable key or key revocation in this slice.
+
+`GET/POST /api/story-invitations/{storyId}` provide owner administration; `GET/POST /api/story-entry/{storyId}` provide a minimal access projection and redemption. New-run authorization reads the policy and grant inside the same command transaction before creating the run or projecting content. Changing the policy cannot be bypassed by requesting an older edition. A retry of an already-committed start still returns that existing journey.
+
+Invitation access controls participation. Existing static sample media, public reusable StoryNode shares and Firebase download-token URLs are not revocable private media. A creator is explicitly told that existing journeys and shared media stay accessible. Expiring subscriptions and confidential/paid media need a separate delivery/lease design before implementation; they cannot reuse this permanent-entry grant as proof of live entitlement.
+
+```mermaid
+flowchart LR
+  Creator[Story creator] --> Policy[Live new-journey entry policy]
+  Creator --> Code[Random invitation: capacity and redemption deadline]
+  Code --> Redeem[Signed-in recipient submits code]
+  Redeem --> Check[Transaction checks issuer, deadline and capacity]
+  Check --> Grant[Permanent account entry key and one consumed slot]
+  Policy --> Start[Server authorizes root or child start]
+  Grant --> Start
+  Start --> Run[Pinned run; later code expiry does not revoke it]
+```
 
 | Use | Resolution policy |
 | --- | --- |

@@ -31,6 +31,7 @@ import { StoryNode } from "./StoryNode";
 import { StoryLeafEditor } from "./StoryLeafEditor";
 import { AchievementSubmission } from "./Achievements";
 import { StoryProgressEditor } from "./StoryProgressEditor";
+import { StoryInvitations } from "./StoryInvitations";
 import { ClipPicker } from "./ClipPicker";
 import { StoryNodeLibrary } from "./Library";
 import { StoryGraph } from "./StoryGraph";
@@ -1248,6 +1249,14 @@ export function Studio({
                   keys cannot grant account access.
                 </p>
                 <StoryProgressEditor story={draft.story} onChange={change} />
+                {draft.revision > 0 && (
+                  <StoryInvitations
+                    key={`${draft.story.id}-${!!draft.publishedVersionId}`}
+                    api={api}
+                    storyId={draft.story.id}
+                    notify={setNotice}
+                  />
+                )}
                 {Object.keys(draft.story.storyNodes).length === 0 && (
                   <p>
                     Your Story is blank. Open Map to add a StoryNode or

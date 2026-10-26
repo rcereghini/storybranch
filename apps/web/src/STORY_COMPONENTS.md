@@ -18,3 +18,5 @@ Names are navigation aids, not an exhaustive allowlist. A new renderer, hook, se
 Record the relevant documents and invariants in the plan/work summary and the [pre-commit review](../../../CONTRIBUTING.md). Do not copy the full canonical specification next to each component.
 
 `StoryProgressEditor.tsx` authors persistent Player + Story key definitions in StoryTrunk. Read [keys](../../../docs/story-system/keys.md#first-implementation-persistent-story-progress) and [Creator Studio](../../../docs/17-creator-studio.md) before changing it or its branch-condition controls.
+
+`StoryInvitations.tsx` provides creator invitation controls and Story-detail redemption. Follow [invitation entry](../../../docs/story-system/keys.md#invitation-entry-contract), [UserContext](../../../docs/story-system/user-context.md) and Studio guidance. This live entry policy is separate from draft/edition changes and never promises media confidentiality or subscription enforcement.
