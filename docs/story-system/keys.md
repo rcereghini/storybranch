@@ -1,6 +1,6 @@
 # Keys, items, achievements and cross-story imports
 
-Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S19. General foreign namespace access, selected-run continuity, cross-creator imports and commercial entitlements remain unsupported.
+Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key and selected-run local-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S20. General foreign namespace access, arbitrary value imports, cross-creator imports and commercial entitlements remain unsupported.
 
 “Key” is a creator-facing idea for a fact or right used in a condition. Storage and authorization distinguish several kinds; a single unrestricted boolean map is not sufficient.
 
@@ -30,7 +30,7 @@ On each new root/child run, the service snapshots only declared granted keys int
 
 Completion atomically increments `users/{uid}/storyProgress/{storyId}.completions`, creates missing permanent grants under its `keys/{keyId}` subcollection with source run/edition/definition snapshot, and records `completions/{runId}` as a durable no-TTL deduplication receipt. These writes commit with the run/event/command receipt and any approved achievement. Thresholds use the completing run's pinned edition. Completion exposes only newly granted labels/IDs through optional `completion.storyKeys`; normal player responses omit the progress snapshot and total. No client writes or generic grant endpoint exist. Definition removal stops future snapshots/grants without deleting history. Reintroduction of the same ID recognizes its prior grant.
 
-Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations are implemented separately below. Mid-run persistent awards, achievement-to-key bindings, selected-run sequel imports, consumption, shops and subscriptions remain follow-on work.
+Studio authors these thresholds in StoryTrunk and selects persistent-key conditions on options; preview has an empty snapshot and cannot claim progress. Safe publication still requires an unconditional cost-free exit. Invitations are implemented separately below. Mid-run persistent awards, achievement-to-key bindings, arbitrary typed imports, consumption, shops and subscriptions remain follow-on work.
 
 ```mermaid
 flowchart LR
@@ -69,7 +69,7 @@ Creator API: `POST /api/achievement-submissions` accepts `{idempotencyKey, expec
 
 The completion's optional `accountAchievement` is a historical grant/already-earned display snapshot, not a live entitlement assertion. Approved definitions are consulted inside the completion transaction, including direct-entry leaves and child runs. There is no post-completion claim endpoint or retroactive scan. Private Studio previews do not invoke this grant service. Source claims and completion receipts are never deleted on revocation, and existing editions and saves are not migrated.
 
-StoryLeaf's authored reward configuration supports labeled local keys, with a versioned configuration and an embedded durable completion receipt in the run. The server grants them once on completion, recording which were already held; replay is a distinct run and child rewards stay isolated. Approved account achievements use the separate registry above; run-local sequel exports remain deferred. See [the local completion contract](story-nodes.md#local-completion-contract).
+StoryLeaf's authored reward configuration supports labeled local keys, with a versioned configuration and an embedded durable completion receipt in the run. The server grants them once on completion, recording which were already held; replay is a distinct run and child rewards stay isolated. Approved account achievements use the separate registry above; S20 supports declared run-local boolean exports. See [the local completion contract](story-nodes.md#local-completion-contract).
 
 Target definitions declare a stable ID/namespace, definition version, kind/value schema, scope, issuer, eligibility, stacking/consumption, expiry/revocation behavior and export/import policy. Grants record subject, definition version, source run/event or verified provider reference, time, value/quantity, claim ID and current status. Separate the definition from each grant.
 
@@ -81,7 +81,7 @@ An exported achievement is a verified fact with provenance, not a pointer allowi
 
 ### Persistent-key imports (S19)
 
-The first implementation imports permanent Player + Story keys between Stories owned by the same creator. It does not import run-local items, endings, approved account achievements, invitations or paid rights. Its explicit selection rule is **ever earned**, not latest run. Narrative continuity still requires the future source-run picker below.
+The first implementation imports permanent Player + Story keys between Stories owned by the same creator. It does not import run-local items, endings, approved account achievements, invitations or paid rights. Its explicit selection rule is **ever earned**, not latest run. S20 below extends this with an explicit source-run picker for local boolean facts.
 
 A source edition's progression key may declare `exportToStoryIds` (at most 20 distinct saved Story IDs). A destination edition declares `keyImports: {version: 1, keys: [{keyId, label, sourceStoryId, sourceVersionId, sourceKeyId, required}]}` (at most 20 unique local aliases). The source edition and key identity are pinned; the source key must explicitly permit the destination, and both roots must belong to the same creator. Publication and new starts validate those permissions. Reserve/save the destination ID first, then publish the source export, then publish the importing destination. Export consent in an immutable edition is permanent for this narrative-fact contract; a later edition does not revoke older declarations or saved snapshots. Cross-creator sharing and integrity revocation need a separate live policy before release.
 
@@ -119,6 +119,32 @@ flowchart LR
 Example target declaration in plain terms: sequel input `captainHelped: boolean` imports `harbor:saved-captain` version 1 from the selected completed Harbor run. It defaults to false only if declared optional. A battle can bind that snapshot to an authored ally buff. The server validates the mapping; the sequel never mutates the original run or takes its inventory.
 
 Do not weaken today's foreign-namespace rejection until the full export/import permission, persistence and verification path exists. Cross-story reads through client-side save searches are not an acceptable interim implementation.
+
+### Selected completed-run imports (S20)
+
+S20 extends S19 with `selection: completed-run` on an import; absent selection remains `ever-earned`. A source edition declares `runKeyExports: {version: 1, keys: [{keyId, label, exportToStoryIds}]}` with at most 20 unique run-local key definitions. These export the boolean presence of the named local key at completion, including StoryLeaf rewards, never item quantities, imported aliases, persistent account keys or full saves. Namespace, same-creator, explicit destination and immutable permission checks remain mandatory. Across persistent/run export definitions, allow at most 20 distinct destination Stories.
+
+The player chooses one completed run for each source Story/edition pair; all imports from that pair use the same run, preventing contradictory endings from being combined. Nothing is preselected, even when only one run is eligible. For completed-run imports, `required` means a completed source journey must be selected, not that the imported boolean must be true. A selected run where the key is absent is a valid false fact. Optional omitted selections default false. Approval is still explicit and includes any ever-earned checks in the same offer.
+
+`GET /api/story-imports/{destination}/{edition}/runs?keyId={alias}&cursor=` validates destination entry access and the pinned import/export declarations before listing the signed-in account's eligible completed runs. Query at most 20 owned records for the declared source Story in document-ID order, then filter to the exact source edition and a durable completion receipt. Return only run ID, completion time and ending title; never source keys, answers, inventory or imported values. An empty batch may have a next cursor. The picker offers Load more and an error/retry state. This read authorizes no import; the player confirms the selected journey afterward.
+
+Start accepts bounded unique `sourceRuns: [{sourceStoryId, sourceVersionId, runId}]` only with `importConsent: true` and an explicit destination `versionId`. The server rejects undeclared source pairs, another account's run, active/legacy-without-receipt runs, mismatched source editions and duplicate selections. It revalidates the owned source run in the new-run transaction and snapshots only declared boolean values plus run ID, completion revision/time and ending ID. Exact retries replay the original selection; a changed selection under the same command key conflicts. Reload and replay of the source cannot change an existing sequel snapshot. No historical saves or immutable editions are rewritten. Source runs from before export publication cannot satisfy a newer export edition.
+
+Studio exposes run-local exports and the import selection mode. Root start consent groups the run pickers by source Story/edition. Existing persistent imports preserve their behavior. Community child import consent, cross-creator sharing, quantities, paid rights, run-to-run mutation and integrity revocation remain deferred.
+
+```mermaid
+sequenceDiagram
+  participant Player
+  participant API
+  participant Saves as Private owned saves
+  Player->>API: Read declared source journeys for pinned sequel
+  API->>Saves: Bounded query for declared source Story
+  API-->>Player: Eligible completed run labels and cursor
+  Player->>API: Start with consent and selected run IDs
+  API->>Saves: Recheck completion, edition, owner and export permission
+  API->>Saves: Atomically save sequel snapshot, event and receipt
+  API-->>Player: Permitted StoryNode outputs
+```
 
 ## Snapshot facts versus live rights
 

@@ -15,6 +15,8 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import type { StoryImportOffer } from "../../../packages/contracts/key-imports";
+import type { SourceRunSelection } from "../../../packages/contracts/index";
+import { StoryImportConsent } from "./StoryImportConsent";
 import { createRoot } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
 import { analyticsUrl } from "./analytics";
@@ -145,7 +147,7 @@ function App() {
       if (event.key !== "Tab") return;
       const elements = Array.from(
         document.querySelectorAll<HTMLElement>(
-          '[role="dialog"] button:not(:disabled), [role="dialog"] input:not(:disabled)',
+          '[role="dialog"] button:not(:disabled), [role="dialog"] input:not(:disabled), [role="dialog"] select:not(:disabled)',
         ),
       );
       const first = elements[0],
@@ -333,7 +335,10 @@ function App() {
         setBusy(false);
     }
   };
-  const startWithImports = (consent: boolean) => {
+  const startWithImports = (
+    consent: boolean,
+    sourceRuns: SourceRunSelection[],
+  ) => {
     if (!importOffer) return;
     const { storyId, versionId } = importOffer;
     setImportOffer(null);
@@ -341,7 +346,12 @@ function App() {
       path: "/playthroughs",
       body: {
         idempotencyKey: crypto.randomUUID(),
-        payload: { storyId, versionId, importConsent: consent },
+        payload: {
+          storyId,
+          versionId,
+          importConsent: consent,
+          ...(sourceRuns.length ? { sourceRuns } : {}),
+        },
       },
     });
   };
@@ -994,54 +1004,14 @@ function App() {
         </div>
       )}
       {importOffer && (
-        <div className="modal-backdrop">
-          <section
-            className="modal key-import-consent"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="import-title"
-          >
-            <button
-              autoFocus
-              className="modal-close"
-              aria-label="Cancel key imports"
-              onClick={() => setImportOffer(null)}
-            >
-              ×
-            </button>
-            <h2 id="import-title">Bring your earned keys?</h2>
-            <p>
-              {importOffer.title} can check these permanent keys from other
-              Stories by this creator. The result stays fixed for this journey.
-            </p>
-            <ul>
-              {importOffer.keys.map((k) => (
-                <li key={k.keyId}>
-                  {k.label} — {k.sourceTitle}
-                  {k.required ? " (required to start)" : " (optional)"}
-                </li>
-              ))}
-            </ul>
-            <p>
-              This checks keys you have ever earned. It does not share your past
-              choices or select a previous journey.
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={() => startWithImports(true)}
-            >
-              Use earned keys
-            </button>
-            {!importOffer.keys.some((k) => k.required) && (
-              <button
-                className="btn btn-secondary"
-                onClick={() => startWithImports(false)}
-              >
-                Start without imported keys
-              </button>
-            )}
-          </section>
-        </div>
+        <StoryImportConsent
+          key={`${importOffer.storyId}/${importOffer.versionId}`}
+          api={api}
+          offer={importOffer}
+          disabled={busy || offline}
+          onCancel={() => setImportOffer(null)}
+          onStart={startWithImports}
+        />
       )}
     </>
   );
