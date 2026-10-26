@@ -5279,3 +5279,258 @@ it("authorizes live promotional aliases, durable redemption, revocation and exac
     ).status,
   ).toBe(403);
 });
+
+it("uses earned achievements only through approved consumer permissions and live source claims", async () => {
+  const source = starterStory(`earned-source-${randomUUID()}`);
+  const consumer = starterStory(`earned-consumer-${randomUUID()}`);
+  const store = (s: typeof source, revision: number, who = "player") =>
+    call(
+      `/studio/${s.id}`,
+      {
+        idempotencyKey: randomUUID(),
+        expectedRevision: revision,
+        draft: { story: s, description: "Earned key fixture" },
+      },
+      who,
+    );
+  const publish = (s: typeof source, revision: number, who = "player") =>
+    call(
+      `/studio/${s.id}/publish`,
+      {
+        idempotencyKey: randomUUID(),
+        expectedRevision: revision,
+        policyVersion: "creator-alpha-1",
+      },
+      who,
+    );
+  expect((await store(source, 0)).status).toBe(200);
+  expect((await store(consumer, 0)).status).toBe(200);
+  const versionId = (await publish(source, 1)).data.publishedVersionId;
+  const submission = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    storyId: source.id,
+    versionId,
+    storyNodeId: "ending",
+    title: "Earned rescuer",
+    description: "Sequel access",
+    consumerStoryIds: [consumer.id],
+  };
+  expect(
+    (
+      await call("/achievement-submissions", {
+        ...submission,
+        consumerStoryIds: ["not-owned"],
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await call("/achievement-submissions", {
+        ...submission,
+        consumerStoryIds: [consumer.id, consumer.id],
+      })
+    ).status,
+  ).toBe(400);
+  const submitted = await call("/achievement-submissions", submission);
+  expect(submitted.status).toBe(200);
+  expect((await call("/achievement-submissions", submission)).data).toEqual(
+    submitted.data,
+  );
+  const definition = submitted.data;
+  const review = (d: typeof definition, status: string) =>
+    call(`/admin/achievements/${d.id}`, {
+      idempotencyKey: randomUUID(),
+      expectedRevision: d.revision,
+      status,
+      reason: "Test reviewed consumers",
+    });
+  consumer.accountKeys = {
+    version: 1,
+    keys: [
+      {
+        keyId: `${consumer.id}:rescuer`,
+        label: "Rescuer",
+        definitionId: definition.id,
+        source: "achievement",
+      },
+    ],
+  };
+  consumer.storyNodes.opening.storyNodeType = "text-options";
+  consumer.storyNodes.opening.choices.push({
+    ...structuredClone(consumer.storyNodes.opening.choices[0]),
+    id: "earned",
+    label: "Earned route",
+    unavailableDisplay: "hidden",
+    availableWhen: {
+      kind: "key",
+      scope: "account",
+      keyId: `${consumer.id}:rescuer`,
+      present: true,
+    },
+  });
+  expect((await store(consumer, 1)).status).toBe(200);
+  expect((await publish(consumer, 2)).status).toBe(400);
+  // Ownership is rechecked at approval, not just submission.
+  await db.doc(`stories/${consumer.id}`).update({ creatorUid: "progressed" });
+  expect((await review(definition, "approved")).status).toBe(403);
+  await db.doc(`stories/${consumer.id}`).update({ creatorUid: "player" });
+  const approved = (await review(definition, "approved")).data;
+  const consumerVersion = (await publish(consumer, 2)).data.publishedVersionId;
+  expect(consumerVersion).toBeTruthy();
+  const begin = (storyId: string, versionId: string, who = "progressed") =>
+    call(
+      "/playthroughs",
+      {
+        idempotencyKey: randomUUID(),
+        payload: { storyId, versionId },
+      },
+      who,
+    );
+  const initial = (await begin(consumer.id, consumerVersion)).data;
+  const currentView = async () =>
+    (await call(`/playthroughs/${initial.save.id}`, undefined, "progressed"))
+      .data;
+  const outputs = (view: any) =>
+    view.storyNode.outputs.map((o: { id: string }) => o.id);
+  expect(outputs(initial.player)).not.toContain("earned");
+  const oldProfile = (await db.doc("users/progressed").get()).data()!;
+  await db
+    .doc("users/progressed")
+    .update({ achievements: [definition.achievementId] });
+  expect(outputs(await currentView())).not.toContain("earned");
+  await db
+    .doc("users/progressed")
+    .update({ achievements: oldProfile.achievements ?? [] });
+  const sourceRun = (await begin(source.id, versionId)).data;
+  const completionCommand = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: { choiceId: source.storyNodes.opening.choices[0].id },
+  };
+  const completion = await call(
+    `/playthroughs/${sourceRun.save.id}/choices`,
+    completionCommand,
+    "progressed",
+  );
+  expect(completion.status).toBe(200);
+  const claimRef = db.doc(
+    `users/progressed/achievementClaims/${definition.achievementId}`,
+  );
+  const claim = (await claimRef.get()).data();
+  expect(claim).toBeTruthy();
+  expect(outputs(await currentView())).toContain("earned");
+  expect(JSON.stringify(await currentView())).not.toMatch(
+    /accountKeys|definitionId|achievementClaims|consumerStoryIds/,
+  );
+  expect(
+    outputs((await begin(consumer.id, consumerVersion, "player")).data.player),
+  ).not.toContain("earned");
+  const command = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: { choiceId: "earned" },
+  };
+  const committed = await call(
+    `/playthroughs/${initial.save.id}/choices`,
+    command,
+    "progressed",
+  );
+  expect(committed.status).toBe(200);
+  const waiting = (await begin(consumer.id, consumerVersion)).data;
+  const revoked = (await review(approved, "revoked")).data;
+  expect(revoked.status).toBe("revoked");
+  expect(
+    (
+      await call(
+        `/playthroughs/${waiting.save.id}/choices`,
+        { ...command, idempotencyKey: randomUUID() },
+        "progressed",
+      )
+    ).status,
+  ).toBe(409);
+  const safe = (
+    await call(`/playthroughs/${waiting.save.id}`, undefined, "progressed")
+  ).data;
+  expect(outputs(safe)).not.toContain("earned");
+  expect(
+    (
+      await call(
+        `/playthroughs/${waiting.save.id}/choices`,
+        {
+          ...command,
+          idempotencyKey: randomUUID(),
+          payload: { choiceId: consumer.storyNodes.opening.choices[0].id },
+        },
+        "progressed",
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(
+        `/playthroughs/${initial.save.id}/choices`,
+        command,
+        "progressed",
+      )
+    ).data.save,
+  ).toEqual(committed.data.save);
+  expect((await claimRef.get()).data()).toEqual(claim);
+  await review(revoked, "approved");
+  expect(
+    outputs((await begin(consumer.id, consumerVersion)).data.player),
+  ).toContain("earned");
+  // A later approved source edition can authorize the same stable achievement.
+  expect((await store(source, 1)).status).toBe(200);
+  const nextVersion = (await publish(source, 2)).data.publishedVersionId;
+  const later = (
+    await call("/achievement-submissions", {
+      ...submission,
+      idempotencyKey: randomUUID(),
+      versionId: nextVersion,
+    })
+  ).data;
+  await review(later, "approved");
+  consumer.accountKeys.keys[0].definitionId = later.id;
+  expect((await store(consumer, 2)).status).toBe(200);
+  const laterConsumer = (await publish(consumer, 3)).data.publishedVersionId;
+  expect(
+    outputs((await begin(consumer.id, laterConsumer)).data.player),
+  ).toContain("earned");
+  await db
+    .doc(`achievementDefinitions/${definition.id}`)
+    .update({ status: "revoked" });
+  expect(
+    outputs((await begin(consumer.id, laterConsumer)).data.player),
+  ).not.toContain("earned");
+  await db
+    .doc(`achievementDefinitions/${definition.id}`)
+    .update({ status: "approved" });
+  await db
+    .doc(`achievementDefinitions/${later.id}`)
+    .update({ consumerStoryIds: [] });
+  expect(
+    outputs((await begin(consumer.id, laterConsumer)).data.player),
+  ).not.toContain("earned");
+  expect((await publish(consumer, 3)).status).toBe(400);
+  await db
+    .doc(`achievementDefinitions/${later.id}`)
+    .update({ consumerStoryIds: [consumer.id] });
+  await db.doc(`stories/${consumer.id}`).update({ creatorUid: "progressed" });
+  expect(
+    outputs((await begin(consumer.id, laterConsumer)).data.player),
+  ).not.toContain("earned");
+  expect((await store(consumer, 0, "progressed")).status).toBe(200);
+  expect((await publish(consumer, 1, "progressed")).status).toBe(400);
+  await db.doc(`stories/${consumer.id}`).update({ creatorUid: "player" });
+  await db.doc(`achievementDefinitions/${definition.id}`).delete();
+  expect(
+    outputs((await begin(consumer.id, laterConsumer)).data.player),
+  ).not.toContain("earned");
+  expect((await claimRef.get()).data()).toEqual(claim);
+  expect(
+    (
+      await db.doc(`users/progressed/playthroughs/${waiting.save.id}`).get()
+    ).data(),
+  ).not.toHaveProperty("accountKeys");
+});
