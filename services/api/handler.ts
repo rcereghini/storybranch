@@ -3,7 +3,7 @@ import { liveAccountKeys } from "./account-keys";
 import { evaluate, usesAccountKey } from "../../packages/domain/index";
 import { storyKeyHistory } from "./story-key-history";
 import { sideStory } from "./side-story";
-import { playerRun } from "../../packages/domain/player";
+import { playerRun, playerItemChanges } from "../../packages/domain/player";
 import { playerEventSchema } from "../../packages/contracts/player";
 import {
   playerContractHeader,
@@ -440,6 +440,7 @@ async function handleCanonical(request: Request): Promise<Response> {
       let save: Save;
       let progressStory: Story;
       let event: Record<string, unknown>;
+      let previousItems: Save["items"] = {};
       if (kind === "start") {
         const c = startSchema.parse(command);
         const listing = await tx.get(db.doc(`catalogue/${c.payload.storyId}`));
@@ -493,6 +494,7 @@ async function handleCanonical(request: Request): Promise<Response> {
         const { story } = await edition(tx, current.storyId, current.versionId);
         progressStory = story;
         if (kind === "choice") {
+          previousItems = current.items;
           const c = choiceCommandSchema.parse(command);
           const accountKeys = await liveAccountKeys(tx, uid, story);
           const selected = story.storyNodes[current.storyNodeId]?.choices.find(
@@ -571,6 +573,11 @@ async function handleCanonical(request: Request): Promise<Response> {
         }
       }
       const achievement = await prepareAchievement(tx, uid, save);
+      event.itemChanges = playerItemChanges(
+        progressStory,
+        previousItems,
+        save.items,
+      );
       const writeProgress = await prepareStoryProgress(
         tx,
         uid,

@@ -108,3 +108,7 @@ Approved achievement definitions explicitly permit same-creator consumer Stories
 ## S28 — Edition-pinned Story item catalogue
 
 An optional version-1 catalogue adds names/descriptions to stable Story-local item IDs without granting inventory or requiring existing references to be catalogued. Save and publish validate bounded unique local definitions; published editions retain their own metadata. Shared authoring pickers preserve raw IDs, and Studio blocks metadata removal while draft references exist. Player projections omit the catalogue. No save migration, retroactive renaming, cross-Story inventory or account entitlement is introduced. See [Studio catalogue](../17-creator-studio.md#story-item-catalogue) and [StoryContext](story-context.md).
+
+## S29 — Owned inventory and net item history
+
+Expose only owned positive item quantities and pinned display metadata, with raw-ID fallback. New events atomically snapshot net inventory changes and their pinned labels; retries and old history retain existing semantics. A read-only modal drawer and Story log consume these projections without exposing the catalogue. No item transfer, use command, migration or account entitlement is added. See [player runtime](player-runtime.md#owned-inventory-and-item-history-s29).
