@@ -92,3 +92,7 @@ Expose bounded allowlisted projections of the actor's existing progress and gran
 ## S24 — Private invitation entry key history
 
 List the actor's permanent redeemed entry keys separately from narrative rewards, with bounded display-only projections and links to Story details. Snapshot the published title on new redemption; retain legacy grants without backfill. History is not a current availability check and never exposes invitation secrets or introduces commercial rights. See [invitation history](keys.md#private-invitation-key-history-s24).
+
+## S25 — Key-aware Studio previews
+
+Allow bounded declared persistent/imported key simulations only in disposable preview state. Scenario edits restart the run; shared rules explain effective option availability. Real authority, publication checks and immutable data are unchanged. See [preview contract](keys.md#key-aware-disposable-previews-s25).
