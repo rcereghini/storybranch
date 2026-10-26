@@ -56,6 +56,71 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("lists private invitation entry key history with bounded safe projections", async () => {
+  const prefix = `entry-history-${randomUUID()}`;
+  const refs = Array.from({ length: 21 }, (_, i) =>
+    db.doc(
+      `users/player/storyEntryKeys/${prefix}-${String(i).padStart(2, "0")}`,
+    ),
+  );
+  try {
+    const batch = db.batch();
+    refs.forEach((ref, i) =>
+      batch.create(ref, {
+        version: 1,
+        kind: "invitation-entry",
+        storyId: ref.id,
+        grantedAt: 1234,
+        issuerUid: "private-issuer",
+        invitationId: "private-digest",
+        ...(i ? { storyTitle: `Invited Story ${i}` } : {}),
+      }),
+    );
+    await batch.commit();
+    const first = await call("/story-entry-keys");
+    expect(first.status).toBe(200);
+    expect(first.data.items).toHaveLength(20);
+    expect(first.data.items[0]).toEqual({
+      storyId: refs[0].id,
+      title: refs[0].id.replaceAll("-", " "),
+      grantedAt: 1234,
+    });
+    expect(first.data.items[1].title).toBe("Invited Story 1");
+    expect(JSON.stringify(first.data)).not.toMatch(
+      /issuer|digest|invitationId|version/,
+    );
+    const second = await call(
+      `/story-entry-keys?cursor=${first.data.nextCursor}`,
+    );
+    expect(second.data.items).toHaveLength(1);
+    expect(second.data.nextCursor).toBeNull();
+    expect(second.data.items[0].storyId).toBe(refs[20].id);
+    expect(
+      (await call("/story-entry-keys?uid=player", undefined, "progressed"))
+        .data,
+    ).toEqual({ items: [], nextCursor: null });
+    for (const cursor of ["", "../secret", "x".repeat(81)])
+      expect(
+        (await call(`/story-entry-keys?cursor=${encodeURIComponent(cursor)}`))
+          .status,
+      ).toBe(400);
+    expect((await call("/story-entry-keys", { granted: true })).status).toBe(
+      404,
+    );
+    expect((await call("/story-entry-keys/player")).status).toBe(404);
+    expect(
+      (await handle(new Request("http://localhost/api/story-entry-keys")))
+        .status,
+    ).toBe(401);
+    const own = rules.authenticatedContext("player").firestore();
+    await assertFails(getDocs(collection(own, "users/player/storyEntryKeys")));
+    await assertFails(setDoc(doc(own, refs[0].path), { grantedAt: 1 }));
+  } finally {
+    const cleanup = db.batch();
+    refs.forEach((ref) => cleanup.delete(ref));
+    await cleanup.commit();
+  }
+});
 it("lists only owned earned Story key history with bounded cursors and safe provenance", async () => {
   const prefix = `history-${randomUUID()}`;
   const storyId = `${prefix}-00`;
@@ -912,6 +977,14 @@ it("issues invitation entry keys with atomic limits, private records, retries an
   }
   expect((await begin()).status).toBe(200);
   const grantPath = `users/progressed/storyEntryKeys/${storyId}`;
+  const savedGrant = (await db.doc(grantPath).get()).data()!;
+  expect(savedGrant.storyTitle).toBe(story.title);
+  const history = await call("/story-entry-keys", undefined, "progressed");
+  expect(
+    history.data.items.find(
+      (key: { storyId: string }) => key.storyId === storyId,
+    ),
+  ).toEqual({ storyId, title: story.title, grantedAt: savedGrant.grantedAt });
   const own = rules.authenticatedContext("progressed").firestore();
   await assertFails(getDoc(doc(own, grantPath)));
   await assertFails(setDoc(doc(own, grantPath), { granted: true }));

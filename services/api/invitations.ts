@@ -6,6 +6,7 @@ import {
   redeemInvitationSchema,
   type EntryPolicy,
   type StoryInvitation,
+  type StoryEntryKeyHistory,
 } from "../../packages/contracts/invitations";
 import type { Features } from "../../packages/contracts/profile";
 import { db } from "./firebase";
@@ -23,6 +24,32 @@ const policyOf = (data: Record<string, unknown>) =>
     revision: 0,
     invitationRequired: false,
   }) as EntryPolicy;
+
+export async function storyEntryKeyHistory(
+  request: Request,
+  uid: string,
+  segments: string[],
+  cursor: string | null,
+): Promise<StoryEntryKeyHistory> {
+  if (request.method !== "GET" || segments.length !== 2)
+    throw new GameError("NOT_FOUND", "Route not found.");
+  if (cursor !== null && !cursor)
+    throw new GameError("VALIDATION_FAILED", "Invalid entry key cursor.");
+  let query = db
+    .collection(`users/${uid}/storyEntryKeys`)
+    .orderBy(FieldPath.documentId())
+    .limit(20);
+  if (cursor) query = query.startAfter(cursor);
+  const records = await query.get();
+  return {
+    items: records.docs.map((record) => ({
+      storyId: record.id,
+      title: record.data().storyTitle ?? record.id.replaceAll("-", " "),
+      grantedAt: record.data().grantedAt,
+    })),
+    nextCursor: records.size === 20 ? records.docs.at(-1)!.id : null,
+  };
+}
 
 async function access(tx: Transaction, uid: string, storyId: string) {
   const root = await tx.get(db.doc(`stories/${storyId}`));
@@ -198,6 +225,9 @@ export async function invitationRoutes(
             "FORBIDDEN",
             "This invitation is unavailable. Ask the creator for another code.",
           );
+        const edition = await tx.get(
+          rootRef.collection("versions").doc(root.data()!.publishedVersionId),
+        );
         tx.create(grantRef, {
           version: 1,
           kind: "invitation-entry",
@@ -205,6 +235,7 @@ export async function invitationRoutes(
           issuerUid: invite.issuerUid,
           invitationId: invite.id,
           grantedAt: now,
+          storyTitle: edition.data()?.title ?? storyId.replaceAll("-", " "),
         });
         tx.update(ref, {
           claims: invite.claims + 1,

@@ -63,3 +63,8 @@ export type StoryEntry = {
   hasKey: boolean;
   canStart: boolean;
 };
+
+export type StoryEntryKeyHistory = {
+  items: { storyId: string; title: string; grantedAt: number }[];
+  nextCursor: string | null;
+};

@@ -1,6 +1,6 @@
 # Keys, items, achievements and cross-story imports
 
-Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key and selected-run local-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S23. General foreign namespace access, arbitrary value imports, cross-creator imports and commercial entitlements remain unsupported.
+Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key and selected-run local-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S24. General foreign namespace access, arbitrary value imports, cross-creator imports and commercial entitlements remain unsupported.
 
 “Key” is a creator-facing idea for a fact or right used in a condition. Storage and authorization distinguish several kinds; a single unrestricted boolean map is not sufficient.
 
@@ -157,6 +157,12 @@ The branch command accepts optional child `storyId`, `versionId`, `importConsent
 The shared consent dialog uses an authorized child picker endpoint. Cancel creates no save. Loading uses the existing player overlay/reserved space; entering and returning still use the shared Story/StoryNode lifecycle. No cross-creator imports, paid rights or automatic parent fact transfer are introduced.
 
 ## Snapshot facts versus live rights
+
+### Private invitation key history (S24)
+
+Adventures lists the signed-in account's redeemed Story entry keys separately from earned narrative keys. `GET /api/story-entry-keys?cursor=` returns at most 20 records in document-ID order, projecting only `storyId`, `title`, `grantedAt` and `nextCursor`. It accepts no other account identity and exposes no invitation digest, code, issuer ID, capacity, deadline or private policy record. Empty accounts return an empty list; failed reads retain loaded results and the retry cursor in reserved status space.
+
+New redemptions snapshot `storyTitle` from the currently published edition into the existing grant. Older grants use a readable Story ID fallback, without rewriting data or looking up private drafts. Titles and redemption dates are historical display facts. Disabling/expiring a code or changing the Story's policy does not remove a redeemed grant from history. The list links to Story details, never starts a run automatically or promises that a Story is currently available. Normal server entry and publication checks still govern starting it. No subscription, paid-content entitlement, generic account condition or grant mutation is introduced.
 
 ### Invitation entry contract
 

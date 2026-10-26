@@ -44,7 +44,11 @@ import {
   storySourceRuns,
   sideStoryImports,
 } from "./key-imports";
-import { assertStoryEntry, invitationRoutes } from "./invitations";
+import {
+  assertStoryEntry,
+  invitationRoutes,
+  storyEntryKeyHistory,
+} from "./invitations";
 import { edition } from "./story-store";
 import * as paths from "./paths";
 import {
@@ -284,6 +288,8 @@ async function handleCanonical(request: Request): Promise<Response> {
     }
     if (segments[1] === "story-progress")
       return json(await storyKeyHistory(request, uid, segments, cursor));
+    if (segments[1] === "story-entry-keys")
+      return json(await storyEntryKeyHistory(request, uid, segments, cursor));
     // Daily limits: the person's own, else the defaults in Settings.
     const limits = effectiveLimits(profile.data(), await appSettings());
     if (["story-invitations", "story-entry"].includes(segments[1]))
