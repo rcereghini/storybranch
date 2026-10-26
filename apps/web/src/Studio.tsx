@@ -1,4 +1,5 @@
 import { ConditionEditor } from "./ConditionEditor";
+import { BranchItemsEditor } from "./BranchItemsEditor";
 import { EarnedAccountKeys } from "./EarnedAccountKeys";
 import { renderStoryNode } from "../../../packages/domain/player";
 import { PromotionalKeyEditor } from "./PromotionalKeys";
@@ -1856,6 +1857,13 @@ export function Studio({
                             </select>
                           </label>
                         )}
+                        <BranchItemsEditor
+                          key={`${storyNode.id}-${c.id}-items`}
+                          story={draft.story}
+                          choice={c}
+                          option={i + 1}
+                          onApply={(next) => editChoice(i, next)}
+                        />
                         {storyNode.storyNodeType.endsWith("options") && (
                           <ConditionEditor
                             key={storyNode.id + c.id}
