@@ -65,3 +65,5 @@ The player can inspect positive run-local quantities in a fixed inventory drawer
 Test two independent runs, version-pinned resume, same-command retry, stale actions, pending-result reload, revisiting a node, once-only effects, parent changes during a child run and unavailable parent recovery. Sequel tests must demonstrate explicit source selection and isolation from unrelated runs. Preview cannot persist any of these account/run mutations.
 
 S32 stores optional server-only nodeInputs for the current placement entry revision. Every entry replaces or removes them; Roll preserves the current entry snapshot. Old saves remain unchanged and child starts resolve their own defaults. See [StoryBranch data](branch-data.md) for bounds and compatibility. This is not an unbounded visit history or a generic variable store.
+
+S33 adds no persistence shape: input comparisons read the S32 snapshot already stored for this entry. They never recompute defaults on resume or accept client-supplied replacements. See [S33](branch-data.md#s33--visual-bindings-and-current-entry-input-conditions).

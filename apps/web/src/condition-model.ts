@@ -2,7 +2,9 @@ import {
   conditionSchema,
   type Condition,
   type Story,
+  type StoryNode,
 } from "../../../packages/contracts/index";
+import { inputConditionIssue } from "../../../packages/domain/branch-data";
 export type ConditionKey = {
   value: string;
   keyId: string;
@@ -48,7 +50,13 @@ export function conditionKeys(story: Story): ConditionKey[] {
   }));
 }
 export function isEditableCondition(c: Condition | undefined): boolean {
-  if (!c || c.kind === "key" || c.kind === "stat" || c.kind === "item")
+  if (
+    !c ||
+    c.kind === "key" ||
+    c.kind === "stat" ||
+    c.kind === "item" ||
+    c.kind === "input"
+  )
     return true;
   if (c.kind === "not") return isEditableCondition(c.condition);
   if (c.kind === "all" || c.kind === "any")
@@ -58,9 +66,12 @@ export function isEditableCondition(c: Condition | undefined): boolean {
 export function validateCondition(
   input: Condition | undefined,
   story: Story,
+  node?: StoryNode,
 ): Condition | undefined {
   if (!input) return undefined;
   const parsed = conditionSchema.parse(input);
+  const inputIssue = inputConditionIssue(parsed, node ?? {});
+  if (inputIssue) throw new Error(inputIssue);
   if (!isEditableCondition(parsed))
     throw new Error("Use advanced JSON for roll conditions.");
   const keys = conditionKeys(story);

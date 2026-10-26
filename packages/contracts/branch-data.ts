@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const inputName = z
+export const inputName = z
   .string()
   .regex(/^[a-z][a-zA-Z0-9_]{0,39}$/)
   .refine((name) => name !== "constructor" && name !== "prototype");

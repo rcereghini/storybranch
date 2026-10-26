@@ -1,10 +1,12 @@
 import { StoryItemPicker } from "./StoryItemPicker";
+import { InputValueEditor, emptyInputValue } from "./StoryInputsEditor";
 import { describeCondition } from "../../../packages/domain/preview";
 import { useEffect, useState } from "react";
 import {
   statId,
   type Condition,
   type Story,
+  type StoryNode,
 } from "../../../packages/contracts/index";
 import {
   conditionKeys,
@@ -20,6 +22,7 @@ function Clause({
   path,
   depth,
   story,
+  node,
 }: {
   value: Condition;
   onChange: (c: Condition) => void;
@@ -27,6 +30,7 @@ function Clause({
   path: string;
   depth: number;
   story: Story;
+  node?: StoryNode;
 }) {
   const storyId = story.id;
   const newKey = (): Condition => ({
@@ -48,7 +52,15 @@ function Clause({
           onChange={(e) => {
             const kind = e.target.value;
             if (kind === "key") onChange(newKey());
-            else if (kind === "stat")
+            else if (kind === "input" && node?.inputs?.fields[0]) {
+              const field = node.inputs.fields[0];
+              onChange({
+                kind,
+                input: field.name,
+                op: "eq",
+                value: emptyInputValue(field.type),
+              });
+            } else if (kind === "stat")
               onChange({ kind, stat: "agility", op: "gte", value: 5 });
             else if (kind === "item")
               onChange({
@@ -68,6 +80,9 @@ function Clause({
           <option value="key">Key check</option>
           <option value="stat">Stat check</option>
           <option value="item">Item quantity</option>
+          <option value="input" disabled={!node?.inputs?.fields.length}>
+            StoryNode input
+          </option>
           {depth < 5 && (
             <>
               <option value="all">All conditions</option>
@@ -77,6 +92,71 @@ function Clause({
           )}
         </select>
       </label>
+      {value.kind === "input" && (
+        <>
+          <label>
+            Input
+            <select
+              aria-label={`Condition ${path} input`}
+              value={value.input}
+              onChange={(e) => {
+                const field = node?.inputs?.fields.find(
+                  (f) => f.name === e.target.value,
+                );
+                if (field)
+                  onChange({
+                    ...value,
+                    input: field.name,
+                    op: "eq",
+                    value: emptyInputValue(field.type),
+                  });
+              }}
+            >
+              {!node?.inputs?.fields.some((f) => f.name === value.input) && (
+                <option value={value.input}>{value.input} (unavailable)</option>
+              )}
+              {node?.inputs?.fields.map((f) => (
+                <option key={f.name} value={f.name}>
+                  {f.name} ({f.type})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Comparison
+            <select
+              aria-label={`Condition ${path} comparison`}
+              value={value.op}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  op: e.target.value as "eq" | "gte" | "lte",
+                })
+              }
+            >
+              <option value="eq">Exactly</option>
+              {typeof value.value === "number" && (
+                <>
+                  <option value="gte">At least</option>
+                  <option value="lte">At most</option>
+                </>
+              )}
+            </select>
+          </label>
+          <InputValueEditor
+            type={
+              typeof value.value === "number"
+                ? "integer"
+                : typeof value.value === "boolean"
+                  ? "boolean"
+                  : "string"
+            }
+            value={value.value}
+            label={`Condition ${path} input value`}
+            onChange={(next) => onChange({ ...value, value: next })}
+          />
+        </>
+      )}
       {value.kind === "key" && (
         <>
           <label>
@@ -216,6 +296,7 @@ function Clause({
           path={`${path}.1`}
           depth={depth + 1}
           story={story}
+          node={node}
         />
       )}
       {(value.kind === "all" || value.kind === "any") && (
@@ -236,6 +317,7 @@ function Clause({
                 path={`${path}.${i + 1}`}
                 depth={depth + 1}
                 story={story}
+                node={node}
               />
               <button
                 className="btn btn-secondary"
@@ -273,11 +355,13 @@ export function ConditionEditor({
   value,
   onApply,
   option,
+  node,
 }: {
   story: Story;
   value?: Condition;
   onApply: (c: Condition | undefined) => void;
   option: number;
+  node?: StoryNode;
 }) {
   const serialized = JSON.stringify(value);
   const [draft, setDraft] = useState(value);
@@ -289,12 +373,12 @@ export function ConditionEditor({
   const keys = conditionKeys(story);
   let error = "";
   try {
-    validateCondition(draft, story);
+    validateCondition(draft, story, node);
   } catch (e) {
     error =
       e instanceof Error && e.name !== "ZodError"
         ? e.message
-        : "Use valid Story IDs and whole numbers from 0 to 999, within five nesting levels and ten conditions per group.";
+        : "Use valid Story IDs and matching values. Input integers allow -999 to 999; stat/item thresholds allow 0 to 999. Keep within five nesting levels and ten conditions per group.";
   }
   return (
     <details className="key-condition-editor">
@@ -324,6 +408,7 @@ export function ConditionEditor({
                 path="1"
                 depth={0}
                 story={story}
+                node={node}
               />
             ) : (
               <p>No availability condition.</p>
@@ -370,7 +455,7 @@ export function ConditionEditor({
               className="btn btn-primary"
               disabled={!!error}
               onClick={() => {
-                onApply(validateCondition(draft, story));
+                onApply(validateCondition(draft, story, node));
                 setMessage("Condition applied to the draft.");
               }}
             >

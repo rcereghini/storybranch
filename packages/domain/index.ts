@@ -13,6 +13,8 @@ import {
   choiceInputIssue,
   inputBindingIssue,
   resolveNodeInputs,
+  inputConditionIssue,
+  currentInput,
 } from "./branch-data";
 // Every route a choice can take, whichever outcome the server selects.
 export const routesOf = (c: Choice) =>
@@ -65,6 +67,15 @@ export function evaluate(
   accountKeys: readonly string[] = [],
 ): boolean {
   switch (c.kind) {
+    case "input": {
+      const value = currentInput(s, c.input);
+      if (value === undefined || typeof value !== typeof c.value) return false;
+      return c.op === "eq"
+        ? value === c.value
+        : typeof value === "number" &&
+            typeof c.value === "number" &&
+            compare(value, c.op, c.value);
+    }
     case "roll":
       return (
         s.lastRoll?.storyNodeId === c.storyNodeId &&
@@ -421,6 +432,13 @@ export function validateStory(value: unknown): Story {
     )
       throw new Error("Reveal StoryNode requires one reveal output");
     for (const choice of n.choices) {
+      for (const condition of [
+        choice.availableWhen,
+        choice.outcome.kind === "check" ? choice.outcome.condition : undefined,
+      ]) {
+        const issue = condition && inputConditionIssue(condition, n);
+        if (issue) throw new Error(issue);
+      }
       const bindingIssue = choiceInputIssue(choice, story.storyNodes);
       if (bindingIssue) throw new Error(bindingIssue);
       if (

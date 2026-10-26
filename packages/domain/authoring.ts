@@ -50,7 +50,11 @@ export function reviewPublication(input: unknown): PublicationReview {
         const clone = structuredClone(n);
         // The synthetic local check cannot resolve real destination inputs.
         // Original bindings are checked per edge before admitting safe routes.
-        delete clone.inputs;
+        if (clone.inputs)
+          clone.inputs.fields = clone.inputs.fields.map((f) => ({
+            ...f,
+            required: false,
+          }));
         for (const c of clone.choices)
           for (const r of routesOf(c)) {
             r.targetStoryNodeId = leafId;

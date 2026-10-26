@@ -1,4 +1,9 @@
 import { ConditionEditor } from "./ConditionEditor";
+import {
+  StoryInputsEditor,
+  BranchInputsEditor,
+  PreviewInputs,
+} from "./StoryInputsEditor";
 import { SavedPlaytestScenarios } from "./SavedPlaytestScenarios";
 import { StoryItemCatalogue } from "./StoryItemCatalogue";
 import { BranchItemsEditor } from "./BranchItemsEditor";
@@ -1876,10 +1881,18 @@ export function Studio({
                           option={i + 1}
                           onApply={(next) => editChoice(i, next)}
                         />
+                        <BranchInputsEditor
+                          key={`${storyNode.id}-${c.id}-inputs`}
+                          story={draft.story}
+                          choice={c}
+                          option={i + 1}
+                          onApply={(next) => editChoice(i, next)}
+                        />
                         {storyNode.storyNodeType.endsWith("options") && (
                           <ConditionEditor
                             key={storyNode.id + c.id}
                             story={draft.story}
+                            node={storyNode}
                             value={c.availableWhen}
                             option={i + 1}
                             onApply={(condition) => {
@@ -1929,6 +1942,16 @@ export function Studio({
                           Add option
                         </Button>
                       )}
+                    <StoryInputsEditor
+                      key={storyNode.id}
+                      node={storyNode}
+                      onApply={(inputs) => {
+                        const next = { ...storyNode };
+                        if (inputs) next.inputs = inputs;
+                        else delete next.inputs;
+                        updateStoryNode(next);
+                      }}
+                    />
                     <details>
                       <summary>Advanced conditions and effects (JSON)</summary>
                       <p>
@@ -1967,8 +1990,9 @@ export function Studio({
                       <p>
                         Inputs declare bounded values for incoming connections.
                         Set each route's inputBindings in Outputs JSON. Preview
-                        checks required values and compatible types; inputs do
-                        not yet change displayed content.
+                        checks required values and compatible types. Conditions
+                        can check inputs; displayed text does not interpolate
+                        them.
                       </p>
                       <label>
                         Outputs JSON
@@ -2132,6 +2156,7 @@ export function Studio({
                   })
                 }
               />
+              <PreviewInputs story={preview.story} save={preview.save} />
               <Story
                 key={preview.session}
                 story={preview.story}

@@ -3,6 +3,7 @@ import {
   type Save,
   type StoryNode,
   type Choice,
+  type Condition,
 } from "../contracts/index";
 import {
   inputType,
@@ -10,6 +11,43 @@ import {
   type InputBindings,
   type InputValue,
 } from "../contracts/branch-data";
+
+export function inputConditionIssue(
+  condition: Condition,
+  node: Pick<StoryNode, "inputs">,
+): string | undefined {
+  if (condition.kind === "input") {
+    const field = node.inputs?.fields.find((f) => f.name === condition.input);
+    if (!field) return `Unknown condition input: ${condition.input}.`;
+    if (field.type !== inputType(condition.value))
+      return `Condition input type mismatch: ${field.name}.`;
+  }
+  const children =
+    condition.kind === "not"
+      ? [condition.condition]
+      : condition.kind === "all" || condition.kind === "any"
+        ? condition.conditions
+        : [];
+  for (const child of children) {
+    const issue = inputConditionIssue(child, node);
+    if (issue) return issue;
+  }
+}
+
+export function currentInput(save: Save, name: string): InputValue | undefined {
+  const snapshot = save.nodeInputs;
+  if (
+    !snapshot ||
+    snapshot.version !== 1 ||
+    snapshot.storyNodeId !== save.storyNodeId ||
+    !Number.isInteger(snapshot.revision) ||
+    snapshot.revision < 0 ||
+    snapshot.revision > save.revision ||
+    !Object.hasOwn(snapshot.values, name)
+  )
+    return undefined;
+  return snapshot.values[name];
+}
 
 export function inputBindingIssue(
   destination: StoryNode,

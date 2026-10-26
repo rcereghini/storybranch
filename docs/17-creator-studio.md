@@ -212,3 +212,5 @@ Catalogue IDs are fixed after adding an entry in the editor; edit its name/descr
 ## Typed StoryBranch inputs (S32)
 
 The advanced editor adds Inputs JSON for version-1 declarations; Outputs JSON accepts each route's inputBindings. Empty fields remove the declaration. Invalid schema input leaves the last valid value unchanged; valid but incomplete wiring can save and is diagnosed by preview/publication. These values are server-only plumbing and do not interpolate text or change conditions. See [StoryBranch data](story-system/branch-data.md) for limits, defaults and Dice sources. Visual binding controls and resolved-input inspection remain follow-up work.
+
+S33 adds visual StoryNode input declarations, per-route binding editors, current-entry input comparisons in the condition builder and a private resolved-input inspector. All use existing Apply/Reset and draft save/undo behavior. See [S33](story-system/branch-data.md#s33--visual-bindings-and-current-entry-input-conditions). Schema-valid incomplete graphs can still save; preview/publication remain authoritative about compatibility and safe exits. JSON authoring remains available.
