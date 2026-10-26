@@ -65,7 +65,12 @@ export async function prepareStoryProgress(
   const storyKeys = newlyGranted.map(({ keyId, label }) => ({ keyId, label }));
   save.completion.storyKeys = storyKeys;
   return () => {
-    tx.set(root, { version: 1, completions, updatedAt: save.updatedAt });
+    tx.set(root, {
+      version: 1,
+      completions,
+      storyTitle: story.title,
+      updatedAt: save.updatedAt,
+    });
     tx.create(receipt, {
       version: 1,
       runId: save.id,

@@ -56,6 +56,110 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("lists only owned earned Story key history with bounded cursors and safe provenance", async () => {
+  const prefix = `history-${randomUUID()}`;
+  const storyId = `${prefix}-00`;
+  const refs = [];
+  try {
+    const batch = db.batch();
+    for (let i = 0; i < 21; i++) {
+      const ref = db.doc(
+        `users/player/storyProgress/${prefix}-${String(i).padStart(2, "0")}`,
+      );
+      refs.push(ref);
+      batch.create(ref, {
+        version: 1,
+        completions: 2,
+        ...(i ? { storyTitle: `Story ${i}` } : {}),
+        privateField: "secret",
+      });
+    }
+    for (let i = 0; i < 21; i++) {
+      const keyId = `${storyId}:reward-${String(i).padStart(2, "0")}`;
+      const ref = db.doc(`users/player/storyProgress/${storyId}/keys/${keyId}`);
+      refs.push(ref);
+      batch.create(ref, {
+        keyId,
+        label: `Reward ${i}`,
+        at: 1234,
+        runId: "source-run",
+        versionId: "edition-1",
+        afterCompletions: 1,
+        exportToStoryIds: ["private-export"],
+        ...(i === 0
+          ? {
+              achievement: {
+                definitionId: "private-definition",
+                definitionRevision: 2,
+              },
+            }
+          : {}),
+      });
+    }
+    await batch.commit();
+    const first = await call("/story-progress");
+    expect(first.status).toBe(200);
+    expect(first.data.items).toHaveLength(20);
+    expect(first.data.items[0]).toEqual({
+      storyId,
+      title: storyId.replaceAll("-", " "),
+      completions: 2,
+    });
+    expect(JSON.stringify(first.data)).not.toContain("privateField");
+    const second = await call(
+      `/story-progress?cursor=${first.data.nextCursor}`,
+    );
+    expect(second.data.items).toHaveLength(1);
+    expect(second.data.nextCursor).toBeNull();
+    expect(
+      (await call("/story-progress", undefined, "progressed")).data.items,
+    ).toEqual([]);
+    const path = `/story-progress/${storyId}/keys`;
+    const keys = await call(path);
+    expect(keys.data.items).toHaveLength(20);
+    expect(keys.data.items[0]).toEqual({
+      keyId: `${storyId}:reward-00`,
+      label: "Reward 0",
+      earnedAt: 1234,
+      runId: "source-run",
+      versionId: "edition-1",
+      source: "achievement",
+    });
+    expect(keys.data.items[1].source).toBe("completion-count");
+    expect(JSON.stringify(keys.data)).not.toMatch(
+      /private-export|private-definition|afterCompletions/,
+    );
+    const rest = await call(
+      `${path}?afterKey=${encodeURIComponent(keys.data.nextCursor)}`,
+    );
+    expect(rest.data.items).toHaveLength(1);
+    expect(rest.data.nextCursor).toBeNull();
+    expect((await call(path, undefined, "progressed")).data).toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    expect((await call(`/story-progress/missing/keys`)).data.items).toEqual([]);
+    for (const cursor of [
+      "foreign:key",
+      "../secret",
+      `${storyId}:${"x".repeat(101)}`,
+      "",
+    ])
+      expect(
+        (await call(`${path}?afterKey=${encodeURIComponent(cursor)}`)).status,
+      ).toBe(400);
+    expect((await call(path, { keyId: "forged" })).status).toBe(404);
+    const anonymous = await handle(new Request(`http://localhost/api${path}`));
+    expect(anonymous.status).toBe(401);
+    const own = rules.authenticatedContext("player").firestore();
+    await assertFails(getDoc(doc(own, refs[21].path)));
+    await assertFails(setDoc(doc(own, refs[21].path), { label: "forged" }));
+  } finally {
+    const cleanup = db.batch();
+    refs.forEach((ref) => cleanup.delete(ref));
+    await cleanup.commit();
+  }
+});
 it("selects one owned completed source run, freezes its false or true facts, and paginates without inventory disclosure", async () => {
   const source = starterStory(`run-source-${randomUUID()}`);
   const target = starterStory(`run-target-${randomUUID()}`);
