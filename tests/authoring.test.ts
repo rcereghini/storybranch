@@ -433,3 +433,52 @@ it("preserves route effects and atomically spends then awards local inventory", 
     transition(story, empty, choice.id, 0, 2).save.items["items:missing"],
   ).toBe(0);
 });
+import {
+  itemReferences,
+  storyItems,
+  itemLabel,
+} from "../packages/domain/story-items";
+import { storySchema } from "../packages/contracts/index";
+it("validates optional item metadata without changing legacy references or granting inventory", () => {
+  const story = starterStory("catalogue");
+  story.storyNodes.opening.choices[0].costs = [
+    { itemId: "catalogue:old", quantity: 1 },
+  ];
+  expect(storyItems(story)[0]).toMatchObject({
+    itemId: "catalogue:old",
+    catalogued: false,
+  });
+  story.itemCatalogue = {
+    version: 1,
+    items: [
+      { itemId: "catalogue:old", name: "Old relic", description: "A relic" },
+      { itemId: "catalogue:new", name: "New relic", description: "" },
+    ],
+  };
+  expect(storySchema.parse(story).itemCatalogue).toEqual(story.itemCatalogue);
+  expect(itemLabel(story, "catalogue:old")).toBe("Old relic (catalogue:old)");
+  expect(itemReferences(story)).toEqual([
+    expect.objectContaining({
+      itemId: "catalogue:old",
+      storyNodeId: "opening",
+      location: expect.stringContaining("cost"),
+    }),
+  ]);
+  expect(storyItems(story)).toHaveLength(2);
+  expect(start(story, "run", "player", baseStats, 1).items).toEqual({});
+  for (const items of [
+    [{ itemId: "other:old", name: "Foreign", description: "" }],
+    [story.itemCatalogue.items[0], story.itemCatalogue.items[0]],
+    [{ itemId: "catalogue:old", name: "", description: "" }],
+    [{ itemId: "catalogue:old", name: "Valid", description: "x".repeat(501) }],
+    Array.from({ length: 101 }, (_, i) => ({
+      itemId: `catalogue:item-${i}`,
+      name: "Item",
+      description: "",
+    })),
+  ])
+    expect(
+      storySchema.safeParse({ ...story, itemCatalogue: { version: 1, items } })
+        .success,
+    ).toBe(false);
+});

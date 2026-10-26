@@ -41,3 +41,5 @@ Reusable content has no story/run/user identity. Placement applies story-specifi
 ## Exclusions and checks
 
 Do not store auth tokens, SDK instances, live subscription flags, a shared inventory or per-player rolls in StoryContext. Validate all named state references and import declarations at publication. Verify that simultaneous players cannot mutate one another's state and that editing a draft leaves existing editions and previews intact.
+
+The optional version-1 `itemCatalogue` stores Story-local item names/descriptions, validated for unique IDs and local namespace. It is edition-pinned metadata only; inventory quantities remain in PlayerContext. Older Stories and uncatalogued item references remain supported. Studio owns the authoring/removal guard and reference views; see [item catalogue](../17-creator-studio.md#story-item-catalogue). No catalogue is included in the player projection.

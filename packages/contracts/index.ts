@@ -289,6 +289,26 @@ export const storyTrunkContextSchema = z
       ),
   })
   .strict();
+export const itemCatalogueSchema = z
+  .object({
+    version: z.literal(1),
+    items: z
+      .array(
+        z
+          .object({
+            itemId: namespaced,
+            name: z.string().trim().min(1).max(80),
+            description: z.string().max(500),
+          })
+          .strict(),
+      )
+      .max(100)
+      .refine(
+        (items) => new Set(items.map((i) => i.itemId)).size === items.length,
+        "Item IDs must be unique.",
+      ),
+  })
+  .strict();
 export const storySchema = z
   .object({
     id,
@@ -297,6 +317,7 @@ export const storySchema = z
     title: z.string(),
     entryStoryNodeId: id,
     trunkContext: storyTrunkContextSchema.optional(),
+    itemCatalogue: itemCatalogueSchema.optional(),
     runKeyExports: z
       .object({
         version: z.literal(1),
@@ -409,7 +430,14 @@ export const storySchema = z
       .optional(),
     storyNodes: z.record(storyNodeSchema),
   })
-  .strict();
+  .strict()
+  .refine(
+    (story) =>
+      (story.itemCatalogue?.items ?? []).every((item) =>
+        item.itemId.startsWith(story.id + ":"),
+      ),
+    "Catalogue items must belong to this Story's namespace.",
+  );
 export type Story = z.infer<typeof storySchema>;
 export type Choice = z.infer<typeof choiceSchema>;
 export type Effect = z.infer<typeof effectSchema>;
