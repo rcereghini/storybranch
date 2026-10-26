@@ -16,6 +16,35 @@ export function previewItemIds(story: Story): string[] {
   return storyItems(story).map((i) => i.itemId);
 }
 
+export function previewScenarioIssues(
+  story: Story,
+  scenario: PreviewScenario,
+): string[] {
+  const groups = [
+    ["Item", Object.keys(scenario.items ?? {}), previewItemIds(story)],
+    [
+      "Story key",
+      scenario.storyKeys,
+      (story.progression?.keys ?? []).map((k) => k.keyId),
+    ],
+    [
+      "Imported key",
+      scenario.importedKeys,
+      (story.keyImports?.keys ?? []).map((k) => k.keyId),
+    ],
+    [
+      "Account key",
+      scenario.accountKeys,
+      (story.accountKeys?.keys ?? []).map((k) => k.keyId),
+    ],
+  ] as const;
+  return groups.flatMap(([kind, selected, declared]) =>
+    selected
+      .filter((id) => !declared.includes(id))
+      .map((id) => `${kind} unavailable: ${id}`),
+  );
+}
+
 export function previewPreset(
   story: Story,
   preset: "first" | "returning" | "sequel",

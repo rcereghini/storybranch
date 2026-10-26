@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { savedPlaytestScenariosSchema } from "./preview";
 import { id, storySchema, storyTrunkContextSchema } from "./index";
 // The trunk is a configuration view, not a playable placement. Existing root
 // metadata stays the sole source of truth; editions need no duplicate title.
@@ -69,9 +70,25 @@ export const draftSchema = z
     description: z.string().max(500),
     storyNodePositions: storyNodePositionsSchema.optional(),
     comic: comicStudioSchema.optional(),
+    playtestScenarios: savedPlaytestScenariosSchema.optional(),
   })
   .strict()
   .superRefine((draft, ctx) => {
+    for (const entry of draft.playtestScenarios ?? []) {
+      const scenario = entry.scenario;
+      if (
+        [
+          ...scenario.storyKeys,
+          ...scenario.importedKeys,
+          ...scenario.accountKeys,
+          ...Object.keys(scenario.items ?? {}),
+        ].some((id) => !id.startsWith(draft.story.id + ":"))
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Saved setup references must belong to this Story.",
+        });
+    }
     if (Object.keys(draft.story.storyNodes).length > 80)
       ctx.addIssue({
         code: "custom",

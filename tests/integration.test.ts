@@ -5715,6 +5715,92 @@ it("records authoritative net inventory once and projects pinned owned metadata"
   expect(newEarned.data.player.inventory[0].name).toBe("New coin");
 });
 
+it("saves private playtest setups with revision guards and excludes them from editions and real runs", async () => {
+  const story = starterStory(`setups-${randomUUID()}`);
+  const path = `/studio/${story.id}`;
+  const entry = {
+    id: "returning",
+    name: "Private test setup",
+    scenario: {
+      version: 1,
+      storyKeys: [`${story.id}:removed`],
+      importedKeys: [],
+      accountKeys: [],
+      items: { [`${story.id}:retired`]: 5 },
+    },
+  };
+  const command = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    draft: { story, description: "Setups", playtestScenarios: [entry] },
+  };
+  const saved = await call(path, command);
+  expect(saved.status).toBe(200);
+  expect((await call(path, command)).data).toEqual(saved.data);
+  expect((await call(path)).data.playtestScenarios).toEqual([entry]);
+  expect((await call(path, undefined, "progressed")).status).toBe(404);
+  expect(
+    (await call(path, { ...command, idempotencyKey: randomUUID() })).status,
+  ).toBe(409);
+  expect(
+    (
+      await call(path, {
+        ...command,
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: {
+          ...command.draft,
+          playtestScenarios: [
+            {
+              ...entry,
+              scenario: { ...entry.scenario, items: { "foreign:item": 1 } },
+            },
+          ],
+        },
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  const edition = (
+    await db.doc(`stories/${story.id}/versions/edition-1`).get()
+  ).data();
+  expect(edition).not.toHaveProperty("playtestScenarios");
+  expect(JSON.stringify(edition)).not.toContain("Private test setup");
+  expect(
+    (
+      await call("/playthroughs", {
+        idempotencyKey: randomUUID(),
+        payload: { storyId: story.id, scenario: entry.scenario },
+      })
+    ).status,
+  ).toBe(400);
+  const real = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: story.id },
+  });
+  expect(real.status).toBe(200);
+  expect(real.data.save.items).toEqual({});
+  expect(JSON.stringify(real.data)).not.toMatch(
+    /Private test setup|retired|removed/,
+  );
+  const removed = await call(path, {
+    ...command,
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    draft: { ...command.draft, playtestScenarios: [] },
+  });
+  expect(removed.status).toBe(200);
+  expect((await call(path)).data.playtestScenarios).toEqual([]);
+});
+
 it("pins item catalogues to editions and keeps definitions out of player projections", async () => {
   const story = starterStory(`catalogue-${randomUUID()}`);
   const path = `/studio/${story.id}`;

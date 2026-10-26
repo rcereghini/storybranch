@@ -6,7 +6,62 @@ import {
 import { start, baseStats, transition } from "../packages/domain/index";
 import { blankStory } from "../apps/web/src/studio-model";
 import { draftSchema } from "../packages/contracts/authoring";
+import { savedPlaytestScenariosSchema } from "../packages/contracts/preview";
+import {
+  previewScenarioIssues,
+  startPreview,
+  previewPreset,
+} from "../packages/domain/preview";
 import type { Story } from "../packages/contracts/index";
+
+it("bounds private saved setups, preserves stale local references and rejects loading them", () => {
+  const story = blankStory("setups");
+  const scenario = {
+    ...previewPreset(story, "first"),
+    items: { "setups:removed": 2 },
+    storyKeys: ["setups:old"],
+  };
+  const entry = { id: "one", name: " Returning player ", scenario };
+  expect(
+    draftSchema.parse({ story, description: "", playtestScenarios: [entry] })
+      .playtestScenarios?.[0].name,
+  ).toBe("Returning player");
+  expect(previewScenarioIssues(story, scenario)).toEqual([
+    "Item unavailable: setups:removed",
+    "Story key unavailable: setups:old",
+  ]);
+  expect(() => startPreview(story, scenario, 1)).toThrow();
+  expect(
+    savedPlaytestScenariosSchema.safeParse([
+      entry,
+      { ...entry, id: "two", name: "returning player" },
+    ]).success,
+  ).toBe(false);
+  expect(
+    savedPlaytestScenariosSchema.safeParse(
+      Array.from({ length: 21 }, (_, i) => ({
+        ...entry,
+        id: `s${i}`,
+        name: `Setup ${i}`,
+      })),
+    ).success,
+  ).toBe(false);
+  expect(
+    draftSchema.safeParse({
+      story,
+      description: "",
+      playtestScenarios: [
+        { ...entry, scenario: { ...scenario, items: { "foreign:item": 1 } } },
+      ],
+    }).success,
+  ).toBe(false);
+  expect(
+    savedPlaytestScenariosSchema.safeParse([
+      { ...entry, scenario: { ...scenario, items: { "setups:item": 1000 } } },
+    ]).success,
+  ).toBe(false);
+  expect(draftSchema.safeParse({ story, description: "" }).success).toBe(true);
+});
 import {
   accountFeatures,
   allFeatures,
