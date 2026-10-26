@@ -1,4 +1,4 @@
-import { KeyConditionEditor } from "./KeyConditionEditor";
+import { ConditionEditor } from "./ConditionEditor";
 import { EarnedAccountKeys } from "./EarnedAccountKeys";
 import { renderStoryNode } from "../../../packages/domain/player";
 import { PromotionalKeyEditor } from "./PromotionalKeys";
@@ -1857,7 +1857,7 @@ export function Studio({
                           </label>
                         )}
                         {storyNode.storyNodeType.endsWith("options") && (
-                          <KeyConditionEditor
+                          <ConditionEditor
                             key={storyNode.id + c.id}
                             story={draft.story}
                             value={c.availableWhen}

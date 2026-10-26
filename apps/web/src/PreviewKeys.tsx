@@ -92,6 +92,19 @@ export function PreviewKeys({
                 {option.label} — {option.status}
               </strong>
               <p>{option.reason}</p>
+              {option.checks.length > 0 && (
+                <ul aria-label={"Condition checks for " + option.label}>
+                  {option.checks.map((check) => (
+                    <li key={check.path}>
+                      <strong>
+                        {check.met ? "Pass" : "Fail"} {check.path}
+                      </strong>
+                      : {check.description}
+                      {check.actual ? ". " + check.actual + "." : "."}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>
