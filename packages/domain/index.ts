@@ -274,7 +274,7 @@ export function transition(
   for (const cost of c.costs) {
     if ((s.items[cost.itemId] ?? 0) < cost.quantity)
       throw new GameError("VALIDATION_FAILED", "Missing required items.");
-    s.items[cost.itemId] -= cost.quantity;
+    s.items[cost.itemId] = (s.items[cost.itemId] ?? 0) - cost.quantity;
   }
   let success = true;
   if (c.outcome.kind === "check")

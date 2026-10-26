@@ -8,7 +8,7 @@ import {
   previewScenarioSchema,
   type PreviewScenario,
 } from "../contracts/preview";
-import { start, baseStats, evaluate } from "./index";
+import { start, baseStats, evaluate, routesOf } from "./index";
 import { renderStoryNode } from "./player";
 
 export function previewItemIds(story: Story): string[] {
@@ -201,6 +201,23 @@ export function previewOptions(
             `Cost ${id}: need ${quantity}, have ${save.items[id] ?? 0}.`,
         ),
         ...(!costs.size ? ["No item cost."] : []),
+        ...routesOf(choice).flatMap((route, index) => {
+          const label =
+            choice.outcome.kind === "direct"
+              ? "Selected route"
+              : choice.outcome.kind === "reveal"
+                ? `Result ${choice.outcome.results[index].scoreId}`
+                : index === 0
+                  ? "Pass"
+                  : "Fail";
+          return route.effects.flatMap((effect) =>
+            effect.kind === "item"
+              ? [
+                  `${label}: ${effect.delta >= 0 ? "grant" : "remove"} ${Math.abs(effect.delta)} ${effect.itemId} if this route is taken. Inventory must remain within 0–999; destination entry effects still apply.`,
+                ]
+              : [],
+          );
+        }),
       ].join(" "),
     };
   });

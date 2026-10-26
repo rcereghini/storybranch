@@ -373,3 +373,63 @@ it("validates mixed stat/item/key trees and explains every check using runtime s
   expect(explainCondition(account, save)[0].actual).toBe("Currently absent");
   expect(explainCondition(account, save, ["mixed:account"])[0].met).toBe(true);
 });
+import {
+  itemRoutes,
+  validateBranchItems,
+} from "../apps/web/src/branch-items-model";
+it("preserves route effects and atomically spends then awards local inventory", () => {
+  const story = starterStory("items");
+  const choice = structuredClone(story.storyNodes.opening.choices[0]);
+  choice.costs = [
+    { itemId: "items:relic", quantity: 1 },
+    { itemId: "items:relic", quantity: 1 },
+  ];
+  const routes = itemRoutes(choice);
+  routes[0].route.effects = [
+    { id: "score", kind: "score", scoreId: "items:score", delta: 1 },
+    { id: "reward", kind: "item", itemId: "items:relic", delta: 3 },
+  ];
+  expect(validateBranchItems(choice, story.id)).toEqual(choice);
+  story.storyNodes.opening.choices = [choice];
+  const save = start(story, "run", "player", baseStats, 1);
+  save.items["items:relic"] = 2;
+  const result = transition(story, save, choice.id, 0, 2).save;
+  expect(result.items["items:relic"]).toBe(3);
+  expect(result.scores?.["items:score"]).toBe(1);
+  expect(save.items["items:relic"]).toBe(2);
+  save.items["items:relic"] = 1;
+  expect(() => transition(story, save, choice.id, 0, 2)).toThrow(/items/);
+  expect(save.items["items:relic"]).toBe(1);
+  save.items["items:relic"] = 999;
+  expect(() => transition(story, save, choice.id, 0, 2)).toThrow(/bounds/);
+  expect(save.items["items:relic"]).toBe(999);
+  const invalid = structuredClone(choice);
+  invalid.costs[0].itemId = "other:relic";
+  expect(() => validateBranchItems(invalid, story.id)).toThrow(/namespace/);
+  invalid.costs = [];
+  itemRoutes(invalid)[0].route.effects.push({
+    id: "bad",
+    kind: "item",
+    itemId: "items:relic",
+    delta: 100,
+  });
+  expect(() => validateBranchItems(invalid, story.id)).toThrow();
+  const dice = {
+    ...choice,
+    outcome: {
+      kind: "dice" as const,
+      sides: 20,
+      target: 10,
+      success: structuredClone(routes[0].route),
+      failure: { targetStoryNodeId: "ending", effects: [] },
+    },
+  };
+  expect(itemRoutes(dice).map((r) => r.label)).toEqual(["Pass", "Fail"]);
+  expect(validateBranchItems(dice, story.id).outcome).toEqual(dice.outcome);
+  choice.costs = [{ itemId: "items:missing", quantity: 0 }];
+  itemRoutes(choice)[0].route.effects = [];
+  const empty = start(story, "empty", "player", baseStats, 1);
+  expect(
+    transition(story, empty, choice.id, 0, 2).save.items["items:missing"],
+  ).toBe(0);
+});
