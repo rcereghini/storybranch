@@ -757,3 +757,27 @@ html.studio-editing .tab-bar {
   display: block;
   color: var(--muted);
 }
+
+.key-condition-editor {
+  margin-block: 12px;
+  overflow-wrap: anywhere;
+}
+.key-condition-editor .btn {
+  min-height: 44px;
+  margin: 6px 4px 6px 0;
+  white-space: normal;
+}
+.studio.studio-shell .key-condition-clause {
+  min-width: 0;
+  margin: 10px 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+}
+.key-condition-clause > legend {
+  padding: 0 4px;
+}
+.key-condition-editor summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+}
