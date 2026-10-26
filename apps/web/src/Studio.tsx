@@ -1,4 +1,10 @@
 import { Button } from "./ui";
+import { PreviewKeys } from "./PreviewKeys";
+import type { PreviewScenario } from "../../../packages/contracts/preview";
+import {
+  startPreview as simulatePreview,
+  previewPreset,
+} from "../../../packages/domain/preview";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createApi, ApiError } from "../../../packages/api-client/index";
 import { z } from "zod";
@@ -22,7 +28,6 @@ import {
 import {
   baseStats,
   isResultStoryNode,
-  start,
   transition,
 } from "../../../packages/domain/index";
 import { resolveFixtureMedia } from "../../../fixtures/media";
@@ -127,6 +132,8 @@ export function Studio({
   const [preview, setPreview] = useState<{
     story: StoryData;
     save: Save;
+    scenario: PreviewScenario;
+    session: number;
   } | null>(null);
   const [passRoll, setPassRoll] = useState(true);
   const [retry, setRetry] = useState<Request | null>(null);
@@ -514,9 +521,12 @@ export function Studio({
     if (!draft) return;
     try {
       const story = validatePublication(draft.story);
+      const scenario = previewPreset(story, "first");
       setPreview({
         story,
-        save: start(story, "preview", "preview", baseStats, Date.now()),
+        scenario,
+        session: Date.now(),
+        save: simulatePreview(story, scenario, Date.now()),
       });
       setNotice("");
     } catch (e) {
@@ -1981,7 +1991,21 @@ export function Studio({
               </Button>
             </div>
             <div className="studio-preview-stage">
+              <PreviewKeys
+                story={preview.story}
+                save={preview.save}
+                scenario={preview.scenario}
+                onRestart={(scenario) =>
+                  setPreview({
+                    ...preview,
+                    scenario,
+                    session: preview.session + 1,
+                    save: simulatePreview(preview.story, scenario, Date.now()),
+                  })
+                }
+              />
               <Story
+                key={preview.session}
                 story={preview.story}
                 save={preview.save}
                 user={{
@@ -2040,11 +2064,10 @@ export function Studio({
                       onClick={() =>
                         setPreview({
                           ...preview,
-                          save: start(
+                          session: preview.session + 1,
+                          save: simulatePreview(
                             preview.story,
-                            "preview",
-                            "preview",
-                            baseStats,
+                            preview.scenario,
                             Date.now(),
                           ),
                         })

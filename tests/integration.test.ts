@@ -56,6 +56,25 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("rejects disposable preview facts on authoritative start commands", async () => {
+  for (const extra of [
+    {
+      scenario: {
+        version: 1,
+        storyKeys: ["glass-harbor:hero"],
+        importedKeys: [],
+      },
+    },
+    { storyProgressSnapshot: { version: 1, keys: ["glass-harbor:hero"] } },
+    { keyImportSnapshot: { version: 1, keys: [] } },
+  ]) {
+    const result = await call("/playthroughs", {
+      idempotencyKey: randomUUID(),
+      payload: { storyId: "glass-harbor", ...extra },
+    });
+    expect(result.status).toBe(400);
+  }
+});
 it("lists private invitation entry key history with bounded safe projections", async () => {
   const prefix = `entry-history-${randomUUID()}`;
   const refs = Array.from({ length: 21 }, (_, i) =>

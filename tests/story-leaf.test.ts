@@ -14,6 +14,127 @@ import {
 import { validatePublication } from "../packages/domain/authoring";
 import { playerRun, renderStoryNode } from "../packages/domain/player";
 import { starterStory } from "../apps/web/src/studio-model";
+import {
+  startPreview,
+  previewPreset,
+  previewOptions,
+} from "../packages/domain/preview";
+
+it("simulates only declared preview facts, restarts cleanly and uses the real output rules", () => {
+  const story = starterStory("preview-test");
+  story.progression = {
+    version: 1,
+    keys: [{ keyId: "preview-test:hero", label: "Hero", afterCompletions: 1 }],
+  };
+  story.keyImports = {
+    version: 1,
+    keys: [
+      {
+        keyId: "preview-test:item",
+        label: "Item",
+        sourceStoryId: "prequel",
+        sourceVersionId: "v1",
+        sourceKeyId: "prequel:item",
+        required: true,
+      },
+    ],
+  };
+  const node = story.storyNodes.opening;
+  node.storyNodeType = "text-options";
+  node.choices.push(
+    {
+      ...structuredClone(node.choices[0]),
+      id: "hero",
+      label: "Hero route",
+      unavailableDisplay: "hidden",
+      availableWhen: {
+        kind: "key",
+        scope: "story",
+        keyId: "preview-test:hero",
+        present: true,
+      },
+    },
+    {
+      ...structuredClone(node.choices[0]),
+      id: "item",
+      label: "Sequel route",
+      unavailableDisplay: "locked",
+      availableWhen: {
+        kind: "all",
+        conditions: [
+          {
+            kind: "key",
+            scope: "import",
+            keyId: "preview-test:item",
+            present: true,
+          },
+          {
+            kind: "not",
+            condition: {
+              kind: "key",
+              keyId: "preview-test:blocked",
+              present: true,
+            },
+          },
+        ],
+      },
+    },
+  );
+  const original = structuredClone(story);
+  const first = startPreview(story, previewPreset(story, "first"), 1);
+  expect(previewOptions(story, first).map((o) => o.status)).toEqual([
+    "Visible",
+    "Hidden",
+    "Locked",
+  ]);
+  expect(() => transition(story, first, "hero", 0, 2)).toThrow();
+  const returning = startPreview(story, previewPreset(story, "returning"), 1);
+  expect(transition(story, returning, "hero", 0, 2).save.status).toBe(
+    "completed",
+  );
+  expect(returning.keys).not.toContain("preview-test:hero");
+  const sequel = startPreview(story, previewPreset(story, "sequel"), 1);
+  expect(transition(story, sequel, "item", 0, 2).save.status).toBe("completed");
+  expect(sequel.keyImportSnapshot?.consented).toBe(false);
+  expect(sequel.keyImportSnapshot?.keys[0].grant).toBeUndefined();
+  expect(story).toEqual(original);
+  expect(startPreview(story, previewPreset(story, "first"), 1)).toEqual(first);
+  node.choices[2].costs = [
+    { itemId: "preview-test:coin", quantity: 1 },
+    { itemId: "preview-test:coin", quantity: 2 },
+  ];
+  const diag = previewOptions(story, sequel)[2];
+  expect(diag.status).toBe("Locked");
+  expect(diag.reason).toContain("need 3, have 0");
+  expect(diag.reason).toContain("Condition met");
+  for (const invalid of [
+    { version: 1, storyKeys: ["other:hero"], importedKeys: [] },
+    { version: 1, storyKeys: [], importedKeys: ["other:item"] },
+    {
+      version: 1,
+      storyKeys: ["preview-test:hero", "preview-test:hero"],
+      importedKeys: [],
+    },
+    {
+      version: 1,
+      storyKeys: [],
+      importedKeys: [],
+      accountKeys: ["premium:paid"],
+    },
+  ])
+    expect(() =>
+      startPreview(story, invalid as Parameters<typeof startPreview>[1], 1),
+    ).toThrow();
+  expect(
+    startSchema.safeParse({
+      idempotencyKey: "test",
+      payload: {
+        storyId: story.id,
+        scenario: previewPreset(story, "returning"),
+      },
+    }).success,
+  ).toBe(false);
+});
 
 it("requires unique, consented source-run selections and bounded local exports", () => {
   const payload = {
