@@ -34,3 +34,5 @@ StoryKeys.tsx provides the private earned-key history in Adventures using packag
 StoryKeys.tsx also provides `StoryEntryKeys`, a separate redeemed invitation list. Read [S24 invitation history](../../../docs/story-system/keys.md#private-invitation-key-history-s24); keep it account-mounted, preserve pagination on retry, and navigate to Story details without bypassing entry checks.
 
 `PreviewKeys.tsx` and `packages/domain/preview.ts` implement disposable declared-key scenarios and creator-only option diagnostics for Studio. Read [S25](../../../docs/story-system/keys.md#key-aware-disposable-previews-s25). Never attach this diagnostic surface or simulated snapshots to published playback; scenario changes restart through the shared Story/StoryNode lifecycle.
+
+`PromotionalKeys.tsx` owns Studio definition issuance/revocation/alias bindings and Adventures redemption/history. `PreviewKeys.tsx` supports disposable account aliases. Follow [S26](../../../docs/story-system/keys.md#live-promotional-account-keys-s26). Account rights are live server inputs; never persist them in run snapshots or infer them from creator preview.

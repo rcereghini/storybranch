@@ -619,3 +619,15 @@ body {
 .story-key-history .btn {
   min-height: 44px;
 }
+.promotional-keys {
+  overflow-wrap: anywhere;
+}
+.promotional-keys .btn {
+  min-height: 44px;
+}
+.promotional-keys .field input {
+  min-height: 44px;
+}
+.promotional-keys .earned-key-list .btn {
+  margin: 4px 8px 4px 0;
+}

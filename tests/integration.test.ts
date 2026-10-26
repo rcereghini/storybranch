@@ -56,6 +56,80 @@ import { receipt } from "../services/api/paths";
 import { recordClaudeUsage, recordImageUsage } from "../services/api/ai-usage";
 import type { AiUsageReport } from "../packages/contracts/usage";
 let tokens: Record<string, string> = {};
+it("paginates private promotional definitions and live grant statuses without secrets", async () => {
+  const prefix = `list-promo-${randomUUID()}`;
+  const refs = [];
+  try {
+    const batch = db.batch();
+    for (let i = 0; i < 21; i++) {
+      const id = `${prefix}-${String(i).padStart(2, "0")}`;
+      const definition = db.doc(`promotionalKeys/${id}`);
+      const grant = db.doc(`users/player/promotionalKeys/${id}`);
+      refs.push(definition, grant);
+      batch.create(definition, {
+        id,
+        issuerUid: "player",
+        label: `Key ${i}`,
+        storyIds: ["private-story"],
+        expiresAt: i === 2 ? 1 : Date.now() + 86400000,
+        redeemBy: 1,
+        maxClaims: 1,
+        claims: 1,
+        revoked: i === 1,
+        revision: 2,
+        privateSecret: "secret",
+      });
+      batch.create(grant, {
+        issuerUid: "player",
+        label: `Key ${i}`,
+        grantedAt: 1234,
+        privateSecret: "secret",
+      });
+    }
+    await batch.commit();
+    for (const route of ["/promotional-keys", "/promotional-key-grants"]) {
+      const first = await call(route);
+      expect(first.status).toBe(200);
+      expect(first.data.items).toHaveLength(20);
+      expect(JSON.stringify(first.data)).not.toMatch(
+        /privateSecret|secret|issuerUid/,
+      );
+      const rest = await call(`${route}?cursor=${first.data.nextCursor}`);
+      expect(rest.data.items).toHaveLength(1);
+      expect(rest.data.nextCursor).toBeNull();
+      expect(
+        (await call(`${route}?uid=player`, undefined, "progressed")).data.items,
+      ).toEqual([]);
+      for (const cursor of ["", "../other", "x".repeat(81)])
+        expect(
+          (await call(`${route}?cursor=${encodeURIComponent(cursor)}`)).status,
+        ).toBe(400);
+      expect((await call(`${route}/other`)).status).toBe(404);
+      expect(
+        (await handle(new Request(`http://localhost/api${route}`))).status,
+      ).toBe(401);
+    }
+    const wallet = (await call("/promotional-key-grants")).data;
+    expect(
+      wallet.items.slice(0, 3).map((i: { status: string }) => i.status),
+    ).toEqual(["active", "revoked", "expired"]);
+    expect(Object.keys(wallet.items[0]).sort()).toEqual([
+      "definitionId",
+      "expiresAt",
+      "grantedAt",
+      "label",
+      "status",
+    ]);
+    await refs[0].delete();
+    expect((await call("/promotional-key-grants")).data.items[0].status).toBe(
+      "unavailable",
+    );
+  } finally {
+    const cleanup = db.batch();
+    refs.forEach((ref) => cleanup.delete(ref));
+    await cleanup.commit();
+  }
+});
 it("rejects disposable preview facts on authoritative start commands", async () => {
   for (const extra of [
     {
@@ -4855,4 +4929,353 @@ it("requires the player contract before reads, commands or receipt replay and ex
       await db.doc(receipt("player", "start", command.idempotencyKey)).get()
     ).data()!.result.save,
   ).toHaveProperty("appliedEntryEffects");
+});
+
+it("authorizes live promotional aliases, durable redemption, revocation and exact retries", async () => {
+  const story = starterStory(`promo-${randomUUID()}`);
+  const store = (s: typeof story, revision: number, who = "player") =>
+    call(
+      `/studio/${s.id}`,
+      {
+        idempotencyKey: randomUUID(),
+        expectedRevision: revision,
+        draft: { story: s, description: "Promotional test" },
+      },
+      who,
+    );
+  const publish = (s: typeof story, revision: number, who = "player") =>
+    call(
+      `/studio/${s.id}/publish`,
+      {
+        idempotencyKey: randomUUID(),
+        expectedRevision: revision,
+        policyVersion: "creator-alpha-1",
+      },
+      who,
+    );
+  expect((await store(story, 0)).status).toBe(200);
+  const create = {
+    action: "create",
+    idempotencyKey: randomUUID(),
+    definitionId: randomUUID(),
+    label: "Bonus path",
+    storyIds: [story.id],
+    days: 30,
+    redemptionDays: 2,
+    maxClaims: 1,
+  };
+  const issued = await call("/promotional-keys", create);
+  expect(issued.status).toBe(200);
+  expect((await call("/promotional-keys", create)).data).toEqual(issued.data);
+  expect(
+    (await call("/promotional-keys", { ...create, label: "Changed" })).status,
+  ).toBe(409);
+  expect(
+    (
+      await call("/promotional-keys", {
+        ...create,
+        idempotencyKey: randomUUID(),
+        definitionId: randomUUID(),
+        storyIds: ["not-owned"],
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (await call("/promotional-keys", undefined, "progressed")).data.items,
+  ).toEqual([]);
+  expect(JSON.stringify((await call("/promotional-keys")).data)).not.toContain(
+    issued.data.code,
+  );
+  expect(JSON.stringify((await call("/promotional-keys")).data)).not.toContain(
+    "issuerUid",
+  );
+  const definitionId = create.definitionId;
+  story.accountKeys = {
+    version: 1,
+    keys: [{ keyId: `${story.id}:bonus`, label: "Bonus access", definitionId }],
+  };
+  story.storyNodes.opening.storyNodeType = "text-options";
+  story.storyNodes.opening.choices.push({
+    ...structuredClone(story.storyNodes.opening.choices[0]),
+    id: "bonus",
+    label: "Secret bonus",
+    unavailableDisplay: "hidden",
+    availableWhen: {
+      kind: "key",
+      scope: "account",
+      keyId: `${story.id}:bonus`,
+      present: true,
+    },
+  });
+  expect((await store(story, 1)).status).toBe(200);
+  const edition = await publish(story, 2);
+  expect(edition.status).toBe(200);
+  const versionId = edition.data.publishedVersionId;
+  const begin = (who = "progressed") =>
+    call(
+      "/playthroughs",
+      {
+        idempotencyKey: randomUUID(),
+        payload: { storyId: story.id, versionId },
+      },
+      who,
+    );
+  const initial = await begin();
+  expect(initial.status).toBe(200);
+  expect(
+    initial.data.player.storyNode.outputs.map((c: { id: string }) => c.id),
+  ).not.toContain("bonus");
+  const redeem = { idempotencyKey: randomUUID(), code: issued.data.code };
+  expect(
+    (await call("/promotional-key-grants", redeem, "progressed")).status,
+  ).toBe(200);
+  const ownGrant = db.doc(`users/progressed/promotionalKeys/${definitionId}`);
+  const grantBefore = (await ownGrant.get()).data();
+  await db
+    .doc(receipt("progressed", "promotional-key", redeem.idempotencyKey))
+    .delete();
+  expect(
+    (await call("/promotional-key-grants", redeem, "progressed")).data
+      .alreadyGranted,
+  ).toBe(true);
+  expect(
+    (
+      await call("/promotional-key-grants", {
+        idempotencyKey: randomUUID(),
+        code: issued.data.code,
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (await db.doc(`promotionalKeys/${definitionId}`).get()).data()!.claims,
+  ).toBe(1);
+  const view = (
+    await call(`/playthroughs/${initial.data.save.id}`, undefined, "progressed")
+  ).data;
+  expect(view.storyNode.outputs.map((c: { id: string }) => c.id)).toContain(
+    "bonus",
+  );
+  expect(JSON.stringify(view)).not.toMatch(
+    /accountKeys|definitionId|issuerUid|promotionalKeys/,
+  );
+  const choose = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: { choiceId: "bonus" },
+  };
+  const definitionRef = db.doc(`promotionalKeys/${definitionId}`);
+  await definitionRef.update({ expiresAt: 1 });
+  expect(
+    (
+      await call(
+        `/playthroughs/${initial.data.save.id}`,
+        undefined,
+        "progressed",
+      )
+    ).data.storyNode.outputs.map((c: { id: string }) => c.id),
+  ).not.toContain("bonus");
+  expect(
+    (
+      await call(
+        `/playthroughs/${initial.data.save.id}/choices`,
+        { ...choose, idempotencyKey: randomUUID() },
+        "progressed",
+      )
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await call("/promotional-key-grants", undefined, "progressed")
+    ).data.items.find(
+      (k: { definitionId: string }) => k.definitionId === definitionId,
+    ).status,
+  ).toBe("expired");
+  await definitionRef.update({
+    expiresAt: issued.data.definition.expiresAt,
+    storyIds: [],
+  });
+  expect(
+    (
+      await call(
+        `/playthroughs/${initial.data.save.id}`,
+        undefined,
+        "progressed",
+      )
+    ).data.storyNode.outputs.map((c: { id: string }) => c.id),
+  ).not.toContain("bonus");
+  await definitionRef.update({ storyIds: [story.id], redeemBy: 1 });
+  expect(
+    (
+      await call(
+        "/promotional-key-grants",
+        { idempotencyKey: randomUUID(), code: issued.data.code },
+        "progressed",
+      )
+    ).data.alreadyGranted,
+  ).toBe(true);
+  const other = starterStory(`other-promo-${randomUUID()}`);
+  other.accountKeys = {
+    version: 1,
+    keys: [{ keyId: `${other.id}:bonus`, label: "Not allowed", definitionId }],
+  };
+  expect((await store(other, 0)).status).toBe(200);
+  expect((await publish(other, 1)).status).toBe(400);
+  const committed = await call(
+    `/playthroughs/${initial.data.save.id}/choices`,
+    choose,
+    "progressed",
+  );
+  expect(committed.status).toBe(200);
+  expect(committed.data.save.status).toBe("completed");
+  expect(
+    (
+      await db
+        .doc(`users/progressed/playthroughs/${initial.data.save.id}`)
+        .get()
+    ).data(),
+  ).not.toHaveProperty("accountKeys");
+  const stale = await begin();
+  const savedBefore = (
+    await db.doc(`users/progressed/playthroughs/${stale.data.save.id}`).get()
+  ).data();
+  const revoke = {
+    action: "revoke",
+    idempotencyKey: randomUUID(),
+    definitionId,
+    expectedRevision: 2,
+  };
+  expect((await call("/promotional-keys", revoke, "progressed")).status).toBe(
+    403,
+  );
+  expect(
+    (await call("/promotional-keys", { ...revoke, expectedRevision: 1 }))
+      .status,
+  ).toBe(409);
+  const revoked = await call("/promotional-keys", revoke);
+  expect(revoked.status).toBe(200);
+  expect((await call("/promotional-keys", revoke)).data).toEqual(revoked.data);
+  const denied = await call(
+    `/playthroughs/${stale.data.save.id}/choices`,
+    { ...choose, idempotencyKey: randomUUID() },
+    "progressed",
+  );
+  expect(denied.status).toBe(409);
+  expect(
+    (
+      await db.doc(`users/progressed/playthroughs/${stale.data.save.id}`).get()
+    ).data(),
+  ).toEqual(savedBefore);
+  const refreshed = (
+    await call(`/playthroughs/${stale.data.save.id}`, undefined, "progressed")
+  ).data;
+  expect(
+    refreshed.storyNode.outputs.map((c: { id: string }) => c.id),
+  ).not.toContain("bonus");
+  expect(
+    (
+      await call(
+        `/playthroughs/${stale.data.save.id}/choices`,
+        {
+          idempotencyKey: randomUUID(),
+          expectedRevision: 0,
+          payload: { choiceId: story.storyNodes.opening.choices[0].id },
+        },
+        "progressed",
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(
+        `/playthroughs/${initial.data.save.id}/choices`,
+        choose,
+        "progressed",
+      )
+    ).data.save,
+  ).toEqual(committed.data.save);
+  expect((await ownGrant.get()).data()).toEqual(grantBefore);
+  const wallet = await call("/promotional-key-grants", undefined, "progressed");
+  expect(
+    wallet.data.items.find(
+      (k: { definitionId: string }) => k.definitionId === definitionId,
+    ),
+  ).toEqual({
+    definitionId,
+    label: "Bonus path",
+    grantedAt: grantBefore!.grantedAt,
+    expiresAt: issued.data.definition.expiresAt,
+    status: "revoked",
+  });
+  expect(JSON.stringify(wallet.data)).not.toMatch(/issuerUid|code|storyIds/);
+  expect(
+    (
+      await call(
+        "/promotional-key-grants",
+        { idempotencyKey: randomUUID(), code: issued.data.code },
+        "progressed",
+      )
+    ).status,
+  ).toBe(403);
+  expect((await store(story, 2)).status).toBe(200);
+  expect((await publish(story, 3)).status).toBe(400);
+  const foreign = starterStory(`foreign-promo-${randomUUID()}`);
+  foreign.accountKeys = {
+    version: 1,
+    keys: [{ keyId: `${foreign.id}:bonus`, label: "Foreign", definitionId }],
+  };
+  expect((await store(foreign, 0, "progressed")).status).toBe(200);
+  expect((await publish(foreign, 1, "progressed")).status).toBe(400);
+  const own = rules.authenticatedContext("progressed").firestore();
+  for (const path of [
+    `promotionalKeys/${definitionId}`,
+    `promotionalCodes/${createHash("sha256").update(issued.data.code).digest("hex")}`,
+    ownGrant.path,
+  ]) {
+    await assertFails(getDoc(doc(own, path)));
+    await assertFails(setDoc(doc(own, path), { forged: true }));
+  }
+  expect(
+    (await handle(new Request("http://localhost/api/promotional-key-grants")))
+      .status,
+  ).toBe(401);
+  const race = (
+    await call("/promotional-keys", {
+      ...create,
+      idempotencyKey: randomUUID(),
+      definitionId: randomUUID(),
+    })
+  ).data;
+  const outcomes = await Promise.all(
+    ["player", "progressed"].map((who) =>
+      call(
+        "/promotional-key-grants",
+        { idempotencyKey: randomUUID(), code: race.code },
+        who,
+      ),
+    ),
+  );
+  expect(outcomes.map((r) => r.status).sort()).toEqual([200, 403]);
+  expect(
+    (await db.doc(`promotionalKeys/${race.definition.id}`).get()).data()!
+      .claims,
+  ).toBe(1);
+  const deadline = (
+    await call("/promotional-keys", {
+      ...create,
+      idempotencyKey: randomUUID(),
+      definitionId: randomUUID(),
+    })
+  ).data;
+  await db
+    .doc(`promotionalKeys/${deadline.definition.id}`)
+    .update({ redeemBy: 1 });
+  expect(
+    (
+      await call(
+        "/promotional-key-grants",
+        { idempotencyKey: randomUUID(), code: deadline.code },
+        "progressed",
+      )
+    ).status,
+  ).toBe(403);
 });

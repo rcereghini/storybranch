@@ -53,6 +53,11 @@ export function PreviewKeys({
           [
             ["storyKeys", "Story keys", story.progression?.keys ?? []],
             ["importedKeys", "Imported facts", story.keyImports?.keys ?? []],
+            [
+              "accountKeys",
+              "Promotional account keys",
+              story.accountKeys?.keys ?? [],
+            ],
           ] as const
         ).map(([field, title, keys]) => (
           <fieldset key={field}>
@@ -85,7 +90,7 @@ export function PreviewKeys({
           remain excluded; see Publication review in the editor.
         </p>
         <ul aria-label="Preview option diagnostics">
-          {previewOptions(story, save).map((option) => (
+          {previewOptions(story, save, scenario.accountKeys).map((option) => (
             <li key={option.id}>
               <strong>
                 {option.label} — {option.status}

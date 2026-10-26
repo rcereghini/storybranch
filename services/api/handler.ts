@@ -1,3 +1,5 @@
+import { promotionalRoutes, liveAccountKeys } from "./promotional-keys";
+import { evaluate, usesAccountKey } from "../../packages/domain/index";
 import { storyKeyHistory } from "./story-key-history";
 import { sideStory } from "./side-story";
 import { playerRun } from "../../packages/domain/player";
@@ -286,6 +288,10 @@ async function handleCanonical(request: Request): Promise<Response> {
         ),
       );
     }
+    if (["promotional-keys", "promotional-key-grants"].includes(segments[1]))
+      return json(
+        await promotionalRoutes(request, uid, segments, features, cursor),
+      );
     if (segments[1] === "story-progress")
       return json(await storyKeyHistory(request, uid, segments, cursor));
     if (segments[1] === "story-entry-keys")
@@ -487,6 +493,19 @@ async function handleCanonical(request: Request): Promise<Response> {
         progressStory = story;
         if (kind === "choice") {
           const c = choiceCommandSchema.parse(command);
+          const accountKeys = await liveAccountKeys(tx, uid, story);
+          const selected = story.storyNodes[current.storyNodeId]?.choices.find(
+            (choice) => choice.id === c.payload.choiceId,
+          );
+          if (
+            selected?.availableWhen &&
+            usesAccountKey(selected.availableWhen) &&
+            !evaluate(selected.availableWhen, current, accountKeys)
+          )
+            throw new GameError(
+              "STALE_REVISION",
+              "Promotional access changed. Reload current options to continue.",
+            );
           const moved = transition(
             story,
             current,
@@ -498,6 +517,7 @@ async function handleCanonical(request: Request): Promise<Response> {
               return rolls.get(sides)!;
             },
             c.payload.action,
+            accountKeys,
           );
           save = moved.save;
           event = moved.event;

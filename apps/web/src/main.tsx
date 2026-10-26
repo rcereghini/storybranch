@@ -1,3 +1,4 @@
+import { PromotionalKeyWallet } from "./PromotionalKeys";
 import { StoryKeys, StoryEntryKeys } from "./StoryKeys";
 import { transitionTiming } from "./transition-timing";
 import {
@@ -969,6 +970,7 @@ function App() {
               user && (
                 <React.Fragment key={user.uid}>
                   <AccountAchievements api={api} />
+                  <PromotionalKeyWallet api={api} />
                   <StoryEntryKeys
                     api={api}
                     onOpen={(id) => navigate(`/s/${id}`)}
