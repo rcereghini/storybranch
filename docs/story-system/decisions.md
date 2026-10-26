@@ -112,3 +112,7 @@ An optional version-1 catalogue adds names/descriptions to stable Story-local it
 ## S29 — Owned inventory and net item history
 
 Expose only owned positive item quantities and pinned display metadata, with raw-ID fallback. New events atomically snapshot net inventory changes and their pinned labels; retries and old history retain existing semantics. A read-only modal drawer and Story log consume these projections without exposing the catalogue. No item transfer, use command, migration or account entitlement is added. See [player runtime](player-runtime.md#owned-inventory-and-item-history-s29).
+
+## S30 — Visible StoryBranch cost disclosure
+
+Show aggregated costs and current quantities on visible options using server-selected, edition-pinned item names. Visible requirements may disclose unowned item names, but hidden options, descriptions, conditions, destinations and future rewards remain private. The server still decides eligibility and commits spending; Studio preview shares the presentation. See [visible option costs](player-runtime.md#visible-option-costs-s30).

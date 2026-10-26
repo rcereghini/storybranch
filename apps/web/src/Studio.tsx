@@ -2092,6 +2092,7 @@ export function Studio({
                     preview.story.storyNodes[preview.save.storyNodeId],
                     preview.save,
                     preview.scenario.accountKeys,
+                    preview.story.itemCatalogue,
                   )}
                   result={isResultStoryNode(
                     preview.story,

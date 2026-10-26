@@ -31,6 +31,52 @@ const command = {
   body: { idempotencyKey: "exact-retry" },
 };
 
+it("discloses only visible aggregated costs and keeps condition authority", () => {
+  const node = structuredClone(glassHarbor.storyNodes[save.storyNodeId]);
+  const coin = "glass-harbor:coin";
+  const catalogue = {
+    version: 1 as const,
+    items: [
+      { itemId: coin, name: "Brass coin", description: "Private description" },
+    ],
+  };
+  node.choices = [node.choices[0]];
+  const choice = node.choices[0];
+  choice.availableWhen = undefined;
+  choice.unavailableDisplay = "locked";
+  choice.costs = [
+    { itemId: coin, quantity: 2 },
+    { itemId: coin, quantity: 2 },
+    { itemId: "glass-harbor:unused", quantity: 0 },
+  ];
+  const project = (owned: number) =>
+    renderStoryNode(node, { ...save, items: { [coin]: owned } }, [], catalogue);
+  expect(project(3).outputs[0]).toMatchObject({
+    enabled: false,
+    itemCosts: [{ itemId: coin, name: "Brass coin", required: 4, owned: 3 }],
+  });
+  expect(project(4).outputs[0].enabled).toBe(true);
+  expect(project(0).outputs[0].itemCosts?.[0].owned).toBe(0);
+  expect(JSON.stringify(project(0))).not.toMatch(
+    /Private description|unused|targetStoryNodeId/,
+  );
+  choice.unavailableDisplay = "hidden";
+  expect(project(3).outputs).toEqual([]);
+  choice.unavailableDisplay = "locked";
+  choice.availableWhen = {
+    kind: "key",
+    keyId: "glass-harbor:secret",
+    present: true,
+  };
+  expect(project(4).outputs[0].enabled).toBe(false);
+  expect(renderStoryNode(node, save).outputs[0].itemCosts?.[0].name).toBe(coin);
+  choice.costs = Array.from({ length: 20 }, () => ({
+    itemId: coin,
+    quantity: 999,
+  }));
+  expect(project(999).outputs[0].itemCosts?.[0].required).toBe(19980);
+});
+
 it("projects owned inventory and net item history without revealing unowned metadata", () => {
   const story = structuredClone(glassHarbor);
   story.itemCatalogue = {

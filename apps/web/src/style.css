@@ -249,8 +249,14 @@ summary {
   font: 700 13px var(--font-ui);
   color: var(--link);
 }
+.choices > button.choice-locked:disabled,
+.scene-overlay .choices > button.choice-locked:disabled {
+  opacity: 1;
+  color: var(--muted);
+}
 .choices small {
   display: block;
+  overflow-wrap: anywhere;
   font-size: 12px;
   color: var(--muted);
   margin-top: 3px;
