@@ -102,6 +102,37 @@ try {
         .getByRole("button", { name, exact: true })
         .click();
     };
+    let failStoryBatch = true;
+    const fillers = Array.from({ length: 19 }, (_, i) => ({
+      id: "picker-filler-" + i,
+      title: "Picker filler " + i,
+    }));
+    await tab.route("**/api/studio?limit=20*", (route) => {
+      const cursor = new URL(route.request().url()).searchParams.get("cursor");
+      if (!cursor)
+        return route.fulfill({
+          json: {
+            items: [source, ...fillers].map(({ id, title }) => ({ id, title })),
+            nextCursor: "story-next",
+          },
+        });
+      assert.equal(cursor, "story-next");
+      if (failStoryBatch) {
+        failStoryBatch = false;
+        return route.fulfill({
+          status: 503,
+          json: {
+            error: { code: "UNAVAILABLE", message: "Story batch failed" },
+          },
+        });
+      }
+      return route.fulfill({
+        json: {
+          items: [{ id: consumer.id, title: consumer.title }],
+          nextCursor: null,
+        },
+      });
+    });
     await open(source);
     await pane("StoryNode");
     await tab
@@ -113,9 +144,72 @@ try {
     await submission
       .getByLabel("Achievement title", { exact: true })
       .fill(`Sequel hero ${width}`);
-    await submission
-      .getByLabel("Achievement consumer Stories")
-      .fill(consumer.id);
+    const storyPicker = submission.getByRole("region", {
+      name: "Achievement consumer Stories",
+    });
+    await storyPicker
+      .getByRole("checkbox", { name: new RegExp(source.title) })
+      .check();
+    for (const filler of fillers)
+      await storyPicker
+        .getByRole("checkbox", { name: new RegExp(filler.id + "$") })
+        .check();
+    await storyPicker.getByText("20/20 selected", { exact: true }).waitFor();
+    await storyPicker
+      .getByRole("button", { name: "Load more Stories" })
+      .click();
+    await storyPicker.getByText(/Story batch failed/).waitFor();
+    assert.equal(
+      await storyPicker
+        .getByRole("list", { name: "Selected Stories" })
+        .getByRole("listitem")
+        .count(),
+      20,
+    );
+    await storyPicker
+      .getByRole("button", { name: "Load more Stories" })
+      .click();
+    const consumerCheckbox = storyPicker.getByRole("checkbox", {
+      name: new RegExp(consumer.title),
+    });
+    await consumerCheckbox.waitFor();
+    assert(await consumerCheckbox.isDisabled());
+    await storyPicker
+      .getByRole("button", { name: "Remove Story " + source.id, exact: true })
+      .click();
+    await consumerCheckbox.check();
+    for (const filler of fillers)
+      await storyPicker
+        .getByRole("button", { name: "Remove Story " + filler.id, exact: true })
+        .click();
+    await storyPicker.getByRole("searchbox").fill("does-not-match");
+    await storyPicker
+      .getByText("No matching Stories in the loaded results.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await storyPicker
+        .getByRole("list", { name: "Selected Stories" })
+        .getByRole("listitem")
+        .count(),
+      1,
+    );
+    await storyPicker.getByRole("searchbox").fill(consumer.title);
+    assert(await consumerCheckbox.isChecked());
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate((t) => {
+        document.documentElement.dataset.theme = t;
+      }, theme);
+      await storyPicker.scrollIntoViewIfNeeded();
+      assert(
+        await tab.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await tab.screenshot({
+        path: "test-results/consumer-picker-" + width + "-" + theme + ".png",
+        animations: "disabled",
+      });
+    }
     const submitted = tab.waitForResponse(
       (r) =>
         r.url().endsWith("/api/achievement-submissions") &&
@@ -138,6 +232,27 @@ try {
       .fill("Approved sequel key");
     await review.getByRole("button", { name: "Approve", exact: true }).click();
     await review.getByText("Status: approved", { exact: true }).waitFor();
+    await open(source);
+    await pane("StoryNode");
+    await tab
+      .getByLabel("Edit StoryNode", { exact: true })
+      .selectOption("ending");
+    await submission.getByText("Status: approved", { exact: true }).waitFor();
+    await storyPicker.getByText(consumer.id, { exact: true }).waitFor();
+    assert(
+      await storyPicker
+        .getByRole("button", {
+          name: `Remove Story ${consumer.id}`,
+          exact: true,
+        })
+        .isDisabled(),
+    );
+    await storyPicker
+      .getByRole("button", { name: "Load more Stories" })
+      .click();
+    await consumerCheckbox.waitFor();
+    assert(await consumerCheckbox.isChecked());
+    assert(await consumerCheckbox.isDisabled());
     let failMore = true;
     const listed = { ...definition, status: "approved" };
     await tab.route("**/api/achievement-submissions*", async (route) => {

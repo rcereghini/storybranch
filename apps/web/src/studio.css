@@ -716,3 +716,44 @@ html.studio-editing .tab-bar {
     padding: 22px 18px;
   }
 }
+
+.consumer-story-picker {
+  overflow-wrap: anywhere;
+}
+.consumer-story-picker .btn {
+  min-height: 44px;
+}
+.consumer-story-selections {
+  list-style: none;
+  padding: 0;
+}
+.consumer-story-selections li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: 8px;
+}
+.consumer-story-selections span {
+  flex: 1;
+  min-width: 0;
+}
+.consumer-story-results {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.consumer-story-results label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.consumer-story-results input[type="checkbox"] {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+.consumer-story-results small {
+  display: block;
+  color: var(--muted);
+}

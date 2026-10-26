@@ -1,3 +1,4 @@
+import { ConsumerStoryPicker } from "./ConsumerStoryPicker";
 import { useEffect, useRef, useState } from "react";
 import type { createApi } from "../../../packages/api-client/index";
 import type {
@@ -26,7 +27,7 @@ export function AchievementSubmission({
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [consumers, setConsumers] = useState("");
+  const [consumers, setConsumers] = useState<string[]>([]);
   const pending = useRef<object | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +39,7 @@ export function AchievementSubmission({
           setDefinition(definition);
           setTitle(definition?.title ?? "");
           setDescription(definition?.description ?? "");
-          setConsumers((definition?.consumerStoryIds ?? []).join(", "));
+          setConsumers(definition?.consumerStoryIds ?? []);
           setLoaded(true);
         }
       })
@@ -79,15 +80,13 @@ export function AchievementSubmission({
           Achievement definition ID: <code>{definition.id}</code>
         </p>
       )}
-      <label>
-        Allow account key checks from these Story IDs (comma separated)
-        <input
-          aria-label="Achievement consumer Stories"
-          value={consumers}
-          disabled={locked}
-          onChange={(e) => setConsumers(e.target.value)}
-        />
-      </label>
+      <ConsumerStoryPicker
+        api={api}
+        label="Achievement consumer Stories"
+        selected={consumers}
+        onChange={setConsumers}
+        disabled={locked}
+      />
       <p>
         Only your saved Stories can be listed. These permissions are reviewed
         and cannot change after approval.
@@ -128,10 +127,7 @@ export function AchievementSubmission({
             storyNodeId,
             title,
             description,
-            consumerStoryIds: consumers
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
+            consumerStoryIds: consumers,
           };
           pending.current = command;
           setBusy(true);

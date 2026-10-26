@@ -1,3 +1,4 @@
+import { ConsumerStoryPicker } from "./ConsumerStoryPicker";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type createApi } from "../../../packages/api-client/index";
 import type { Story } from "../../../packages/contracts/index";
@@ -108,7 +109,7 @@ export function PromotionalKeyEditor({
     (k) => k.id,
   );
   const [label, setLabel] = useState("Bonus access");
-  const [stories, setStories] = useState(story.id);
+  const [stories, setStories] = useState<string[]>([story.id]);
   const [days, setDays] = useState(30);
   const [redemptionDays, setRedemptionDays] = useState(7);
   const [maxClaims, setMaxClaims] = useState(10);
@@ -135,14 +136,13 @@ export function PromotionalKeyEditor({
             onChange={(e) => setLabel(e.target.value)}
           />
         </label>
-        <label>
-          Allowed Story IDs, separated by commas
-          <input
-            aria-label="Promotional key Stories"
-            value={stories}
-            onChange={(e) => setStories(e.target.value)}
-          />
-        </label>
+        <ConsumerStoryPicker
+          api={api}
+          label="Promotional key Stories"
+          selected={stories}
+          onChange={setStories}
+          disabled={list.busy || !!list.pending}
+        />
         <label>
           Key expires in days from creation
           <input
@@ -184,10 +184,7 @@ export function PromotionalKeyEditor({
                 action: "create",
                 definitionId: crypto.randomUUID(),
                 label,
-                storyIds: stories
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
+                storyIds: stories,
                 days,
                 redemptionDays,
                 maxClaims,
