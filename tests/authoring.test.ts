@@ -215,3 +215,96 @@ it("allows incomplete private drafts while bounding authoring payloads", () => {
     draftSchema.safeParse({ story, description: "x".repeat(501) }).success,
   ).toBe(false);
 });
+
+import {
+  conditionKeys,
+  isKeyCondition,
+  validateKeyCondition,
+} from "../apps/web/src/key-condition-model";
+import { evaluate } from "../packages/domain/index";
+import { starterStory } from "../apps/web/src/studio-model";
+import type { Condition } from "../packages/contracts/index";
+it("authors bounded composite key conditions without trusting local entitlement aliases", () => {
+  const story = starterStory("conditions");
+  story.trunkContext = { version: 1, initialKeys: ["conditions:local"] };
+  story.progression = {
+    version: 1,
+    keys: [{ keyId: "conditions:hero", label: "Hero", afterCompletions: 1 }],
+  };
+  story.accountKeys = {
+    version: 1,
+    keys: [
+      { keyId: "conditions:bonus", label: "Bonus", definitionId: "definition" },
+    ],
+  };
+  story.keyImports = {
+    version: 1,
+    keys: [
+      {
+        keyId: "conditions:relic",
+        label: "Relic",
+        sourceStoryId: "source",
+        sourceVersionId: "v1",
+        sourceKeyId: "source:relic",
+        required: false,
+      },
+    ],
+  };
+  expect(conditionKeys(story).map((k) => k.scope)).toEqual([
+    "run",
+    "story",
+    "import",
+    "account",
+  ]);
+  const key = (keyId: string, scope: "run" | "account" = "run"): Condition => ({
+    kind: "key",
+    keyId,
+    scope,
+    present: true,
+  });
+  const c: Condition = {
+    kind: "any",
+    conditions: [
+      {
+        kind: "all",
+        conditions: [
+          key("conditions:local"),
+          key("conditions:bonus", "account"),
+        ],
+      },
+      { kind: "not", condition: key("conditions:local") },
+    ],
+  };
+  expect(validateKeyCondition(c, story)).toEqual(c);
+  const save = start(story, "run", "player", baseStats, 1);
+  save.keys.push("conditions:bonus");
+  expect(evaluate(c, save)).toBe(false);
+  expect(evaluate(c, save, ["conditions:bonus"])).toBe(true);
+  const mixed: Condition = {
+    kind: "all",
+    conditions: [c, { kind: "stat", stat: "agility", op: "gte", value: 5 }],
+  };
+  expect(isKeyCondition(mixed)).toBe(false);
+  expect(() => validateKeyCondition(mixed, story)).toThrow(/advanced JSON/);
+  expect(() => validateKeyCondition(key("other:key"), story)).toThrow(
+    /namespace/,
+  );
+  expect(() =>
+    validateKeyCondition(key("conditions:missing", "account"), story),
+  ).toThrow(/declared/);
+  let nested = key("conditions:local");
+  for (let i = 0; i < 5; i++) nested = { kind: "not", condition: nested };
+  expect(validateKeyCondition(nested, story)).toEqual(nested);
+  expect(() =>
+    validateKeyCondition({ kind: "not", condition: nested }, story),
+  ).toThrow();
+  expect(() =>
+    validateKeyCondition({ kind: "all", conditions: [] }, story),
+  ).toThrow();
+  expect(() =>
+    validateKeyCondition(
+      { kind: "any", conditions: Array(11).fill(key("conditions:local")) },
+      story,
+    ),
+  ).toThrow();
+});

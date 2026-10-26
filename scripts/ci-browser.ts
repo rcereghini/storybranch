@@ -27,6 +27,7 @@ try {
   await import("./story-trunk-check");
   await import("./key-imports-check");
   await import("./preview-keys-check");
+  await import("./key-conditions-check");
   await import("./promotional-keys-check");
   await import("./earned-account-keys-check");
 } finally {

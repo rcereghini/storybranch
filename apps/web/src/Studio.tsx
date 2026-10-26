@@ -1,3 +1,4 @@
+import { KeyConditionEditor } from "./KeyConditionEditor";
 import { EarnedAccountKeys } from "./EarnedAccountKeys";
 import { renderStoryNode } from "../../../packages/domain/player";
 import { PromotionalKeyEditor } from "./PromotionalKeys";
@@ -1854,6 +1855,29 @@ export function Studio({
                               ))}
                             </select>
                           </label>
+                        )}
+                        {storyNode.storyNodeType.endsWith("options") && (
+                          <KeyConditionEditor
+                            key={storyNode.id + c.id}
+                            story={draft.story}
+                            value={c.availableWhen}
+                            option={i + 1}
+                            onApply={(condition) => {
+                              const { availableWhen: _, ...rest } = c;
+                              editChoice(
+                                i,
+                                condition
+                                  ? {
+                                      ...rest,
+                                      availableWhen: condition,
+                                      unavailableDisplay: c.availableWhen
+                                        ? c.unavailableDisplay
+                                        : "hidden",
+                                    }
+                                  : rest,
+                              );
+                            }}
+                          />
                         )}
                         {storyNode.storyNodeType.endsWith("options") && (
                           <Button
