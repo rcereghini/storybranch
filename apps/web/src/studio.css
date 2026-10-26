@@ -846,3 +846,8 @@ html.studio-editing .tab-bar {
   height: 8em;
   overflow-y: auto;
 }
+
+.playtest-tools .btn {
+  margin-inline-end: 8px;
+  margin-block-end: 8px;
+}

@@ -128,3 +128,7 @@ Optional version-1 declarations and constant/current-Dice mappings resolve on au
 ## S33 — Visual input authoring and authoritative conditions
 
 Expose S32 declarations/bindings through explicit Apply/Reset controls and private preview inspection. Add bounded typed comparisons against the current entry snapshot, validated recursively against the source declaration and evaluated server-side. Preserve unconditional safe exits, private values, immutable editions and separate Dice Roll/Next. See [the contract](branch-data.md#s33--visual-bindings-and-current-entry-input-conditions).
+
+## S34 — Recorded private playtest assertions
+
+Extend existing draft-only saved setups with bounded Dice controls and recorded command paths containing exact draws and expected destinations/statuses. A pure runner starts from the setup against the current effective draft graph and reports the first mismatch without mutating active preview or real state. History is bounded, recording is explicit, and passing a partial path is not full-Story verification. See [Studio S34](../17-creator-studio.md#s34--recorded-and-repeatable-private-playtests).

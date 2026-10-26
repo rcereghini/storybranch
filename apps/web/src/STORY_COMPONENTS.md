@@ -56,3 +56,5 @@ StoryKeys.tsx also provides `StoryEntryKeys`, a separate redeemed invitation lis
 S32's Inputs/Outputs JSON controls in Studio use [StoryBranch data](../../../docs/story-system/branch-data.md). Inputs are server-only snapshots; they must not be spread into player render props or reusable library content. Existing renderers have no input consumer in this slice.
 
 `StoryInputsEditor.tsx` owns visual input declarations, per-choice mappings and the private preview inspector. `ConditionEditor.tsx` also supports declared current-entry input comparisons. Follow [S33](../../../docs/story-system/branch-data.md#s33--visual-bindings-and-current-entry-input-conditions); preserve explicit Apply/Reset, stale references, server authority, safe exits and private snapshots.
+
+`PlaytestTools.tsx` records private preview commands, captures editable destination/status assertions and runs the pure `packages/domain/playtest.ts` simulator. Follow S34 in [Studio](../../../docs/17-creator-studio.md#s34--recorded-and-repeatable-private-playtests): bounded exact Dice results, separate Roll/Next, explicit persistence through named setups and no real player commands or grants.

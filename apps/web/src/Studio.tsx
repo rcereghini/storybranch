@@ -1,4 +1,7 @@
 import { ConditionEditor } from "./ConditionEditor";
+import { PlaytestTools } from "./PlaytestTools";
+import { recordPreviewStep } from "../../../packages/domain/playtest";
+import type { PlaytestStep } from "../../../packages/contracts/preview";
 import {
   StoryInputsEditor,
   BranchInputsEditor,
@@ -38,11 +41,7 @@ import {
   reviewPublication,
   validatePublication,
 } from "../../../packages/domain/authoring";
-import {
-  baseStats,
-  isResultStoryNode,
-  transition,
-} from "../../../packages/domain/index";
+import { baseStats, isResultStoryNode } from "../../../packages/domain/index";
 import { resolveFixtureMedia } from "../../../fixtures/media";
 import { Story } from "./Story";
 import { StoryNode } from "./StoryNode";
@@ -146,9 +145,9 @@ export function Studio({
     story: StoryData;
     save: Save;
     scenario: PreviewScenario;
+    history: PlaytestStep[];
     session: number;
   } | null>(null);
-  const [passRoll, setPassRoll] = useState(true);
   const [retry, setRetry] = useState<Request | null>(null);
   const [offline, setOffline] = useState(!navigator.onLine);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -542,6 +541,7 @@ export function Studio({
       setPreview({
         story,
         scenario,
+        history: [],
         session: Date.now(),
         save: simulatePreview(story, scenario, Date.now()),
       });
@@ -2112,13 +2112,60 @@ export function Studio({
                 Preview dice result
                 <select
                   aria-label="Preview dice result"
-                  value={passRoll ? "pass" : "fail"}
-                  onChange={(e) => setPassRoll(e.target.value === "pass")}
+                  value={
+                    preview.scenario.dice?.mode === "fixed"
+                      ? "fixed"
+                      : preview.scenario.dice?.mode === "lowest"
+                        ? "fail"
+                        : "pass"
+                  }
+                  onChange={(e) =>
+                    setPreview({
+                      ...preview,
+                      scenario: {
+                        ...preview.scenario,
+                        dice:
+                          e.target.value === "fixed"
+                            ? { mode: "fixed", value: 1 }
+                            : {
+                                mode:
+                                  e.target.value === "fail"
+                                    ? "lowest"
+                                    : "highest",
+                              },
+                      },
+                    })
+                  }
                 >
                   <option value="pass">Highest roll</option>
                   <option value="fail">Lowest roll</option>
+                  <option value="fixed">Exact roll</option>
                 </select>
               </label>
+              {preview.scenario.dice?.mode === "fixed" && (
+                <label>
+                  Exact roll
+                  <input
+                    aria-label="Exact preview roll"
+                    type="number"
+                    min={1}
+                    max={100}
+                    step={1}
+                    value={preview.scenario.dice.value}
+                    onChange={(e) => {
+                      const value = e.target.valueAsNumber;
+                      if (Number.isInteger(value) && value >= 1 && value <= 100)
+                        setPreview({
+                          ...preview,
+                          scenario: {
+                            ...preview.scenario,
+                            dice: { mode: "fixed", value },
+                          },
+                        });
+                    }}
+                  />
+                </label>
+              )}
               <Button
                 className="btn btn-secondary btn-small"
                 onClick={() => setPreview(null)}
@@ -2138,8 +2185,27 @@ export function Studio({
                   setPreview({
                     ...preview,
                     scenario,
+                    history: [],
                     session: preview.session + 1,
                     save: simulatePreview(preview.story, scenario, Date.now()),
+                  })
+                }
+              />
+              <PlaytestTools
+                story={preview.story}
+                scenario={preview.scenario}
+                history={preview.history}
+                onChange={(scenario) => setPreview({ ...preview, scenario })}
+                onRestart={() =>
+                  setPreview({
+                    ...preview,
+                    history: [],
+                    session: preview.session + 1,
+                    save: simulatePreview(
+                      preview.story,
+                      preview.scenario,
+                      Date.now(),
+                    ),
                   })
                 }
               />
@@ -2151,6 +2217,7 @@ export function Studio({
                   setPreview({
                     ...preview,
                     scenario,
+                    history: [],
                     session: preview.session + 1,
                     save: simulatePreview(preview.story, scenario, Date.now()),
                   })
@@ -2202,17 +2269,16 @@ export function Studio({
                   onPlaybackChange={() => {}}
                   onOutput={(output) => {
                     try {
-                      const moved = transition(
+                      const moved = recordPreviewStep(
                         preview.story,
                         preview.save,
+                        preview.scenario,
+                        preview.history,
                         output.choiceId,
-                        preview.save.revision,
+                        output.action ?? "continue",
                         Date.now(),
-                        (sides) => (passRoll ? sides : 1),
-                        output.action,
-                        preview.scenario.accountKeys,
                       );
-                      setPreview({ ...preview, save: moved.save });
+                      setPreview({ ...preview, ...moved });
                     } catch (e) {
                       setNotice((e as Error).message);
                     }
@@ -2223,6 +2289,7 @@ export function Studio({
                       onClick={() =>
                         setPreview({
                           ...preview,
+                          history: [],
                           session: preview.session + 1,
                           save: simulatePreview(
                             preview.story,
