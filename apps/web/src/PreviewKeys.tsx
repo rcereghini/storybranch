@@ -1,4 +1,5 @@
 import type { Story, Save } from "../../../packages/contracts/index";
+import { PreviewStateEditor } from "./PreviewStateEditor";
 import type { PreviewScenario } from "../../../packages/contracts/preview";
 import {
   previewPreset,
@@ -18,6 +19,11 @@ export function PreviewKeys({
 }) {
   return (
     <div className="preview-key-tools">
+      <PreviewStateEditor
+        story={story}
+        scenario={scenario}
+        onRestart={onRestart}
+      />
       <details>
         <summary>Test key scenarios</summary>
         <p>

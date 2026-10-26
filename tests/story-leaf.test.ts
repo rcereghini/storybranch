@@ -564,3 +564,73 @@ it("validates exclusive achievement key triggers and same-edition StoryLeaves", 
   delete key.achievementStoryNodeId;
   expect(() => validateStory(story)).toThrow();
 });
+
+it("bounds disposable stats/inventory, applies entry effects once and leaves real starts unchanged", () => {
+  const story = starterStory("preview-state");
+  story.storyNodes.opening.entryEffects = [
+    { id: "boost", kind: "stat", stat: "agility", delta: 1 },
+    { id: "relic", kind: "item", itemId: "preview-state:relic", delta: 1 },
+  ];
+  const defaults = previewPreset(story, "first");
+  const scenario = {
+    ...defaults,
+    stats: { ...baseStats, agility: 8 },
+    items: { "preview-state:relic": 2 },
+  };
+  const before = structuredClone({ story, scenario });
+  const save = startPreview(story, scenario, 1);
+  expect(save.statsSnapshot.agility).toBe(8);
+  expect(save.stats.agility).toBe(9);
+  expect(save.items["preview-state:relic"]).toBe(3);
+  expect(save.appliedEntryEffects).toEqual(["boost", "relic"]);
+  expect(startPreview(story, scenario, 1)).toEqual(save);
+  expect({ story, scenario }).toEqual(before);
+  const real = start(story, "real", "player", baseStats, 1);
+  expect(real.stats.agility).toBe(6);
+  expect(real.items["preview-state:relic"]).toBe(1);
+  expect(startPreview(story, defaults, 1).items).toEqual(real.items);
+  for (const agility of [0, 21, 1.5, NaN])
+    expect(() =>
+      startPreview(story, { ...defaults, stats: { ...baseStats, agility } }, 1),
+    ).toThrow();
+  for (const quantity of [-1, 1000, 1.5, NaN])
+    expect(() =>
+      startPreview(
+        story,
+        { ...defaults, items: { "preview-state:relic": quantity } },
+        1,
+      ),
+    ).toThrow();
+  for (const itemId of ["foreign:relic", "preview-state:unknown"])
+    expect(() =>
+      startPreview(story, { ...defaults, items: { [itemId]: 1 } }, 1),
+    ).toThrow(/referenced/);
+  expect(() =>
+    startPreview(
+      story,
+      { ...defaults, items: { "preview-state:relic": 999 } },
+      1,
+    ),
+  ).toThrow(/bounds/);
+  expect(
+    startSchema.safeParse({
+      idempotencyKey: "preview-test",
+      payload: {
+        storyId: story.id,
+        stats: scenario.stats,
+        items: scenario.items,
+      },
+    }).success,
+  ).toBe(false);
+  expect(
+    branchCommandSchema.safeParse({
+      idempotencyKey: "preview-test",
+      expectedRevision: 0,
+      payload: {
+        branchId: "branch",
+        stats: scenario.stats,
+        items: scenario.items,
+      },
+    }).success,
+  ).toBe(false);
+});

@@ -302,10 +302,84 @@ try {
     await preview.getByText("Test key scenarios", { exact: true }).click();
     await preview.getByRole("checkbox", { name: /Hero/ }).check();
     assert.match(await checks.innerText(), /Pass 1:/);
+    await preview
+      .getByText("Test stats and inventory", { exact: true })
+      .click();
+    const agility = preview.getByLabel("Starting agility", { exact: true });
+    const quantity = preview.getByLabel(
+      "Starting quantity " + story.id + ":relic",
+      { exact: true },
+    );
+    const applyState = preview.getByRole("button", {
+      name: "Apply stats and inventory",
+      exact: true,
+    });
+    await agility.fill("4");
+    assert.match(await checks.innerText(), /Current agility: 5/);
+    assert.equal(
+      await preview.getByRole("button", { name: /Composite exit/ }).count(),
+      1,
+    );
+    await agility.fill("21");
+    assert(await applyState.isDisabled());
+    await agility.fill("4");
+    await quantity.fill("1.5");
+    assert(await applyState.isDisabled());
+    await quantity.fill("1");
+    await applyState.click();
+    assert.match(await checks.innerText(), /Fail 1.1.3.*Current agility: 4/);
+    assert.match(await checks.innerText(), /Fail 1.1.4.*Current quantity: 1/);
+    assert.equal(
+      await preview.getByRole("button", { name: /Composite exit/ }).count(),
+      0,
+    );
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate((t) => {
+        document.documentElement.dataset.theme = t;
+      }, theme);
+      await agility.scrollIntoViewIfNeeded();
+      assert(
+        await tab.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await tab.screenshot({
+        path: "test-results/preview-state-" + width + "-" + theme + ".png",
+        animations: "disabled",
+      });
+    }
+    await preview
+      .getByRole("button", { name: "Reset stats and inventory", exact: true })
+      .click();
+    assert.equal(await agility.inputValue(), "5");
+    assert.equal(await quantity.inputValue(), "0");
+    assert.match(await checks.innerText(), /Pass 1:/);
+    await agility.fill("6");
+    await applyState.click();
+
     await preview.getByRole("button", { name: /Composite exit/ }).click();
     await preview
       .getByRole("heading", { name: "The end", exact: true })
       .waitFor();
+    await preview
+      .getByRole("button", { name: "Play preview again", exact: true })
+      .click();
+    assert.match(await checks.innerText(), /Current agility: 6/);
+    assert.equal(await agility.inputValue(), "6");
+    await preview
+      .getByRole("button", { name: "Close preview", exact: true })
+      .click();
+    await tab.getByRole("button", { name: "Preview", exact: true }).click();
+    await preview
+      .getByText("Test stats and inventory", { exact: true })
+      .click();
+    assert.equal(await agility.inputValue(), "5");
+    assert.equal(await quantity.inputValue(), "0");
+    assert.equal(
+      await preview.getByRole("button", { name: /Composite exit/ }).count(),
+      0,
+    );
+
     await preview.getByRole("button", { name: "Close preview" }).click();
     await tab
       .getByRole("button", { name: "Publish edition", exact: true })
@@ -317,7 +391,7 @@ try {
     await tab.close();
   }
   console.log(
-    "PASS: mixed stat/item/key summaries and diagnostics, visual All/Any/Not conditions, explicit apply/reset, persistence, preview routing, unsupported-tree preservation and publication at desktop/mobile.",
+    "PASS: editable stat/inventory scenarios, explicit apply/reset/replay/isolation and mixed stat/item/key summaries and diagnostics, visual All/Any/Not conditions, explicit apply/reset, persistence, preview routing, unsupported-tree preservation and publication at desktop/mobile.",
   );
 } finally {
   await browser.close();

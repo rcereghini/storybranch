@@ -781,3 +781,30 @@ html.studio-editing .tab-bar {
   padding-block: 12px;
   cursor: pointer;
 }
+
+.preview-state-editor label {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.preview-state-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+.preview-state-stats > legend {
+  grid-column: 1 / -1;
+}
+.preview-state-editor input[type="number"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+}
+.preview-state-editor .btn {
+  min-height: 44px;
+  margin: 6px 6px 6px 0;
+  white-space: normal;
+}
+.preview-state-editor .key-history-status {
+  height: 8em;
+  overflow-y: auto;
+}
