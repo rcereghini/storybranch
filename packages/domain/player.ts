@@ -12,7 +12,11 @@ import { evaluate } from "./index";
 
 // Explicit allowlist: authored routes, scoring and entry effects stay server-side.
 // Studio uses this same adapter with its disposable, local preview save.
-export function renderStoryNode(node: StoryNode, save: Save) {
+export function renderStoryNode(
+  node: StoryNode,
+  save: Save,
+  accountKeys: readonly string[] = [],
+) {
   const outputs = node.choices.flatMap((choice) => {
     const required = new Map<string, number>();
     for (const cost of choice.costs)
@@ -21,7 +25,8 @@ export function renderStoryNode(node: StoryNode, save: Save) {
         (required.get(cost.itemId) ?? 0) + cost.quantity,
       );
     const enabled =
-      (!choice.availableWhen || evaluate(choice.availableWhen, save)) &&
+      (!choice.availableWhen ||
+        evaluate(choice.availableWhen, save, accountKeys)) &&
       [...required].every(
         ([item, quantity]) => (save.items[item] ?? 0) >= quantity,
       );

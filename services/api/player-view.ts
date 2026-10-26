@@ -1,3 +1,4 @@
+import { liveAccountKeys } from "./promotional-keys";
 import type { Save, Stats } from "../../packages/contracts/index";
 import { renderStoryNode, playerRun } from "../../packages/domain/player";
 import { isResultStoryNode } from "../../packages/domain/index";
@@ -19,9 +20,13 @@ export async function playerView(
   uid: string,
   profile: { stats: Stats; achievements?: string[] },
 ) {
-  const { story, clips } = await db.runTransaction((tx) =>
-    edition(tx, s.storyId, s.versionId),
-  );
+  const { story, clips, accountKeys } = await db.runTransaction(async (tx) => {
+    const stored = await edition(tx, s.storyId, s.versionId);
+    return {
+      ...stored,
+      accountKeys: await liveAccountKeys(tx, uid, stored.story),
+    };
+  });
   const storyNode = story.storyNodes[s.storyNodeId];
   const next =
     storyNode.choices.length === 1 &&
@@ -60,7 +65,7 @@ export async function playerView(
       achievements: profile.achievements ?? [],
       saveSpots: [{ id: s.id, storyId: s.storyId, storyNodeId: s.storyNodeId }],
     },
-    storyNode: renderStoryNode(storyNode, s),
+    storyNode: renderStoryNode(storyNode, s, accountKeys),
     // Quiz results share as "my result" rather than an ending.
     result: isResultStoryNode(story, storyNode.id),
     media: storyNodeMedia(storyNode.video, clips),

@@ -27,6 +27,7 @@ try {
   await import("./story-trunk-check");
   await import("./key-imports-check");
   await import("./preview-keys-check");
+  await import("./promotional-keys-check");
 } finally {
   server.kill();
 }

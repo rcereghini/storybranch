@@ -17,6 +17,7 @@ export function previewPreset(
 ): PreviewScenario {
   return {
     version: 1,
+    accountKeys: [],
     storyKeys:
       preset === "returning"
         ? (story.progression?.keys ?? []).map((k) => k.keyId)
@@ -35,6 +36,9 @@ export function startPreview(
 ): Save {
   const scenario = previewScenarioSchema.parse(input);
   if (
+    scenario.accountKeys.some(
+      (id) => !story.accountKeys?.keys.some((k) => k.keyId === id),
+    ) ||
     scenario.storyKeys.some(
       (id) => !story.progression?.keys.some((k) => k.keyId === id),
     ) ||
@@ -88,9 +92,13 @@ function describe(c: Condition): string {
 }
 
 // Creator-only explanations; never attach to a player projection.
-export function previewOptions(story: Story, save: Save) {
+export function previewOptions(
+  story: Story,
+  save: Save,
+  accountKeys: readonly string[] = [],
+) {
   const node = story.storyNodes[save.storyNodeId];
-  const outputs = renderStoryNode(node, save).outputs;
+  const outputs = renderStoryNode(node, save, accountKeys).outputs;
   return node.choices.map((choice) => {
     const output = outputs.find((o) => o.id === choice.id);
     const costs = new Map<string, number>();
@@ -103,7 +111,7 @@ export function previewOptions(story: Story, save: Save) {
       status: !output ? "Hidden" : output.enabled ? "Visible" : "Locked",
       reason: [
         choice.availableWhen
-          ? `${evaluate(choice.availableWhen, save) ? "Condition met" : "Condition not met"}: ${describe(choice.availableWhen)}.`
+          ? `${evaluate(choice.availableWhen, save, accountKeys) ? "Condition met" : "Condition not met"}: ${describe(choice.availableWhen)}.`
           : "No condition.",
         ...[...costs].map(
           ([id, quantity]) =>

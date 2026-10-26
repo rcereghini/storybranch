@@ -20,7 +20,7 @@ export type Condition =
       kind: "key";
       keyId: string;
       present: boolean;
-      scope?: "run" | "story" | "import";
+      scope?: "run" | "story" | "import" | "account";
     }
   | { kind: "item"; itemId: string; op: "gte" | "lte" | "eq"; quantity: number }
   | { kind: "all" | "any"; conditions: Condition[] }
@@ -53,7 +53,7 @@ function conditionAt(depth: number): z.ZodType<Condition> {
         kind: z.literal("key"),
         keyId: namespaced,
         present: z.boolean(),
-        scope: z.enum(["run", "story", "import"]).optional(),
+        scope: z.enum(["run", "story", "import", "account"]).optional(),
       })
       .strict(),
     z
@@ -320,6 +320,27 @@ export const storySchema = z
           .refine(
             (keys) => new Set(keys.map((k) => k.keyId)).size === keys.length,
             "Run export keys must be unique.",
+          ),
+      })
+      .strict()
+      .optional(),
+    accountKeys: z
+      .object({
+        version: z.literal(1),
+        keys: z
+          .array(
+            z
+              .object({
+                keyId: namespaced,
+                label: z.string().trim().min(1).max(80),
+                definitionId: id,
+              })
+              .strict(),
+          )
+          .max(20)
+          .refine(
+            (keys) => new Set(keys.map((k) => k.keyId)).size === keys.length,
+            "Account aliases must be unique.",
           ),
       })
       .strict()

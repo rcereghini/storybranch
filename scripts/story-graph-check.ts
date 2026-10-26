@@ -34,6 +34,24 @@ try {
       name: "Branching story timeline",
     });
     await show(tab, "Map");
+    for (const viewportWidth of width === 1440 ? [1440, 1920, 2560] : [390]) {
+      await tab.setViewportSize({ width: viewportWidth, height: 1000 });
+      for (const theme of ["light", "dark"]) {
+        await tab.evaluate((value) => {
+          document.documentElement.dataset.theme = value;
+        }, theme);
+        const bounds = await tab.locator(".studio-shell").boundingBox();
+        assert(bounds);
+        assert.equal(bounds.x, 0);
+        assert.equal(bounds.width, viewportWidth);
+        assert(
+          await tab.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        );
+      }
+    }
+    await tab.setViewportSize({ width, height: 1000 });
     // Undo removes an added StoryNode; redo brings it back.
     if (width === 1440) {
       await graph

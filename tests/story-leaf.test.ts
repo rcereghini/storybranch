@@ -20,6 +20,80 @@ import {
   previewOptions,
 } from "../packages/domain/preview";
 
+it("uses transient declared account facts without accepting local keys as access", () => {
+  const story = starterStory("promo-test");
+  story.accountKeys = {
+    version: 1,
+    keys: [
+      {
+        keyId: "promo-test:bonus",
+        label: "Bonus",
+        definitionId: "promo-definition",
+      },
+    ],
+  };
+  const opening = story.storyNodes.opening;
+  opening.storyNodeType = "text-options";
+  opening.choices.push({
+    ...structuredClone(opening.choices[0]),
+    id: "bonus",
+    label: "Bonus",
+    unavailableDisplay: "hidden",
+    availableWhen: {
+      kind: "all",
+      conditions: [
+        {
+          kind: "key",
+          scope: "account",
+          keyId: "promo-test:bonus",
+          present: true,
+        },
+      ],
+    },
+  });
+  validatePublication(story);
+  const scenario = {
+    ...previewPreset(story, "first"),
+    accountKeys: ["promo-test:bonus"],
+  };
+  const save = startPreview(story, scenario, 1);
+  save.keys.push("promo-test:bonus");
+  expect(renderStoryNode(opening, save).outputs).toHaveLength(1);
+  expect(
+    renderStoryNode(opening, save, scenario.accountKeys).outputs,
+  ).toHaveLength(2);
+  expect(previewOptions(story, save, scenario.accountKeys)[1].status).toBe(
+    "Visible",
+  );
+  expect(() => transition(story, save, "bonus", 0, 2)).toThrow();
+  const completed = transition(
+    story,
+    save,
+    "bonus",
+    0,
+    2,
+    undefined,
+    "continue",
+    scenario.accountKeys,
+  ).save;
+  expect(completed.status).toBe("completed");
+  expect(completed).not.toHaveProperty("accountKeys");
+  expect(save.storyProgressSnapshot?.keys).toEqual([]);
+  expect(() =>
+    startPreview(
+      story,
+      { ...scenario, accountKeys: ["promo-test:undeclared"] },
+      1,
+    ),
+  ).toThrow();
+  const noFallback = structuredClone(story);
+  noFallback.storyNodes.opening.choices.shift();
+  expect(() => validatePublication(noFallback)).toThrow();
+  const undeclared = structuredClone(story);
+  delete undeclared.accountKeys;
+  expect(() => validateStory(undeclared)).toThrow(/declared alias/);
+});
+
 it("simulates only declared preview facts, restarts cleanly and uses the real output rules", () => {
   const story = starterStory("preview-test");
   story.progression = {

@@ -1,3 +1,5 @@
+import { renderStoryNode } from "../../../packages/domain/player";
+import { PromotionalKeyEditor } from "./PromotionalKeys";
 import { Button } from "./ui";
 import { PreviewKeys } from "./PreviewKeys";
 import type { PreviewScenario } from "../../../packages/contracts/preview";
@@ -1260,6 +1262,12 @@ export function Studio({
                   keys cannot grant account access.
                 </p>
                 <StoryProgressEditor story={draft.story} onChange={change} />
+                <PromotionalKeyEditor
+                  key={draft.story.id}
+                  api={api}
+                  story={draft.story}
+                  onChange={change}
+                />
                 <StoryKeyImports story={draft.story} onChange={change} />
                 <StoryRunExports story={draft.story} onChange={change} />
                 {draft.revision > 0 && (
@@ -1760,7 +1768,7 @@ export function Studio({
                           )}
                         {storyNode.storyNodeType.endsWith("options") && (
                           <label>
-                            Persistent key required
+                            Key required
                             <select
                               aria-label={`Option ${i + 1} persistent key`}
                               value={
@@ -1768,7 +1776,8 @@ export function Studio({
                                   ? ""
                                   : c.availableWhen.kind === "key" &&
                                       (c.availableWhen.scope === "story" ||
-                                        c.availableWhen.scope === "import") &&
+                                        c.availableWhen.scope === "import" ||
+                                        c.availableWhen.scope === "account") &&
                                       c.availableWhen.present
                                     ? `${c.availableWhen.scope}|${c.availableWhen.keyId}`
                                     : "advanced"
@@ -1786,7 +1795,11 @@ export function Studio({
                                             "import|",
                                           )
                                             ? "import"
-                                            : "story",
+                                            : e.target.value.startsWith(
+                                                  "account|",
+                                                )
+                                              ? "account"
+                                              : "story",
                                           keyId: e.target.value.split("|")[1],
                                           present: true,
                                         },
@@ -1807,6 +1820,16 @@ export function Studio({
                                     value={`story|${k.keyId}`}
                                   >
                                     {k.label}
+                                  </option>
+                                ),
+                              )}
+                              {(draft.story.accountKeys?.keys ?? []).map(
+                                (k) => (
+                                  <option
+                                    key={`account-${k.keyId}`}
+                                    value={`account|${k.keyId}`}
+                                  >
+                                    {k.label} (promotional)
                                   </option>
                                 ),
                               )}
@@ -2016,7 +2039,11 @@ export function Studio({
                 }}
               >
                 <StoryNode
-                  storyNode={preview.story.storyNodes[preview.save.storyNodeId]}
+                  storyNode={renderStoryNode(
+                    preview.story.storyNodes[preview.save.storyNodeId],
+                    preview.save,
+                    preview.scenario.accountKeys,
+                  )}
                   result={isResultStoryNode(
                     preview.story,
                     preview.save.storyNodeId,
@@ -2052,6 +2079,7 @@ export function Studio({
                         Date.now(),
                         (sides) => (passRoll ? sides : 1),
                         output.action,
+                        preview.scenario.accountKeys,
                       );
                       setPreview({ ...preview, save: moved.save });
                     } catch (e) {

@@ -19,6 +19,7 @@ export const previewScenarioSchema = z
     version: z.literal(1),
     storyKeys: keys(40),
     importedKeys: keys(20),
+    accountKeys: keys(20).default([]),
   })
   .strict();
 export type PreviewScenario = z.infer<typeof previewScenarioSchema>;

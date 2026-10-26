@@ -1,3 +1,4 @@
+import { validateAccountKeys } from "./promotional-keys";
 import { createHash } from "node:crypto";
 import { FieldPath, type DocumentReference } from "firebase-admin/firestore";
 import { GameError } from "../../packages/contracts/index";
@@ -124,6 +125,7 @@ export async function authoring(
       const story = validatePublication({ ...old.story, versionId });
       await validateKeyExports(tx, story, uid);
       await validateKeyImports(tx, story, uid);
+      await validateAccountKeys(tx, story, uid);
       // Only the publisher's own finished clips and photos; the edition records
       // each file so players never read the creator's clip records.
       const clips = new Map<string, DocumentReference>();

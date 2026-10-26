@@ -45,7 +45,20 @@ export const baseStats: Stats = {
 };
 const compare = (a: number, op: "gte" | "lte" | "eq", b: number) =>
   op === "gte" ? a >= b : op === "lte" ? a <= b : a === b;
-export function evaluate(c: Condition, s: Save): boolean {
+export function usesAccountKey(c: Condition): boolean {
+  return c.kind === "key"
+    ? c.scope === "account"
+    : c.kind === "not"
+      ? usesAccountKey(c.condition)
+      : c.kind === "all" || c.kind === "any"
+        ? c.conditions.some(usesAccountKey)
+        : false;
+}
+export function evaluate(
+  c: Condition,
+  s: Save,
+  accountKeys: readonly string[] = [],
+): boolean {
   switch (c.kind) {
     case "roll":
       return (
@@ -55,6 +68,8 @@ export function evaluate(c: Condition, s: Save): boolean {
     case "stat":
       return compare(s.stats[c.stat], c.op, c.value);
     case "key":
+      if (c.scope === "account")
+        return accountKeys.includes(c.keyId) === c.present;
       if (c.scope === "import")
         return (
           (s.keyImportSnapshot?.keys.some(
@@ -70,11 +85,11 @@ export function evaluate(c: Condition, s: Save): boolean {
     case "item":
       return compare(s.items[c.itemId] ?? 0, c.op, c.quantity);
     case "all":
-      return c.conditions.every((x) => evaluate(x, s));
+      return c.conditions.every((x) => evaluate(x, s, accountKeys));
     case "any":
-      return c.conditions.some((x) => evaluate(x, s));
+      return c.conditions.some((x) => evaluate(x, s, accountKeys));
     case "not":
-      return !evaluate(c.condition, s);
+      return !evaluate(c.condition, s, accountKeys);
   }
 }
 function effects(s: Save, list: Effect[], once = false) {
@@ -196,6 +211,7 @@ export function transition(
   now: number,
   roll?: (sides: number) => number,
   action: "roll" | "continue" = "continue",
+  accountKeys: readonly string[] = [],
 ) {
   if (input.storyId !== story.id || input.versionId !== story.versionId)
     throw new GameError("VALIDATION_FAILED", "Version mismatch.");
@@ -210,7 +226,7 @@ export function transition(
   if (
     !c ||
     input.status !== "active" ||
-    (c.availableWhen && !evaluate(c.availableWhen, input))
+    (c.availableWhen && !evaluate(c.availableWhen, input, accountKeys))
   )
     throw new GameError("VALIDATION_FAILED", "This choice is unavailable.");
   const s: Save = JSON.parse(JSON.stringify(input));
@@ -260,7 +276,7 @@ export function transition(
   }
   let success = true;
   if (c.outcome.kind === "check")
-    success = evaluate(c.outcome.condition, input);
+    success = evaluate(c.outcome.condition, input, accountKeys);
   if (c.outcome.kind === "dice") {
     if (!s.lastRoll?.pending || s.lastRoll.storyNodeId !== s.storyNodeId)
       throw new GameError("VALIDATION_FAILED", "Roll before continuing.");
@@ -427,6 +443,15 @@ export function validateStory(value: unknown): Story {
       throw new Error(
         "Story-scoped key conditions require a declared persistent key.",
       );
+    if (
+      "kind" in v &&
+      v.kind === "key" &&
+      "scope" in v &&
+      v.scope === "account" &&
+      (!("keyId" in v) ||
+        !story.accountKeys?.keys.some((k) => k.keyId === v.keyId))
+    )
+      throw new Error("Account key conditions require a declared alias.");
     for (const [k, x] of Object.entries(v)) {
       if (
         ["keyId", "itemId", "milestoneId", "scoreId"].includes(k) &&

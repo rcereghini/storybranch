@@ -96,3 +96,7 @@ List the actor's permanent redeemed entry keys separately from narrative rewards
 ## S25 — Key-aware Studio previews
 
 Allow bounded declared persistent/imported key simulations only in disposable preview state. Scenario edits restart the run; shared rules explain effective option availability. Real authority, publication checks and immutable data are unchanged. See [preview contract](keys.md#key-aware-disposable-previews-s25).
+
+## S26 — Live creator promotional keys for options
+
+Introduce issuer-controlled expiring promotional rights for explicit same-creator Story consumers. Resolve declared account aliases live at projection/choice, never snapshot them into saves. Preserve committed outcomes and safe exits on revocation. Codes have bounded redemption windows/capacity and durable per-account uniqueness. No payments, protected media, foreign issuers or per-recipient revocation. See [S26](keys.md#live-promotional-account-keys-s26).

@@ -3,6 +3,10 @@
    part fills the screen at a time, chosen by the view switch. */
 
 /* While editing, the footer and phone tab bar make room for the editor. */
+html.studio-editing main {
+  max-width: none;
+}
+
 html.studio-editing .app-footer,
 html.studio-editing .tab-bar {
   display: none;
