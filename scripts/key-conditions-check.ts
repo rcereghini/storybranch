@@ -48,8 +48,8 @@ try {
     opening.storyNodeType = "text-options";
     opening.choices[0].label = "Safe exit";
     const mixed = {
-      kind: "stat" as const,
-      stat: "agility" as const,
+      kind: "roll" as const,
+      storyNodeId: "opening",
       op: "gte" as const,
       value: 5,
     };
@@ -113,22 +113,18 @@ try {
         .selectOption("opening");
     };
     await open();
-    await tab
-      .getByText("Build option 3 key conditions", { exact: true })
-      .click();
+    await tab.getByText("Build option 3 conditions", { exact: true }).click();
     const unsupported = tab.getByRole("region", {
-      name: "Option 3 key condition builder",
+      name: "Option 3 condition builder",
     });
-    await unsupported.getByText(/includes stat, item or roll/).waitFor();
+    await unsupported.getByText(/includes roll/).waitFor();
     assert.equal(await unsupported.getByRole("button").count(), 0);
-    await tab
-      .getByText("Build option 2 key conditions", { exact: true })
-      .click();
+    await tab.getByText("Build option 2 conditions", { exact: true }).click();
     const editor = tab.getByRole("region", {
-      name: "Option 2 key condition builder",
+      name: "Option 2 condition builder",
     });
     await editor
-      .getByRole("button", { name: "Add key condition", exact: true })
+      .getByRole("button", { name: "Add condition", exact: true })
       .click();
     await editor
       .getByLabel("Condition 1 match", { exact: true })
@@ -155,12 +151,60 @@ try {
       .getByLabel("Condition 1.2.1 key", { exact: true })
       .selectOption(`run|${story.id}:local`);
     // Before Apply, preview still uses the authored unconditional option.
+    await editor
+      .getByRole("button", { name: "Add condition to 1.1", exact: true })
+      .click();
+    await editor
+      .getByLabel("Condition 1.1.3 match", { exact: true })
+      .selectOption("stat");
+    await editor
+      .getByLabel("Condition 1.1.3 threshold", { exact: true })
+      .fill("");
+    assert(
+      await editor
+        .getByRole("button", { name: "Apply condition", exact: true })
+        .isDisabled(),
+    );
+    await editor
+      .getByLabel("Condition 1.1.3 threshold", { exact: true })
+      .fill("5");
+    await editor
+      .getByRole("button", { name: "Add condition to 1.1", exact: true })
+      .click();
+    await editor
+      .getByLabel("Condition 1.1.4 match", { exact: true })
+      .selectOption("item");
+    await editor
+      .getByLabel("Condition 1.1.4 item", { exact: true })
+      .fill("foreign:relic");
+    assert(
+      await editor
+        .getByRole("button", { name: "Apply condition", exact: true })
+        .isDisabled(),
+    );
+    await editor
+      .getByLabel("Condition 1.1.4 item", { exact: true })
+      .fill(story.id + ":relic");
+    await editor
+      .getByLabel("Condition 1.1.4 comparison", { exact: true })
+      .selectOption("eq");
+    await editor
+      .getByLabel("Condition 1.1.4 threshold", { exact: true })
+      .fill("0");
+    assert.match(
+      await editor.getByLabel("Condition summary").innerText(),
+      /agility at least 5/,
+    );
+    assert.match(
+      await editor.getByLabel("Condition summary").innerText(),
+      /quantity exactly 0/,
+    );
     await tab.getByRole("button", { name: "Preview", exact: true }).click();
     const preview = tab.getByRole("dialog", { name: "Private preview" });
     await preview.getByRole("button", { name: /Composite exit/ }).waitFor();
     await preview.getByRole("button", { name: "Close preview" }).click();
     await editor
-      .getByRole("button", { name: "Apply key condition", exact: true })
+      .getByRole("button", { name: "Apply condition", exact: true })
       .click();
     await editor
       .getByRole("button", { name: "Clear condition", exact: true })
@@ -179,7 +223,7 @@ try {
         document.documentElement.dataset.theme = t;
       }, theme);
       await editor
-        .getByLabel("Condition 1.2 match", { exact: true })
+        .getByLabel("Condition 1.1.4 item", { exact: true })
         .scrollIntoViewIfNeeded();
       assert(
         await tab.evaluate(
@@ -211,9 +255,7 @@ try {
     );
     await tab.reload();
     await open();
-    await tab
-      .getByText("Build option 2 key conditions", { exact: true })
-      .click();
+    await tab.getByText("Build option 2 conditions", { exact: true }).click();
     assert.equal(
       await editor
         .getByLabel("Condition 1.1.2 key", { exact: true })
@@ -228,8 +270,38 @@ try {
       await preview.getByRole("button", { name: /Composite exit/ }).count(),
       0,
     );
+    await preview.getByText("Why these options?", { exact: true }).click();
+    const checks = preview.getByRole("list", {
+      name: "Condition checks for Composite exit",
+    });
+    assert.match(await checks.innerText(), /Fail 1/);
+    assert.match(
+      await checks.innerText(),
+      /Pass 1.1.3.*agility at least 5. Current agility: 5/,
+    );
+    assert.match(
+      await checks.innerText(),
+      /Pass 1.1.4.*quantity exactly 0. Current quantity: 0/,
+    );
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate((t) => {
+        document.documentElement.dataset.theme = t;
+      }, theme);
+      await checks.scrollIntoViewIfNeeded();
+      assert(
+        await tab.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await tab.screenshot({
+        path:
+          "test-results/condition-diagnostics-" + width + "-" + theme + ".png",
+        animations: "disabled",
+      });
+    }
     await preview.getByText("Test key scenarios", { exact: true }).click();
     await preview.getByRole("checkbox", { name: /Hero/ }).check();
+    assert.match(await checks.innerText(), /Pass 1:/);
     await preview.getByRole("button", { name: /Composite exit/ }).click();
     await preview
       .getByRole("heading", { name: "The end", exact: true })
@@ -245,7 +317,7 @@ try {
     await tab.close();
   }
   console.log(
-    "PASS: visual All/Any/Not key conditions, explicit apply/reset, persistence, preview routing, unsupported-tree preservation and publication at desktop/mobile.",
+    "PASS: mixed stat/item/key summaries and diagnostics, visual All/Any/Not conditions, explicit apply/reset, persistence, preview routing, unsupported-tree preservation and publication at desktop/mobile.",
   );
 } finally {
   await browser.close();

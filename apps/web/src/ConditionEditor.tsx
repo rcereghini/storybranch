@@ -1,11 +1,16 @@
+import { describeCondition } from "../../../packages/domain/preview";
 import { useEffect, useState } from "react";
-import type { Condition, Story } from "../../../packages/contracts/index";
+import {
+  statId,
+  type Condition,
+  type Story,
+} from "../../../packages/contracts/index";
 import {
   conditionKeys,
-  isKeyCondition,
-  validateKeyCondition,
+  isEditableCondition,
+  validateCondition,
   type ConditionKey,
-} from "./key-condition-model";
+} from "./condition-model";
 
 function Clause({
   value,
@@ -13,12 +18,14 @@ function Clause({
   keys,
   path,
   depth,
+  storyId,
 }: {
   value: Condition;
   onChange: (c: Condition) => void;
   keys: ConditionKey[];
   path: string;
   depth: number;
+  storyId: string;
 }) {
   const newKey = (): Condition => ({
     kind: "key",
@@ -39,6 +46,15 @@ function Clause({
           onChange={(e) => {
             const kind = e.target.value;
             if (kind === "key") onChange(newKey());
+            else if (kind === "stat")
+              onChange({ kind, stat: "agility", op: "gte", value: 5 });
+            else if (kind === "item")
+              onChange({
+                kind,
+                itemId: `${storyId}:item`,
+                op: "gte",
+                quantity: 1,
+              });
             else if (kind === "not") onChange({ kind, condition: newKey() });
             else if (kind === "all" || kind === "any")
               onChange({
@@ -48,6 +64,8 @@ function Clause({
           }}
         >
           <option value="key">Key check</option>
+          <option value="stat">Stat check</option>
+          <option value="item">Item quantity</option>
           {depth < 5 && (
             <>
               <option value="all">All conditions</option>
@@ -99,6 +117,85 @@ function Clause({
           </label>
         </>
       )}
+      {(value.kind === "stat" || value.kind === "item") && (
+        <>
+          {value.kind === "stat" ? (
+            <label>
+              Stat
+              <select
+                aria-label={`Condition ${path} stat`}
+                value={value.stat}
+                onChange={(e) =>
+                  onChange({ ...value, stat: statId.parse(e.target.value) })
+                }
+              >
+                {statId.options.map((stat) => (
+                  <option key={stat} value={stat}>
+                    {stat}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              Story item ID
+              <input
+                aria-label={`Condition ${path} item`}
+                value={value.itemId}
+                maxLength={100}
+                onChange={(e) => onChange({ ...value, itemId: e.target.value })}
+              />
+              <small>
+                Use this Story's namespace: {storyId}:item. Checks do not
+                consume items.
+              </small>
+            </label>
+          )}
+          <label>
+            Comparison
+            <select
+              aria-label={`Condition ${path} comparison`}
+              value={value.op}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  op: e.target.value as "gte" | "lte" | "eq",
+                })
+              }
+            >
+              <option value="gte">At least</option>
+              <option value="lte">At most</option>
+              <option value="eq">Exactly</option>
+            </select>
+          </label>
+          <label>
+            {value.kind === "stat" ? "Value" : "Quantity"}
+            <input
+              type="number"
+              min={0}
+              max={999}
+              step={1}
+              aria-label={`Condition ${path} threshold`}
+              value={
+                Number.isNaN(
+                  value.kind === "stat" ? value.value : value.quantity,
+                )
+                  ? ""
+                  : value.kind === "stat"
+                    ? value.value
+                    : value.quantity
+              }
+              onChange={(e) =>
+                onChange(
+                  value.kind === "stat"
+                    ? { ...value, value: e.target.valueAsNumber }
+                    : { ...value, quantity: e.target.valueAsNumber },
+                )
+              }
+            />
+          </label>
+        </>
+      )}
       {value.kind === "not" && (
         <Clause
           value={value.condition}
@@ -106,6 +203,7 @@ function Clause({
           keys={keys}
           path={`${path}.1`}
           depth={depth + 1}
+          storyId={storyId}
         />
       )}
       {(value.kind === "all" || value.kind === "any") && (
@@ -125,6 +223,7 @@ function Clause({
                 keys={keys}
                 path={`${path}.${i + 1}`}
                 depth={depth + 1}
+                storyId={storyId}
               />
               <button
                 className="btn btn-secondary"
@@ -157,7 +256,7 @@ function Clause({
     </fieldset>
   );
 }
-export function KeyConditionEditor({
+export function ConditionEditor({
   story,
   value,
   onApply,
@@ -178,27 +277,32 @@ export function KeyConditionEditor({
   const keys = conditionKeys(story);
   let error = "";
   try {
-    validateKeyCondition(draft, story);
+    validateCondition(draft, story);
   } catch (e) {
     error =
       e instanceof Error && e.name !== "ZodError"
         ? e.message
-        : "Choose valid keys within five nesting levels and ten conditions per group.";
+        : "Use valid Story IDs and whole numbers from 0 to 999, within five nesting levels and ten conditions per group.";
   }
   return (
     <details className="key-condition-editor">
-      <summary>Build option {option} key conditions</summary>
-      <section aria-label={`Option ${option} key condition builder`}>
-        {!isKeyCondition(value) ? (
+      <summary>Build option {option} conditions</summary>
+      <section aria-label={`Option ${option} condition builder`}>
+        {!isEditableCondition(value) ? (
           <p>
-            This condition includes stat, item or roll checks. Edit its advanced
-            JSON; the visual key editor preserves it unchanged.
+            This condition includes roll checks. Edit its advanced JSON; the
+            visual editor preserves it unchanged.
           </p>
         ) : (
           <>
             <p>
               All requires every check; Any requires one; Not reverses its
               check. Apply saves these edits to the draft.
+            </p>
+            <p aria-label="Condition summary">
+              {draft
+                ? describeCondition(draft)
+                : "Always available (subject to item costs)."}
             </p>
             {draft ? (
               <Clause
@@ -207,6 +311,7 @@ export function KeyConditionEditor({
                 keys={keys}
                 path="1"
                 depth={0}
+                storyId={story.id}
               />
             ) : (
               <p>No availability condition.</p>
@@ -214,23 +319,22 @@ export function KeyConditionEditor({
             {!draft && (
               <button
                 className="btn btn-secondary"
-                disabled={!keys.length}
                 onClick={() =>
                   setDraft({
-                    kind: "key",
-                    keyId: keys[0].keyId,
-                    scope: keys[0].scope,
-                    present: true,
+                    kind: "stat",
+                    stat: "agility",
+                    op: "gte",
+                    value: 5,
                   })
                 }
               >
-                Add key condition
+                Add condition
               </button>
             )}
             {!keys.length && (
               <p>
-                Configure starting keys, local key rewards or declared
-                Story/imported/account keys first.
+                For key checks, configure starting keys, local key rewards or
+                declared Story/imported/account keys first.
               </p>
             )}
             {draft && (
@@ -254,11 +358,11 @@ export function KeyConditionEditor({
               className="btn btn-primary"
               disabled={!!error}
               onClick={() => {
-                onApply(validateKeyCondition(draft, story));
+                onApply(validateCondition(draft, story));
                 setMessage("Condition applied to the draft.");
               }}
             >
-              Apply key condition
+              Apply condition
             </button>
             <p role="status" className="key-history-status">
               {error || message}

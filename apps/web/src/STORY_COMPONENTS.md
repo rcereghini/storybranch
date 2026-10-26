@@ -41,4 +41,4 @@ StoryKeys.tsx also provides `StoryEntryKeys`, a separate redeemed invitation lis
 
 `ConsumerStoryPicker.tsx` selects saved creator Stories for achievement/promotional consumer permissions. Follow [Studio](../../../docs/17-creator-studio.md) and S26/S27 [keys](../../../docs/story-system/keys.md); listing/filtering is convenience, never authority, and unloaded or failed batches must not erase selections.
 
-`KeyConditionEditor.tsx` and `key-condition-model.ts` author key-only StoryBranch availability trees. Read [Studio](../../../docs/17-creator-studio.md), [keys](../../../docs/story-system/keys.md) and the portable condition contract. Preserve non-key trees, output routing/effects and explicit apply/reset; client authoring never supplies trusted runtime eligibility.
+`ConditionEditor.tsx` and `condition-model.ts` author key/stat/item StoryBranch availability trees. Read [Studio](../../../docs/17-creator-studio.md), [keys](../../../docs/story-system/keys.md) and the portable condition contract. Preserve trees containing roll checks, output routing/effects and explicit apply/reset; client authoring never supplies trusted runtime eligibility.

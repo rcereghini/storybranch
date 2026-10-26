@@ -218,9 +218,9 @@ it("allows incomplete private drafts while bounding authoring payloads", () => {
 
 import {
   conditionKeys,
-  isKeyCondition,
-  validateKeyCondition,
-} from "../apps/web/src/key-condition-model";
+  isEditableCondition,
+  validateCondition,
+} from "../apps/web/src/condition-model";
 import { evaluate } from "../packages/domain/index";
 import { starterStory } from "../apps/web/src/studio-model";
 import type { Condition } from "../packages/contracts/index";
@@ -275,36 +275,101 @@ it("authors bounded composite key conditions without trusting local entitlement 
       { kind: "not", condition: key("conditions:local") },
     ],
   };
-  expect(validateKeyCondition(c, story)).toEqual(c);
+  expect(validateCondition(c, story)).toEqual(c);
   const save = start(story, "run", "player", baseStats, 1);
   save.keys.push("conditions:bonus");
   expect(evaluate(c, save)).toBe(false);
   expect(evaluate(c, save, ["conditions:bonus"])).toBe(true);
   const mixed: Condition = {
     kind: "all",
-    conditions: [c, { kind: "stat", stat: "agility", op: "gte", value: 5 }],
+    conditions: [
+      c,
+      { kind: "roll", storyNodeId: "opening", op: "gte", value: 5 },
+    ],
   };
-  expect(isKeyCondition(mixed)).toBe(false);
-  expect(() => validateKeyCondition(mixed, story)).toThrow(/advanced JSON/);
-  expect(() => validateKeyCondition(key("other:key"), story)).toThrow(
-    /namespace/,
-  );
+  expect(isEditableCondition(mixed)).toBe(false);
+  expect(() => validateCondition(mixed, story)).toThrow(/advanced JSON/);
+  expect(() => validateCondition(key("other:key"), story)).toThrow(/namespace/);
   expect(() =>
-    validateKeyCondition(key("conditions:missing", "account"), story),
+    validateCondition(key("conditions:missing", "account"), story),
   ).toThrow(/declared/);
   let nested = key("conditions:local");
   for (let i = 0; i < 5; i++) nested = { kind: "not", condition: nested };
-  expect(validateKeyCondition(nested, story)).toEqual(nested);
+  expect(validateCondition(nested, story)).toEqual(nested);
   expect(() =>
-    validateKeyCondition({ kind: "not", condition: nested }, story),
+    validateCondition({ kind: "not", condition: nested }, story),
   ).toThrow();
   expect(() =>
-    validateKeyCondition({ kind: "all", conditions: [] }, story),
+    validateCondition({ kind: "all", conditions: [] }, story),
   ).toThrow();
   expect(() =>
-    validateKeyCondition(
+    validateCondition(
       { kind: "any", conditions: Array(11).fill(key("conditions:local")) },
       story,
     ),
   ).toThrow();
+});
+import {
+  describeCondition,
+  explainCondition,
+} from "../packages/domain/preview";
+it("validates mixed stat/item/key trees and explains every check using runtime semantics", () => {
+  const story = starterStory("mixed");
+  const save = start(story, "run", "player", baseStats, 1);
+  const condition: Condition = {
+    kind: "all",
+    conditions: [
+      { kind: "stat", stat: "agility", op: "gte", value: 6 },
+      { kind: "item", itemId: "mixed:relic", op: "eq", quantity: 0 },
+      {
+        kind: "not",
+        condition: { kind: "key", keyId: "mixed:door", present: true },
+      },
+    ],
+  };
+  expect(isEditableCondition(condition)).toBe(true);
+  expect(validateCondition(condition, story)).toEqual(condition);
+  expect(describeCondition(condition)).toContain("agility at least 6");
+  expect(describeCondition(condition)).toContain("quantity exactly 0");
+  const checks = explainCondition(condition, save);
+  expect(checks.map((c) => [c.path, c.met])).toEqual([
+    ["1", false],
+    ["1.1", false],
+    ["1.2", true],
+    ["1.3", true],
+    ["1.3.1", false],
+  ]);
+  expect(checks[1].actual).toBe("Current agility: 5");
+  expect(checks[2].actual).toBe("Current quantity: 0");
+  const before = structuredClone(save);
+  explainCondition(condition, save);
+  expect(save).toEqual(before);
+  for (const op of ["gte", "lte", "eq"] as const) {
+    for (const n of [0, 5, 999]) {
+      const c: Condition = { kind: "stat", stat: "agility", op, value: n };
+      expect(explainCondition(c, save)[0].met).toBe(evaluate(c, save));
+    }
+  }
+  for (const quantity of [-1, 1.5, 1000, NaN])
+    expect(() =>
+      validateCondition(
+        { kind: "item", itemId: "mixed:relic", op: "gte", quantity },
+        story,
+      ),
+    ).toThrow();
+  expect(() =>
+    validateCondition(
+      { kind: "item", itemId: "other:relic", op: "gte", quantity: 1 },
+      story,
+    ),
+  ).toThrow(/namespace/);
+  const account: Condition = {
+    kind: "key",
+    keyId: "mixed:account",
+    scope: "account",
+    present: true,
+  };
+  save.keys.push("mixed:account");
+  expect(explainCondition(account, save)[0].actual).toBe("Currently absent");
+  expect(explainCondition(account, save, ["mixed:account"])[0].met).toBe(true);
 });

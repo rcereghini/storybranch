@@ -73,22 +73,79 @@ export function startPreview(
   );
 }
 
-function describe(c: Condition): string {
+const comparisonWords = { gte: "at least", lte: "at most", eq: "exactly" };
+export function describeCondition(c: Condition): string {
   switch (c.kind) {
     case "key":
       return `${c.scope ?? "run"} key ${c.keyId} must be ${c.present ? "present" : "absent"}`;
     case "stat":
-      return `${c.stat} ${c.op} ${c.value}`;
+      return `${c.stat} ${comparisonWords[c.op]} ${c.value}`;
     case "item":
-      return `${c.itemId} quantity ${c.op} ${c.quantity}`;
+      return `${c.itemId} quantity ${comparisonWords[c.op]} ${c.quantity}`;
     case "roll":
-      return `roll at ${c.storyNodeId} ${c.op} ${c.value}`;
+      return `roll at ${c.storyNodeId} ${comparisonWords[c.op]} ${c.value}`;
     case "all":
     case "any":
-      return `${c.kind} of (${c.conditions.map(describe).join("; ")})`;
+      return `${c.kind} of (${c.conditions.map(describeCondition).join("; ")})`;
     case "not":
-      return `not (${describe(c.condition)})`;
+      return `not (${describeCondition(c.condition)})`;
   }
+}
+
+export type ConditionDiagnostic = {
+  path: string;
+  met: boolean;
+  description: string;
+  actual?: string;
+};
+// Evaluate every child for explanation, even when All/Any could short-circuit.
+// Only disposable creator preview state may be passed to this diagnostic surface.
+export function explainCondition(
+  c: Condition,
+  save: Save,
+  accountKeys: readonly string[] = [],
+  path = "1",
+): ConditionDiagnostic[] {
+  let actual: string | undefined;
+  if (c.kind === "stat")
+    actual = "Current " + c.stat + ": " + save.stats[c.stat];
+  if (c.kind === "item")
+    actual = "Current quantity: " + (save.items[c.itemId] ?? 0);
+  if (c.kind === "key")
+    actual =
+      "Currently " +
+      (evaluate({ ...c, present: true }, save, accountKeys)
+        ? "present"
+        : "absent");
+  if (c.kind === "roll")
+    actual =
+      save.lastRoll?.storyNodeId === c.storyNodeId
+        ? "Last roll: " + save.lastRoll.value
+        : "No matching last roll";
+  const children =
+    c.kind === "not"
+      ? [c.condition]
+      : c.kind === "all" || c.kind === "any"
+        ? c.conditions
+        : [];
+  return [
+    {
+      path,
+      met: evaluate(c, save, accountKeys),
+      description:
+        c.kind === "all"
+          ? "All of the following checks"
+          : c.kind === "any"
+            ? "Any of the following checks"
+            : c.kind === "not"
+              ? "Invert the following check"
+              : describeCondition(c),
+      ...(actual ? { actual } : {}),
+    },
+    ...children.flatMap((child, i) =>
+      explainCondition(child, save, accountKeys, path + "." + (i + 1)),
+    ),
+  ];
 }
 
 // Creator-only explanations; never attach to a player projection.
@@ -109,9 +166,12 @@ export function previewOptions(
       id: choice.id,
       label: choice.label,
       status: !output ? "Hidden" : output.enabled ? "Visible" : "Locked",
+      checks: choice.availableWhen
+        ? explainCondition(choice.availableWhen, save, accountKeys)
+        : [],
       reason: [
         choice.availableWhen
-          ? `${evaluate(choice.availableWhen, save, accountKeys) ? "Condition met" : "Condition not met"}: ${describe(choice.availableWhen)}.`
+          ? `${evaluate(choice.availableWhen, save, accountKeys) ? "Condition met" : "Condition not met"}: ${describeCondition(choice.availableWhen)}.`
           : "No condition.",
         ...[...costs].map(
           ([id, quantity]) =>
