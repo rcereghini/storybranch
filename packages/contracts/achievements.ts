@@ -9,6 +9,11 @@ export const achievementSubmissionSchema = z
     storyNodeId: id,
     title: z.string().trim().min(1).max(80),
     description: z.string().trim().max(500),
+    consumerStoryIds: z
+      .array(id)
+      .max(20)
+      .refine((ids) => new Set(ids).size === ids.length)
+      .optional(),
   })
   .strict();
 export const achievementReviewSchema = z
@@ -20,6 +25,7 @@ export const achievementReviewSchema = z
   })
   .strict();
 export type AchievementDefinition = {
+  consumerStoryIds?: string[];
   rewardKeys?: Array<{ keyId: string; label: string }>;
   ending: { title: string; transcript: string; storyNodeType: string };
   id: string;

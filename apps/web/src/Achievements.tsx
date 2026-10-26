@@ -26,6 +26,7 @@ export function AchievementSubmission({
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [consumers, setConsumers] = useState("");
   const pending = useRef<object | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +38,7 @@ export function AchievementSubmission({
           setDefinition(definition);
           setTitle(definition?.title ?? "");
           setDescription(definition?.description ?? "");
+          setConsumers((definition?.consumerStoryIds ?? []).join(", "));
           setLoaded(true);
         }
       })
@@ -72,6 +74,24 @@ export function AchievementSubmission({
         them requires a new edition and approval.
       </p>
       {definition && <AchievementKeyRewards keys={definition.rewardKeys} />}
+      {definition?.status === "approved" && (
+        <p>
+          Achievement definition ID: <code>{definition.id}</code>
+        </p>
+      )}
+      <label>
+        Allow account key checks from these Story IDs (comma separated)
+        <input
+          aria-label="Achievement consumer Stories"
+          value={consumers}
+          disabled={locked}
+          onChange={(e) => setConsumers(e.target.value)}
+        />
+      </label>
+      <p>
+        Only your saved Stories can be listed. These permissions are reviewed
+        and cannot change after approval.
+      </p>
       <label>
         Achievement title
         <input
@@ -108,6 +128,10 @@ export function AchievementSubmission({
             storyNodeId,
             title,
             description,
+            consumerStoryIds: consumers
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
           };
           pending.current = command;
           setBusy(true);
@@ -221,6 +245,9 @@ export function AdminAchievements({
         <article className="panel" key={item.id}>
           <h2>{item.title}</h2>
           <p>{item.description}</p>
+          <p>
+            Account key consumers: {item.consumerStoryIds?.join(", ") || "None"}
+          </p>
           <AchievementKeyRewards keys={item.rewardKeys} />
           <details>
             <summary>Published ending: {item.ending.title}</summary>

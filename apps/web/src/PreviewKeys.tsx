@@ -53,11 +53,7 @@ export function PreviewKeys({
           [
             ["storyKeys", "Story keys", story.progression?.keys ?? []],
             ["importedKeys", "Imported facts", story.keyImports?.keys ?? []],
-            [
-              "accountKeys",
-              "Promotional account keys",
-              story.accountKeys?.keys ?? [],
-            ],
+            ["accountKeys", "Account keys", story.accountKeys?.keys ?? []],
           ] as const
         ).map(([field, title, keys]) => (
           <fieldset key={field}>

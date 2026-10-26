@@ -250,7 +250,10 @@ export function PromotionalKeyEditor({
                 key.expiresAt <= Date.now() ||
                 !key.storyIds.includes(story.id) ||
                 bindings.length >= 20 ||
-                bindings.some((k) => k.definitionId === key.id)
+                bindings.some(
+                  (k) =>
+                    k.source !== "achievement" && k.definitionId === key.id,
+                )
               }
               onClick={() => {
                 let suffix = 1;
@@ -307,25 +310,27 @@ export function PromotionalKeyEditor({
         </button>
       )}
       <h4>Aliases in this Story</h4>
-      {bindings.map((key, i) => (
-        <p key={key.keyId}>
-          {key.label} · {key.keyId}{" "}
-          <button
-            className="btn btn-secondary"
-            onClick={() =>
-              onChange({
-                ...story,
-                accountKeys: {
-                  version: 1,
-                  keys: bindings.filter((_, n) => n !== i),
-                },
-              })
-            }
-          >
-            Remove promotional alias {i + 1}
-          </button>
-        </p>
-      ))}
+      {bindings
+        .filter((key) => key.source !== "achievement")
+        .map((key, i) => (
+          <p key={key.keyId}>
+            {key.label} · {key.keyId}{" "}
+            <button
+              className="btn btn-secondary"
+              onClick={() =>
+                onChange({
+                  ...story,
+                  accountKeys: {
+                    version: 1,
+                    keys: bindings.filter((k) => k.keyId !== key.keyId),
+                  },
+                })
+              }
+            >
+              Remove promotional alias {i + 1}
+            </button>
+          </p>
+        ))}
       <p>
         Consumer Stories and expiry are fixed when issued. Revoke stops future
         gated choices for every recipient; it cannot undo committed choices.

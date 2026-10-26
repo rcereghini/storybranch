@@ -1,4 +1,4 @@
-import { liveAccountKeys } from "./promotional-keys";
+import { liveAccountKeys } from "./account-keys";
 import type { Save, Stats } from "../../packages/contracts/index";
 import { renderStoryNode, playerRun } from "../../packages/domain/player";
 import { isResultStoryNode } from "../../packages/domain/index";

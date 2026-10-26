@@ -115,3 +115,5 @@ Page views go to Vercel Web Analytics (enabled on the Vercel project; the app lo
 This is the first slice, to grow as needs come up: candidate additions are viewing a user's stories and saves, story moderation beyond hiding, and paid-plan entitlements.
 
 S22 achievement reviews include Permanent Story key rewards derived from the submitted immutable edition. Approval authorizes these same-Story narrative bindings on future completions, not paid rights. Revocation stops new grants; existing permanent keys, historical claims and run snapshots remain. An existing approved definition without reviewed bindings cannot acquire them silently: a new edition and submission are required.
+
+Achievement reviews display consumer Story permissions for S27 earned account-key conditions. Approval revalidates that every listed Story belongs to the submitting creator; revocation removes future condition eligibility while preserving historical claims. See [S27](story-system/keys.md#achievement-backed-account-keys-s27).

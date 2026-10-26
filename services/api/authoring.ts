@@ -1,4 +1,4 @@
-import { validateAccountKeys } from "./promotional-keys";
+import { validateAccountKeys } from "./account-keys";
 import { createHash } from "node:crypto";
 import { FieldPath, type DocumentReference } from "firebase-admin/firestore";
 import { GameError } from "../../packages/contracts/index";

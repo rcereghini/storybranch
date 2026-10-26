@@ -1,4 +1,5 @@
-import { promotionalRoutes, liveAccountKeys } from "./promotional-keys";
+import { promotionalRoutes } from "./promotional-keys";
+import { liveAccountKeys } from "./account-keys";
 import { evaluate, usesAccountKey } from "../../packages/domain/index";
 import { storyKeyHistory } from "./story-key-history";
 import { sideStory } from "./side-story";
@@ -504,7 +505,7 @@ async function handleCanonical(request: Request): Promise<Response> {
           )
             throw new GameError(
               "STALE_REVISION",
-              "Promotional access changed. Reload current options to continue.",
+              "Account key access changed. Reload current options to continue.",
             );
           const moved = transition(
             story,

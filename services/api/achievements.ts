@@ -19,6 +19,17 @@ const definitions = () => db.collection("achievementDefinitions");
 const definitionId = (storyId: string, versionId: string, nodeId: string) =>
   digest(storyId, versionId, nodeId);
 
+async function validateConsumers(tx: Transaction, uid: string, ids: string[]) {
+  for (const id of ids) {
+    const root = await tx.get(db.doc(`stories/${id}`));
+    if (root.data()?.creatorUid !== uid)
+      throw new GameError(
+        "FORBIDDEN",
+        "Achievement consumers must be saved Stories owned by the submitting creator.",
+      );
+  }
+}
+
 export async function achievementRoutes(
   request: Request,
   uid: string,
@@ -140,6 +151,12 @@ export async function achievementRoutes(
           reviewReason: command.reason,
           updatedAt: Date.now(),
         };
+        if (command.status === "approved")
+          await validateConsumers(
+            tx,
+            old.creatorUid,
+            old.consumerStoryIds ?? [],
+          );
         tx.set(ref, next);
         return {
           result: next,
@@ -195,7 +212,9 @@ export async function achievementRoutes(
         "VALIDATION_FAILED",
         "Approved achievement definitions cannot be edited.",
       );
+    await validateConsumers(tx, uid, command.consumerStoryIds ?? []);
     const next: AchievementDefinition = {
+      consumerStoryIds: command.consumerStoryIds ?? [],
       rewardKeys: (story.progression?.keys ?? [])
         .filter((k) => k.achievementStoryNodeId === command.storyNodeId)
         .map(({ keyId, label }) => ({ keyId, label })),

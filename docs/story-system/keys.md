@@ -1,6 +1,6 @@
 # Keys, items, achievements and cross-story imports
 
-Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key and selected-run local-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S26. General foreign namespace access, arbitrary value imports, cross-creator imports and commercial entitlements remain unsupported.
+Status: target contract with implemented local state, persistent Player + Story keys, approved account achievements, invitation entry and consented persistent-key and selected-run local-key imports within one creator's Stories. Decisions S04, S06, S09 and S16–S27. General foreign namespace access, arbitrary value imports, cross-creator imports and commercial entitlements remain unsupported.
 
 “Key” is a creator-facing idea for a fact or right used in a condition. Storage and authorization distinguish several kinds; a single unrestricted boolean map is not sufficient.
 
@@ -14,7 +14,7 @@ A key is an issuer-owned definition plus a verified grant to a subject. Achievem
 | --- | --- | --- |
 | Playthrough (`run`) | One player run; separate on replay | Found item or opened door |
 | Player + Story (`story`) | One account's progress in one Story across runs/editions | Five completions unlock bonus content on the sixth run |
-| Account (invitation entry and declared promotional `account` conditions) | One account; only declared authorized consumers may check | Creator beta invitation, future paid option or subscriber access |
+| Account (invitation entry and declared promotional/achievement `account` conditions) | One account; only declared authorized consumers may check | Creator beta invitation, future paid option or subscriber access |
 
 StoryContext owns definitions, never shared player ownership. Player + Story progress belongs to private UserContext storage; a run receives a bounded, immutable starting snapshot. Other accounts and Stories cannot read it. Stable key IDs retain their meaning across editions; renaming creates a new identity. Creators can define and award their own narrative keys without platform achievement approval. They cannot mint another issuer's keys or platform/premium rights.
 
@@ -244,3 +244,11 @@ An edition may declare accountKeys version 1 with up to 20 unique local aliases 
 An inactive right evaluates absent, including negative/composite conditions. Storage failures fail the request rather than becoming absence. The existing unconditional cost-free path to a StoryLeaf remains mandatory. A stale displayed gated choice is rejected without committing; the player reloads current options through the stale-state recovery flow. Revocation cannot recall already delivered content: a committed choice and its exact retry retain their destination, and current content remains playable. This is promotional option gating, not paid/private-media hosting or whole-Story access.
 
 Studio exposes definition issuance/revocation, explicit alias bindings and option conditions. Adventures exposes code redemption and private history with reserved loading/error/retry space. Disposable previews may simulate only declared account aliases; real ownership/expiry is not asserted, no grant service is called, and edits restart the preview. Account simulations default empty and are independent of permanent Story/import presets.
+
+## Achievement-backed account keys (S27)
+
+An approved account achievement can serve as an earned account key for explicitly permitted Stories owned by the same creator. The achievement submission may include up to 20 unique `consumerStoryIds`; omission means none. Submission and approval both verify ownership of every saved consumer Story. The review displays this permission list. Approved definitions cannot be edited; changing permissions requires a new source edition and approval. This does not grant premium, paid or subscriber access.
+
+A consumer edition binds a local `accountKeys.keys` alias with `source: achievement` and the approved achievement `definitionId`. Omitted `source` remains promotional for existing editions. Publication requires current approval, matching creator and explicit consumer permission. The account claim is the durable earned evidence; no duplicate grant ledger or retroactive award is created. A claim from any edition of the same stable StoryLeaf qualifies only while its original definition and the bound definition are both approved, belong to the same creator and identify that same achievement. Revocation makes the live condition absent without deleting historical claims or permanent Story keys. Reapproval restores eligibility.
+
+Every projection and choice resolves these facts on the server, including resumed and child runs. Profile strings, local keys, preview flags and client claims are not evidence. Storage errors fail the request. Account aliases are transient facts, never saved in a run or sent as an inventory to renderers. The S26 safe exit, exact retry and stale-choice recovery rules apply. Only a declared boolean eligibility check crosses Story boundaries; no source inventory or run data is imported. Studio previews simulate declared aliases without granting claims. Existing achievements without consumer permissions remain display-only for this feature.

@@ -334,6 +334,7 @@ export const storySchema = z
                 keyId: namespaced,
                 label: z.string().trim().min(1).max(80),
                 definitionId: id,
+                source: z.enum(["promotional", "achievement"]).optional(),
               })
               .strict(),
           )

@@ -1,3 +1,4 @@
+import { EarnedAccountKeys } from "./EarnedAccountKeys";
 import { renderStoryNode } from "../../../packages/domain/player";
 import { PromotionalKeyEditor } from "./PromotionalKeys";
 import { Button } from "./ui";
@@ -1268,6 +1269,12 @@ export function Studio({
                   story={draft.story}
                   onChange={change}
                 />
+                <EarnedAccountKeys
+                  key={draft.story.id}
+                  api={api}
+                  story={draft.story}
+                  onChange={change}
+                />
                 <StoryKeyImports story={draft.story} onChange={change} />
                 <StoryRunExports story={draft.story} onChange={change} />
                 {draft.revision > 0 && (
@@ -1829,7 +1836,11 @@ export function Studio({
                                     key={`account-${k.keyId}`}
                                     value={`account|${k.keyId}`}
                                   >
-                                    {k.label} (promotional)
+                                    {k.label} (
+                                    {k.source === "achievement"
+                                      ? "earned account"
+                                      : "promotional"}
+                                    )
                                   </option>
                                 ),
                               )}
