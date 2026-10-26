@@ -53,6 +53,8 @@ flowchart TD
 
 ## Authoritative command sequence
 
+S31 saved playtest setups are optional `playtestScenarios` metadata on private drafts, bounded and validated by the existing draft command schema. They share draft ownership, revision guards, idempotency receipts and the request-size limit. Stale local references are retained for creator diagnostics; only preview loading requires current declarations. Publication selects `draft.story`, so saved setups never enter an edition or player projection. No collection, migration or real-run command field is added. See [Studio scenarios](../17-creator-studio.md#stat-and-inventory-preview-scenarios).
+
 The browser sends actor intent, idempotency key and expected run revision; actor identity comes from verified authentication. For future visit-aware types, include the expected visit/action scope as well. The server:
 
 1. Validates bounded request syntax and rejects unknown fields. Authenticates the actor and authorizes the resource and relevant live capabilities.

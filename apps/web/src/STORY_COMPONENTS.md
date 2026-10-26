@@ -45,6 +45,8 @@ StoryKeys.tsx also provides `StoryEntryKeys`, a separate redeemed invitation lis
 
 `PreviewStateEditor.tsx` edits disposable starting stats and Story-local inventory in private preview. Follow [Studio preview scenarios](../../../docs/17-creator-studio.md#stat-and-inventory-preview-scenarios), S25 and PlayerContext. Apply restarts; validation failures preserve the active preview. Never forward scenario values to real commands or persistence.
 
+`SavedPlaytestScenarios.tsx` manages explicitly saved S31 starting setups in private draft metadata. Follow the same Studio scenario contract: validate shape and local namespaces on save, diagnose stale references against the effective Story, restart safely on Load, preserve draft undo/autosave and omit setups from published editions and player state.
+
 `BranchItemsEditor.tsx` and `branch-items-model.ts` edit output costs and per-route local item effects. Read [visual StoryBranch items](../../../docs/17-creator-studio.md#visual-storybranch-items), keys and the portable effect/choice contracts. Preserve non-item effects, IDs, order, destinations and conditions; server transitions remain authoritative and publication requires a safe exit.
 
 `StoryItemCatalogue.tsx`, `StoryItemPicker.tsx` and `packages/domain/story-items.ts` share catalogue metadata and reference discovery across authoring/preview. Read [Studio's catalogue contract](../../../docs/17-creator-studio.md#story-item-catalogue) and StoryContext. Metadata never grants inventory; preserve raw IDs, uncatalogued references, immutable editions and player disclosure boundaries.

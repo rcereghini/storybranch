@@ -116,3 +116,7 @@ Expose only owned positive item quantities and pinned display metadata, with raw
 ## S30 — Visible StoryBranch cost disclosure
 
 Show aggregated costs and current quantities on visible options using server-selected, edition-pinned item names. Visible requirements may disclose unowned item names, but hidden options, descriptions, conditions, destinations and future rewards remain private. The server still decides eligibility and commits spending; Studio preview shares the presentation. See [visible option costs](player-runtime.md#visible-option-costs-s30).
+
+## S31 — Private saved playtest setups
+
+Persist bounded named starting scenarios only in creator drafts, using existing revisioned saving and undo. Preserve stale references with diagnostics and reject loading them; loading a valid setup restarts disposable preview without touching real runs. Exclude scenarios from editions and player commands. See [Studio scenarios](../17-creator-studio.md#stat-and-inventory-preview-scenarios).

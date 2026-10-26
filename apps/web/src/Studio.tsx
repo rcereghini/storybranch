@@ -1,4 +1,5 @@
 import { ConditionEditor } from "./ConditionEditor";
+import { SavedPlaytestScenarios } from "./SavedPlaytestScenarios";
 import { StoryItemCatalogue } from "./StoryItemCatalogue";
 import { BranchItemsEditor } from "./BranchItemsEditor";
 import { EarnedAccountKeys } from "./EarnedAccountKeys";
@@ -102,7 +103,7 @@ type Listing = {
 // What undo restores: everything the creator edits in a draft.
 type Snapshot = Pick<
   DraftRecord,
-  "story" | "description" | "storyNodePositions" | "comic"
+  "story" | "description" | "storyNodePositions" | "comic" | "playtestScenarios"
 >;
 type Request = { path: string; body: unknown; version: number };
 type SaveState = "idle" | "saving" | "saved" | "error" | "conflict";
@@ -232,6 +233,7 @@ export function Studio({
     description: d.description,
     storyNodePositions: d.storyNodePositions,
     comic: d.comic,
+    playtestScenarios: d.playtestScenarios,
   });
   // Every edit goes through here: it marks the draft for autosave and keeps
   // undo history (quick successive edits, like typing, share one step).
@@ -320,6 +322,9 @@ export function Studio({
             ),
           ),
           ...(current.comic ? { comic: current.comic } : {}),
+          ...(current.playtestScenarios
+            ? { playtestScenarios: current.playtestScenarios }
+            : {}),
         },
       },
     };
@@ -2063,6 +2068,22 @@ export function Studio({
               </Button>
             </div>
             <div className="studio-preview-stage">
+              <SavedPlaytestScenarios
+                story={preview.story}
+                current={preview.scenario}
+                entries={draft.playtestScenarios ?? []}
+                onChange={(playtestScenarios) =>
+                  edit((current) => ({ ...current, playtestScenarios }))
+                }
+                onLoad={(scenario) =>
+                  setPreview({
+                    ...preview,
+                    scenario,
+                    session: preview.session + 1,
+                    save: simulatePreview(preview.story, scenario, Date.now()),
+                  })
+                }
+              />
               <PreviewKeys
                 story={preview.story}
                 save={preview.save}

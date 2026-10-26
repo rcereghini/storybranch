@@ -36,7 +36,7 @@ const keys = (max: number) =>
       (values) => new Set(values).size === values.length,
       "Preview keys must be unique.",
     );
-// Disposable authoring input only; never part of a draft or command schema.
+// Authoring simulation only; S31 can save a starting setup in a private draft.
 export const previewScenarioSchema = z
   .object({
     version: z.literal(1),
@@ -48,3 +48,28 @@ export const previewScenarioSchema = z
   })
   .strict();
 export type PreviewScenario = z.infer<typeof previewScenarioSchema>;
+
+export const savedPlaytestScenariosSchema = z
+  .array(
+    z
+      .object({
+        id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),
+        name: z.string().trim().min(1).max(60),
+        scenario: previewScenarioSchema,
+      })
+      .strict(),
+  )
+  .max(20)
+  .superRefine((entries, ctx) => {
+    if (
+      new Set(entries.map((e) => e.id)).size !== entries.length ||
+      new Set(entries.map((e) => e.name.toLowerCase())).size !== entries.length
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Saved setups need unique IDs and names.",
+      });
+  });
+export type SavedPlaytestScenario = z.infer<
+  typeof savedPlaytestScenariosSchema
+>[number];
