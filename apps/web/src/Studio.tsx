@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createApi, ApiError } from "../../../packages/api-client/index";
 import { z } from "zod";
 import { choiceSchema, effectSchema } from "../../../packages/contracts/index";
+import { nodeInputsSchema } from "../../../packages/contracts/branch-data";
 import { auth } from "./firebase";
 import {
   type Choice,
@@ -1934,6 +1935,40 @@ export function Studio({
                         Use story namespace <code>{draft.story.id}:</code> for
                         keys and items. Changes apply when leaving the field;
                         invalid JSON is rejected.
+                      </p>
+                      <label>
+                        Inputs JSON
+                        <textarea
+                          key={`${storyNode.id}-inputs-${JSON.stringify(storyNode.inputs)}`}
+                          aria-label="Inputs JSON"
+                          rows={6}
+                          defaultValue={JSON.stringify(
+                            storyNode.inputs ?? { version: 1, fields: [] },
+                            null,
+                            2,
+                          )}
+                          onBlur={(e) => {
+                            try {
+                              const inputs = nodeInputsSchema.parse(
+                                JSON.parse(e.target.value),
+                              );
+                              const next = { ...storyNode };
+                              if (inputs.fields.length) next.inputs = inputs;
+                              else delete next.inputs;
+                              updateStoryNode(next);
+                            } catch {
+                              setNotice(
+                                "Invalid inputs JSON. Your last valid inputs are unchanged.",
+                              );
+                            }
+                          }}
+                        />
+                      </label>
+                      <p>
+                        Inputs declare bounded values for incoming connections.
+                        Set each route's inputBindings in Outputs JSON. Preview
+                        checks required values and compatible types; inputs do
+                        not yet change displayed content.
                       </p>
                       <label>
                         Outputs JSON

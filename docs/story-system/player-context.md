@@ -63,3 +63,5 @@ Checkpoint restore is a future capability: it may restore local state under its 
 The player can inspect positive run-local quantities in a fixed inventory drawer. New Story log events show net item changes with edition-pinned names; old events have no reconstructed changes. See [S29 inventory](player-runtime.md#owned-inventory-and-item-history-s29). Account keys and other runs' inventories remain separate.
 
 Test two independent runs, version-pinned resume, same-command retry, stale actions, pending-result reload, revisiting a node, once-only effects, parent changes during a child run and unavailable parent recovery. Sequel tests must demonstrate explicit source selection and isolation from unrelated runs. Preview cannot persist any of these account/run mutations.
+
+S32 stores optional server-only nodeInputs for the current placement entry revision. Every entry replaces or removes them; Roll preserves the current entry snapshot. Old saves remain unchanged and child starts resolve their own defaults. See [StoryBranch data](branch-data.md) for bounds and compatibility. This is not an unbounded visit history or a generic variable store.

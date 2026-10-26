@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  nodeInputsSchema,
+  inputBindingsSchema,
+  type NodeInputSnapshot,
+} from "./branch-data";
 export const id = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
 export const statId = z.enum([
   "strength",
@@ -130,7 +135,11 @@ export const effectSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 const route = z
-  .object({ targetStoryNodeId: id, effects: z.array(effectSchema).max(20) })
+  .object({
+    targetStoryNodeId: id,
+    effects: z.array(effectSchema).max(20),
+    inputBindings: inputBindingsSchema.optional(),
+  })
   .strict();
 export const choiceSchema = z
   .object({
@@ -246,6 +255,7 @@ export type StoryCompletion = z.infer<typeof completionSchema>;
 export const storyNodeSchema = z
   .object({
     id,
+    inputs: nodeInputsSchema.optional(),
     title: z.string().max(160),
     transcript: z.string().max(10000),
     kind: z.enum(["scene", "ending"]),
@@ -469,6 +479,7 @@ export type LocalState = {
   scores?: Record<string, number>;
 };
 export type Save = LocalState & {
+  nodeInputs?: NodeInputSnapshot;
   id: string;
   playerUid: string;
   storyId: string;

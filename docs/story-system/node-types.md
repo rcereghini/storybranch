@@ -38,7 +38,7 @@ StoryLeaf local completion is implemented separately from a new renderer type: e
 
 Initial rule remains uniform integer 1–N, pass on `value >= threshold`; target must be within 1–N. The service supplies randomness and persists it before the UI shows a result. Transaction retries reuse the draw; command retries replay the receipt. Repeated Roll on the pending visit is rejected. Next routes from the stored result and consumes it exactly once. A future modifier must name its source, bounds and ruleset version; the browser cannot supply a total.
 
-The raw roll and selected output are distinct. A following node can explicitly bind to the saved raw result or `passed` flag. A numeric branch label 0 or 1 is not a general-purpose context object. Current downstream conditions can inspect `lastRoll` for a named StoryNode; generalized binding is target-only.
+The raw roll and selected output are distinct. A following node can explicitly bind to the saved raw result or `passed` flag using [S32](branch-data.md). A numeric branch label 0 or 1 is not a general-purpose context object. Current downstream conditions can inspect `lastRoll` for a named StoryNode; conditions consuming the new input snapshot remain deferred.
 
 ## Battle inputs and turn state
 
@@ -66,3 +66,5 @@ Advertisements must be labeled, have bounded waiting and a usable skip/unavailab
 ## Verification required for a type
 
 Prove configuration rejection, all output destinations, input compatibility, conditions/costs and closure in portable checks. Prove forged-result denial, concurrent commands, retry receipts, save/reload and permitted effects in service checks. Exercise the real renderer under Story/StoryNode at desktop/mobile sizes, keyboard operation, offline/retry and completion UI. Preview must clearly identify any mocked provider. Record untested devices, hosted services and provider behavior.
+
+S32 now supports bounded constant/current-Dice input snapshots on existing placements. Earlier generic-binding deferrals still apply to variables, imports, other result types and renderer consumers. The type table's completion and routing contracts are unchanged; see [StoryBranch data](branch-data.md).

@@ -132,3 +132,7 @@ S22 allows each persistent key to use an approved StoryLeaf achievement trigger 
 S26 permits explicitly declared promotional account-key aliases in conditions. The server resolves them live for player projections and choice transactions; expiry/revocation hides or locks future gated options while preserving saves, committed choices and unconditional exits. Facts are never persisted in Save. See [promotional keys](story-system/keys.md#live-promotional-account-keys-s26).
 
 S27 account aliases may use approved achievements as earned evidence, subject to explicit reviewed consumer permissions and current approval of the original and bound definitions. All checks remain server-authoritative and transient; previews simulate only declared aliases. See [keys](story-system/keys.md#achievement-backed-account-keys-s27).
+
+## Common bounded input envelope (S32)
+
+All existing placements may declare optional version-1 inputs and routes may map authored constants or current Dice fields. These are server-only snapshots and do not alter any type's completion trigger, output destinations, renderer or condition behavior. Dice binds only on Next. See [S32](story-system/branch-data.md) for exact syntax and limits; combat and other new types remain deferred.

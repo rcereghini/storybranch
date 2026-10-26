@@ -1,13 +1,13 @@
 # Story system decisions
 
-Established October 23, 2026 for documentation and future implementation. This register owns Story-specific architecture decisions; [the product register](../10-decisions-and-open-questions.md) continues to own broader product/commercial choices. The later naming-only implementation and legacy compatibility are recorded in S13; other target capabilities remain unimplemented.
+Established October 23, 2026 for documentation and future implementation. This register owns Story-specific architecture decisions; [the product register](../10-decisions-and-open-questions.md) continues to own broader product/commercial choices. Later sections record implemented slices. Use [the current roadmap](../roadmap.md) rather than historical deferral statements to assess remaining work.
 
 **Requirement** comes from the user's requested direction or existing project invariants. **Design default** is the concrete architectural choice made to support that direction, changeable through a documented decision. **Deferred** needs a feature-specific contract or product decision before implementation/release.
 
 | ID | Status | Decision and rationale | Owning contract |
 | --- | --- | --- | --- |
 | S01 | User-confirmed terminology + existing runtime requirement | Story contains one StoryTrunk, StoryNodes, StoryBranches and StoryLeaves. StoryTrunk is the title/configuration root outside the playthrough. StoryNodes are playable content/interactions. StoryBranches connect the graph and may carry typed data/conditions. StoryLeaves end paths and configure rewards. Use canonical names in code and new stored/API contracts, with compatibility at the boundary; render through shared Story/StoryNode. | [terminology](terminology.md), [architecture](architecture.md), [nodes](story-nodes.md) |
-| S02 | Requirement | Creator starts with a blank Story containing its single StoryTrunk, with no playable nodes/leaves/connections. Incomplete drafts can save; templates are opt-in. A safe start and valid effective playable graph are required to play/publish. Current starter StoryNodes are an implementation gap. | [nodes](story-nodes.md) |
+| S02 | Requirement, implemented by S14 | Creator starts with a blank Story containing its single StoryTrunk, with no playable nodes/leaves/connections. Incomplete drafts can save; templates are opt-in. A safe start and valid effective playable graph are required to play/publish. | [nodes](story-nodes.md) |
 | S03 | User requirement + validation design default | Every enabled StoryBranch reaches a StoryLeaf. Notify the creator when it cannot; disable the branch and hide its option from players. Server rejects attempts to invoke it. Propagate unsafe required outcomes upstream and block play/publication if no safe start survives. Leaf completion applies authorized end-of-path rewards and shared exits. Structural reachability plus state/loop safety is required; voluntary loops may have guaranteed exits. | [nodes](story-nodes.md), [StoryNode rendering](node-rendering.md) |
 | S04 | Requirement + ownership default | StoryContext owns definitions; PlayerContext owns one run; UserContext owns account facts. Story provider composes projections without changing ownership. Logical contexts do not mandate a React library or three providers. | [architecture](architecture.md), context documents |
 | S05 | Existing requirement + battle design default | Server validates conditions, outcomes and routing. Dice Roll persists/displays; separate Next routes. Future battle persists turns/result and uses explicit Continue. | [StoryNode rendering](node-rendering.md), [types](node-types.md) |
@@ -26,7 +26,7 @@ S13 — User-authorized naming and compatibility: use canonical StoryNode names 
 | Topic | Required before | Starting design and unresolved part |
 | --- | --- | --- |
 | Battle rules | Combat implementation | Turn/action persistence and typed inputs are fixed boundaries; concrete formulas, initiative, stacking, reward balance, escape and turn-limit disposition need versioned encounter rules |
-| Typed state limits and versions | New schema implementation | Use bounded validated values and explicit versions; exact limits, enum IDs and migration adapters need implementation design |
+| Typed state limits and versions | Further schema expansion | S32 fixes limits/version 1 for constant and current-Dice scalar inputs; enums, additional sources/consumers and migration adapters still need implementation design |
 | Conditional graph analysis | Publishing richer graphs | Guarantee usable continuations; choose bounded analyzer/abstract state strategy and require fallbacks where safety cannot be established |
 | Cross-creator exports | Broader sequel/progression release | Need namespace governance, author/user permission, integrity revocation and handling of revoked source facts |
 | Paid/subscriber/promotional rights | Billing/entitlement release | Need issuer/provider, redemption/refund, expiry-during-run and offline policies; no price or commercial promise is chosen here |
@@ -120,3 +120,7 @@ Show aggregated costs and current quantities on visible options using server-sel
 ## S31 — Private saved playtest setups
 
 Persist bounded named starting scenarios only in creator drafts, using existing revisioned saving and undo. Preserve stale references with diagnostics and reject loading them; loading a valid setup restarts disposable preview without touching real runs. Exclude scenarios from editions and player commands. See [Studio scenarios](../17-creator-studio.md#stat-and-inventory-preview-scenarios).
+
+## S32 — Bounded StoryBranch input snapshots
+
+Optional version-1 declarations and constant/current-Dice mappings resolve on authoritative entry into a bounded server-only snapshot. Validate every incoming edge and suppress unsafe choices before publication. Preserve separate Roll/Next, pinned editions, existing saves and player allowlists. Initial authoring uses Inputs/Outputs JSON; inputs have no rendering or condition consumer yet. See [the exact contract](branch-data.md).

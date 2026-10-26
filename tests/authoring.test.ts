@@ -13,6 +13,234 @@ import {
   previewPreset,
 } from "../packages/domain/preview";
 import type { Story } from "../packages/contracts/index";
+import { branchDataStory } from "../fixtures/branch-data";
+import {
+  inputBindingIssue,
+  resolveNodeInputs,
+} from "../packages/domain/branch-data";
+import {
+  readStoryData,
+  legacyStoryData,
+} from "../packages/contracts/legacy-story-format";
+import {
+  nodeInputsSchema,
+  inputBindingsSchema,
+} from "../packages/contracts/branch-data";
+import { renderStoryNode, playerRun } from "../packages/domain/player";
+
+it("preserves falsy defaults, omits optional inputs and isolates child entries", () => {
+  const story = branchDataStory();
+  const entry = story.storyNodes.dice;
+  entry.inputs = {
+    version: 1,
+    fields: [
+      { name: "zero", type: "integer", required: true, default: 0 },
+      { name: "falseValue", type: "boolean", required: true, default: false },
+      { name: "empty", type: "string", required: true, default: "" },
+      { name: "optional", type: "integer", required: false },
+    ],
+  };
+  const parent = start(story, "parent", "player", baseStats, 0);
+  parent.nodeInputs!.values.zero = 8;
+  expect(
+    start(story, "child", "player", baseStats, 1, parent).nodeInputs?.values,
+  ).toEqual({ zero: 0, falseValue: false, empty: "" });
+  const unknown = {
+    version: 1 as const,
+    bindings: [
+      { input: "unknown", source: { kind: "constant" as const, value: 1 } },
+    ],
+  };
+  expect(inputBindingIssue(entry, unknown)).toContain(
+    "Unknown destination input",
+  );
+  expect(() => resolveNodeInputs(entry, 1, unknown)).toThrow();
+  delete entry.inputs;
+  expect(start(story, "old", "player", baseStats, 0)).not.toHaveProperty(
+    "nodeInputs",
+  );
+});
+
+it("validates bounded typed input declarations and binding syntax", () => {
+  const saved = {
+    nodeInputs: {
+      version: 1,
+      storyNodeId: "test",
+      revision: 1,
+      values: { pageId: "unchanged", storyNodeId: "also-unchanged" },
+    },
+  };
+  expect(readStoryData(legacyStoryData(saved))).toEqual(saved);
+  const field = { name: "value", type: "integer", required: true, default: 3 };
+  for (const invalid of [
+    { ...field, default: true },
+    { ...field, default: 1000 },
+    { ...field, default: 1.5 },
+    { ...field, name: "constructor" },
+    { ...field, name: "__proto__" },
+    { ...field, default: null },
+    { ...field, expression: "save.health" },
+  ])
+    expect(
+      nodeInputsSchema.safeParse({ version: 1, fields: [invalid] }).success,
+    ).toBe(false);
+  expect(nodeInputsSchema.safeParse({ version: 2, fields: [] }).success).toBe(
+    false,
+  );
+  expect(
+    nodeInputsSchema.safeParse({ version: 1, fields: [field, field] }).success,
+  ).toBe(false);
+  expect(
+    nodeInputsSchema.safeParse({
+      version: 1,
+      fields: Array.from({ length: 17 }, (_, i) => ({
+        ...field,
+        name: `v${i}`,
+      })),
+    }).success,
+  ).toBe(false);
+  const binding = { input: "value", source: { kind: "constant", value: 2 } };
+  expect(
+    inputBindingsSchema.safeParse({ version: 1, bindings: [binding, binding] })
+      .success,
+  ).toBe(false);
+  expect(
+    inputBindingsSchema.safeParse({
+      version: 1,
+      bindings: [
+        { input: "value", source: { kind: "dice", field: "arbitrary.path" } },
+      ],
+    }).success,
+  ).toBe(false);
+});
+
+it("resolves Dice inputs only on Next and replaces snapshots on revisits and exits", () => {
+  for (const value of [14, 16, 20]) {
+    const story = validatePublication(branchDataStory());
+    const initial = start(story, "test", "player", baseStats, 0);
+    expect(initial.nodeInputs?.values).toEqual({ attempt: 1 });
+    expect(() => transition(story, initial, "roll", 0, 1)).toThrow(
+      "Roll before",
+    );
+    const rolled = transition(
+      story,
+      initial,
+      "roll",
+      0,
+      1,
+      () => value,
+      "roll",
+    ).save;
+    expect(rolled.nodeInputs).toEqual(initial.nodeInputs);
+    const entered = transition(
+      story,
+      JSON.parse(JSON.stringify(rolled)),
+      "roll",
+      1,
+      2,
+    ).save;
+    expect(entered.nodeInputs).toEqual({
+      version: 1,
+      storyNodeId: "summary",
+      revision: 2,
+      values: {
+        roll: value,
+        passed: value >= 16,
+        secret: "private-input-marker",
+      },
+    });
+    expect(
+      JSON.stringify(renderStoryNode(story.storyNodes.summary, entered)),
+    ).not.toContain("private-input-marker");
+    expect(JSON.stringify(playerRun(entered))).not.toContain("nodeInputs");
+    const repeated = transition(story, entered, "Again", 2, 3).save;
+    expect(repeated.nodeInputs).toEqual({ ...initial.nodeInputs, revision: 3 });
+    expect(() => transition(story, repeated, "roll", 3, 4)).toThrow(
+      "Roll before",
+    );
+    const finished = transition(story, entered, "Finish", 2, 3).save;
+    expect(finished).not.toHaveProperty("nodeInputs");
+    expect(rolled.lastRoll?.pending).toBe(true);
+  }
+});
+
+it("checks every incoming edge and suppresses incompatible optional choices", () => {
+  const story = branchDataStory();
+  const source = story.storyNodes.summary;
+  source.choices.push({
+    id: "bad",
+    label: "bad",
+    costs: [],
+    unavailableDisplay: "hidden",
+    outcome: {
+      kind: "direct",
+      route: {
+        targetStoryNodeId: "summary",
+        effects: [],
+        inputBindings: {
+          version: 1,
+          bindings: [
+            {
+              input: "roll",
+              source: { kind: "constant", value: "wrong type" },
+            },
+            { input: "passed", source: { kind: "constant", value: false } },
+          ],
+        },
+      },
+    },
+  });
+  const review = reviewPublication(story);
+  expect(review.story?.storyNodes.summary.choices.map((c) => c.id)).toEqual([
+    "Finish",
+    "Again",
+  ]);
+  expect(review.diagnostics).toContainEqual(
+    expect.objectContaining({
+      choiceId: "bad",
+      message: expect.stringContaining("Incompatible input type"),
+    }),
+  );
+  const bad = source.choices[2].outcome;
+  if (bad.kind !== "direct") throw new Error("Fixture");
+  bad.route.inputBindings!.bindings[0].source = { kind: "constant", value: 7 };
+  const valid = validatePublication(story);
+  const roll = transition(
+    valid,
+    start(valid, "run", "player", baseStats, 0),
+    "roll",
+    0,
+    1,
+    () => 16,
+    "roll",
+  ).save;
+  const summary = transition(valid, roll, "roll", 1, 2).save;
+  expect(
+    transition(valid, summary, "bad", 2, 3).save.nodeInputs?.values,
+  ).toEqual({ roll: 7, passed: false, secret: "private-input-marker" });
+  bad.route.inputBindings!.bindings[0].source = {
+    kind: "dice",
+    field: "value",
+  };
+  expect(
+    reviewPublication(story).diagnostics.some((d) =>
+      d.message.includes("current Dice"),
+    ),
+  ).toBe(true);
+});
+
+it("rejects a required Dice outcome or root input without a compatible source", () => {
+  const story = branchDataStory();
+  const outcome = story.storyNodes.dice.choices[0].outcome;
+  if (outcome.kind !== "dice") throw new Error("Fixture");
+  delete outcome.failure.inputBindings;
+  expect(reviewPublication(story).story).toBeUndefined();
+  const root = branchDataStory();
+  delete root.storyNodes.dice.inputs!.fields[0].default;
+  expect(reviewPublication(root).error).toContain(
+    "Required input has no source",
+  );
+});
 
 it("bounds private saved setups, preserves stale local references and rejects loading them", () => {
   const story = blankStory("setups");

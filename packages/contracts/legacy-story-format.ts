@@ -28,6 +28,7 @@ export const storyDictionaries: ReadonlySet<string> = new Set([
   "scores",
   "stats",
   "statsSnapshot",
+  "values", // S32 input names are authored identifiers, not contract fields.
 ]);
 
 function convert(

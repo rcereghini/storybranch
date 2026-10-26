@@ -9,6 +9,11 @@ import {
   type Effect,
   type Choice,
 } from "../contracts/index";
+import {
+  choiceInputIssue,
+  inputBindingIssue,
+  resolveNodeInputs,
+} from "./branch-data";
 // Every route a choice can take, whichever outcome the server selects.
 export const routesOf = (c: Choice) =>
   c.outcome.kind === "direct"
@@ -201,6 +206,14 @@ export function start(
       parentPlaythroughId: parent?.id ?? null,
       parentRevision: parent?.revision ?? null,
       updatedAt: now,
+      ...(story.storyNodes[story.entryStoryNodeId]?.inputs
+        ? {
+            nodeInputs: resolveNodeInputs(
+              story.storyNodes[story.entryStoryNodeId],
+              0,
+            ),
+          }
+        : {}),
     },
     story,
   );
@@ -293,6 +306,17 @@ export function transition(
         : success
           ? c.outcome.success
           : c.outcome.failure;
+  const destination = story.storyNodes[r.targetStoryNodeId];
+  if (!destination)
+    throw new GameError("VALIDATION_FAILED", "Missing destination.");
+  const nodeInputs = resolveNodeInputs(
+    destination,
+    s.revision + 1,
+    r.inputBindings,
+    c.outcome.kind === "dice" ? input.lastRoll : undefined,
+  );
+  if (nodeInputs) s.nodeInputs = nodeInputs;
+  else delete s.nodeInputs;
   effects(s, r.effects);
   s.storyNodeId = r.targetStoryNodeId;
   s.revision++;
@@ -335,6 +359,10 @@ export function validateStory(value: unknown): Story {
   const storyNodes = Object.values(story.storyNodes);
   if (storyNodes.length > 100 || !story.storyNodes[story.entryStoryNodeId])
     throw new Error("Invalid graph entry or size");
+  const entryIssue = inputBindingIssue(
+    story.storyNodes[story.entryStoryNodeId],
+  );
+  if (entryIssue) throw new Error(entryIssue);
   const effectIds = new Set<string>();
   if (
     story.trunkContext?.initialKeys.some(
@@ -393,6 +421,8 @@ export function validateStory(value: unknown): Story {
     )
       throw new Error("Reveal StoryNode requires one reveal output");
     for (const choice of n.choices) {
+      const bindingIssue = choiceInputIssue(choice, story.storyNodes);
+      if (bindingIssue) throw new Error(bindingIssue);
       if (
         choice.outcome.kind === "dice" &&
         (storyNodeType !== "dice" ||
