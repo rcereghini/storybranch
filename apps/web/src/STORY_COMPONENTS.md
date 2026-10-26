@@ -38,3 +38,5 @@ StoryKeys.tsx also provides `StoryEntryKeys`, a separate redeemed invitation lis
 `PromotionalKeys.tsx` owns Studio definition issuance/revocation/alias bindings and Adventures redemption/history. `PreviewKeys.tsx` supports disposable account aliases. Follow [S26](../../../docs/story-system/keys.md#live-promotional-account-keys-s26). Account rights are live server inputs; never persist them in run snapshots or infer them from creator preview.
 
 `EarnedAccountKeys.tsx` binds approved achievement definitions to consumer account aliases; `Achievements.tsx` authors and reviews consumer permissions. Follow [S27](../../../docs/story-system/keys.md#achievement-backed-account-keys-s27), preserving private claim evidence and live server authority.
+
+`ConsumerStoryPicker.tsx` selects saved creator Stories for achievement/promotional consumer permissions. Follow [Studio](../../../docs/17-creator-studio.md) and S26/S27 [keys](../../../docs/story-system/keys.md); listing/filtering is convenience, never authority, and unloaded or failed batches must not erase selections.
