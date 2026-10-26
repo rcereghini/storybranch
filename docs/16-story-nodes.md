@@ -136,3 +136,5 @@ S27 account aliases may use approved achievements as earned evidence, subject to
 ## Common bounded input envelope (S32)
 
 All existing placements may declare optional version-1 inputs and routes may map authored constants or current Dice fields. These are server-only snapshots and do not alter any type's completion trigger, output destinations, renderer or condition behavior. Dice binds only on Next. See [S32](story-system/branch-data.md) for exact syntax and limits; combat and other new types remain deferred.
+
+S33 permits typed input conditions against the server's current-entry snapshot (integer comparisons, boolean/text equality). Completion triggers and output destinations remain unchanged; all playable graphs still need unconditional safe exits. Input values and expressions remain private in player responses. See [S33](story-system/branch-data.md#s33--visual-bindings-and-current-entry-input-conditions).

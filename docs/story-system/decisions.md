@@ -124,3 +124,7 @@ Persist bounded named starting scenarios only in creator drafts, using existing 
 ## S32 — Bounded StoryBranch input snapshots
 
 Optional version-1 declarations and constant/current-Dice mappings resolve on authoritative entry into a bounded server-only snapshot. Validate every incoming edge and suppress unsafe choices before publication. Preserve separate Roll/Next, pinned editions, existing saves and player allowlists. Initial authoring uses Inputs/Outputs JSON; inputs have no rendering or condition consumer yet. See [the exact contract](branch-data.md).
+
+## S33 — Visual input authoring and authoritative conditions
+
+Expose S32 declarations/bindings through explicit Apply/Reset controls and private preview inspection. Add bounded typed comparisons against the current entry snapshot, validated recursively against the source declaration and evaluated server-side. Preserve unconditional safe exits, private values, immutable editions and separate Dice Roll/Next. See [the contract](branch-data.md#s33--visual-bindings-and-current-entry-input-conditions).

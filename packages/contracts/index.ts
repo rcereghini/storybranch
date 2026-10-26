@@ -3,6 +3,9 @@ import {
   nodeInputsSchema,
   inputBindingsSchema,
   type NodeInputSnapshot,
+  inputName,
+  inputValueSchema,
+  type InputValue,
 } from "./branch-data";
 export const id = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
 export const statId = z.enum([
@@ -14,6 +17,12 @@ export const statId = z.enum([
 ]);
 export type StatId = z.infer<typeof statId>;
 export type Condition =
+  | {
+      kind: "input";
+      input: string;
+      op: "gte" | "lte" | "eq";
+      value: InputValue;
+    }
   | {
       kind: "roll";
       storyNodeId: string;
@@ -37,6 +46,18 @@ const namespaced = z
 const integer = z.number().int().min(0).max(999);
 function conditionAt(depth: number): z.ZodType<Condition> {
   const leaf = [
+    z
+      .object({
+        kind: z.literal("input"),
+        input: inputName,
+        op: z.enum(["gte", "lte", "eq"]),
+        value: inputValueSchema,
+      })
+      .strict()
+      .refine(
+        (c) => c.op === "eq" || typeof c.value === "number",
+        "Only integer inputs support ordered comparisons.",
+      ),
     z
       .object({
         kind: z.literal("roll"),

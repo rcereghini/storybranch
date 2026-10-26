@@ -1,6 +1,6 @@
 # Current delivery checklist
 
-Reviewed October 26, 2026 against merged main `0dd4a9b` (through PR51). This is the current planning checklist; dated verification records remain historical evidence. A checked item means an implemented capability, not that every product milestone or hosted/device acceptance test is complete. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
+Reviewed October 26, 2026 against merged main `ffe3fca` (through PR52), with S33 implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means an implemented capability, not that every product milestone or hosted/device acceptance test is complete. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
 
 ## Implemented foundation
 
@@ -18,8 +18,8 @@ Implementation details: [player runtime](story-system/player-runtime.md), [Studi
 
 ## Next architecture slices
 
-- [x] Implemented in this change: S32 typed input declarations, constant/Dice mappings, per-entry server snapshots and safe publication validation. Contract: [StoryBranch data](story-system/branch-data.md). Initial authoring through advanced JSON; no gameplay consumer yet. Merge/deployment is separate from implementation.
-- [ ] Visual input/binding editor and creator-only resolved-input diagnostics; useful typed input conditions with guaranteed exits.
+- [x] S32 typed input declarations, constant/Dice mappings, per-entry server snapshots and safe publication validation (merged PR52). Contract: [StoryBranch data](story-system/branch-data.md).
+- [x] S33 visual input/binding editor, creator-only resolved-input diagnostics and typed input conditions with guaranteed exits, implemented in this change. Merge/deployment remains separate from implementation.
 - [ ] Repeatable playtests: saved Dice controls, route history and assertions. Existing saved setups contain starting state only.
 - [ ] A concrete TurnBasedBattle contract, then authoritative turns, reload/retry, inputs/results and shared rendering. Decide combat rules, limits and escape before implementation.
 - [ ] Checkpoint restore with explicit roll/visit semantics; broader item use and reward configuration without duplicating permanent claims.

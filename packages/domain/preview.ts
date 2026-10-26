@@ -1,4 +1,5 @@
 import { storyItems } from "./story-items";
+import { currentInput } from "./branch-data";
 import {
   GameError,
   type Story,
@@ -117,6 +118,8 @@ export function startPreview(
 const comparisonWords = { gte: "at least", lte: "at most", eq: "exactly" };
 export function describeCondition(c: Condition): string {
   switch (c.kind) {
+    case "input":
+      return `input ${c.input} ${comparisonWords[c.op]} ${JSON.stringify(c.value)}`;
     case "key":
       return `${c.scope ?? "run"} key ${c.keyId} must be ${c.present ? "present" : "absent"}`;
     case "stat":
@@ -148,6 +151,13 @@ export function explainCondition(
   path = "1",
 ): ConditionDiagnostic[] {
   let actual: string | undefined;
+  if (c.kind === "input") {
+    const value = currentInput(save, c.input);
+    actual =
+      value === undefined
+        ? "No current input value"
+        : "Current input: " + JSON.stringify(value);
+  }
   if (c.kind === "stat")
     actual = "Current " + c.stat + ": " + save.stats[c.stat];
   if (c.kind === "item")

@@ -3,7 +3,12 @@ import {
   reviewPublication,
   validatePublication,
 } from "../packages/domain/authoring";
-import { start, baseStats, transition } from "../packages/domain/index";
+import {
+  start,
+  baseStats,
+  transition,
+} from "../packages/domain/index";
+import { conditionSchema } from "../packages/contracts/index";
 import { blankStory } from "../apps/web/src/studio-model";
 import { draftSchema } from "../packages/contracts/authoring";
 import { savedPlaytestScenariosSchema } from "../packages/contracts/preview";
@@ -13,6 +18,136 @@ import {
   previewPreset,
 } from "../packages/domain/preview";
 import type { Story } from "../packages/contracts/index";
+
+it("evaluates typed input conditions without coercion or cross-entry access", () => {
+  const story = branchDataStory();
+  const save = start(story, "run", "player", baseStats, 0);
+  for (const op of ["eq", "gte", "lte"] as const)
+    expect(
+      evaluate({ kind: "input", input: "attempt", op, value: 1 }, save),
+    ).toBe(true);
+  expect(
+    evaluate({ kind: "input", input: "attempt", op: "eq", value: "1" }, save),
+  ).toBe(false);
+  expect(
+    evaluate({ kind: "input", input: "missing", op: "eq", value: false }, save),
+  ).toBe(false);
+  expect(
+    evaluate(
+      {
+        kind: "not",
+        condition: { kind: "input", input: "missing", op: "eq", value: false },
+      },
+      save,
+    ),
+  ).toBe(true);
+  const check = {
+    kind: "input" as const,
+    input: "attempt",
+    op: "eq" as const,
+    value: 1,
+  };
+  expect(explainCondition(check, save)[0]).toMatchObject({
+    met: true,
+    actual: "Current input: 1",
+  });
+  save.nodeInputs!.revision = 1;
+  expect(evaluate(check, save)).toBe(false);
+  save.nodeInputs!.revision = 0;
+  save.nodeInputs!.storyNodeId = "another";
+  expect(evaluate(check, save)).toBe(false);
+  delete save.nodeInputs;
+  expect(evaluate(check, save)).toBe(false);
+  for (const value of [true, "text"])
+    expect(
+      conditionSchema.safeParse({ kind: "input", input: "v", op: "gte", value })
+        .success,
+    ).toBe(false);
+  for (const value of [-1000, 1000, 1.5, "x".repeat(201), null])
+    expect(
+      conditionSchema.safeParse({ kind: "input", input: "v", op: "eq", value })
+        .success,
+    ).toBe(false);
+});
+
+it("gates a Dice destination by its persisted typed inputs and retains a safe exit", () => {
+  for (const value of [14, 16]) {
+    const story = branchDataStory();
+    story.storyNodes.summary.choices.push({
+      id: "secret",
+      label: "Secret route",
+      costs: [],
+      unavailableDisplay: "hidden",
+      availableWhen: {
+        kind: "all",
+        conditions: [
+          { kind: "input", input: "roll", op: "gte", value: 16 },
+          { kind: "input", input: "passed", op: "eq", value: true },
+          {
+            kind: "input",
+            input: "secret",
+            op: "eq",
+            value: "private-input-marker",
+          },
+        ],
+      },
+      outcome: {
+        kind: "direct",
+        route: { targetStoryNodeId: "ending", effects: [] },
+      },
+    });
+    const published = validatePublication(story);
+    const rolled = transition(
+      published,
+      start(published, "run", "player", baseStats, 0),
+      "roll",
+      0,
+      1,
+      () => value,
+      "roll",
+    ).save;
+    const entered = transition(published, rolled, "roll", 1, 2).save;
+    const output = renderStoryNode(
+      published.storyNodes.summary,
+      entered,
+    ).outputs;
+    expect(output.some((o) => o.id === "secret")).toBe(value >= 16);
+    expect(output.some((o) => o.id === "Finish")).toBe(true);
+    if (value < 16)
+      expect(() => transition(published, entered, "secret", 2, 3)).toThrow(
+        "unavailable",
+      );
+    else
+      expect(transition(published, entered, "secret", 2, 3).save.status).toBe(
+        "completed",
+      );
+    story.storyNodes.summary.choices = [story.storyNodes.summary.choices[2]];
+    expect(reviewPublication(story).story).toBeUndefined();
+  }
+});
+
+it("rejects undeclared or mismatched input checks including nested outcome conditions", () => {
+  for (const condition of [
+    { kind: "input" as const, input: "missing", op: "eq" as const, value: 1 },
+    { kind: "input" as const, input: "roll", op: "eq" as const, value: true },
+  ]) {
+    const story = branchDataStory();
+    const c = story.storyNodes.summary.choices[0];
+    c.outcome = {
+      kind: "check",
+      condition: { kind: "not", condition },
+      success: { targetStoryNodeId: "ending", effects: [] },
+      failure: { targetStoryNodeId: "ending", effects: [] },
+    };
+    const review = reviewPublication(story);
+    expect(review.story).toBeUndefined();
+    expect(
+      review.diagnostics.some((d) =>
+        /condition input|input type mismatch/i.test(d.message),
+      ),
+    ).toBe(true);
+  }
+});
 import { branchDataStory } from "../fixtures/branch-data";
 import {
   inputBindingIssue,

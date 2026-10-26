@@ -6014,3 +6014,148 @@ it("persists authoritative StoryBranch inputs without player disclosure or retry
   ).toBe(200);
   expect((await stored.get()).data()).not.toHaveProperty("nodeInputs");
 });
+
+it("authorizes input-gated choices from the persisted entry and rejects forged values", async () => {
+  const story = branchDataStory(`input-gates-${randomUUID()}`);
+  const dice = story.storyNodes.dice.choices[0].outcome;
+  if (dice.kind !== "dice") throw new Error("Fixture");
+  dice.target = 1;
+  story.storyNodes.summary.choices.push({
+    id: "gated",
+    label: "Earned route",
+    costs: [],
+    unavailableDisplay: "hidden",
+    availableWhen: { kind: "input", input: "passed", op: "eq", value: true },
+    outcome: {
+      kind: "direct",
+      route: { targetStoryNodeId: "ending", effects: [] },
+    },
+  });
+  const path = `/studio/${story.id}`;
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        draft: { story, description: "Input gates" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  const started = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: story.id },
+  });
+  const run = `/playthroughs/${started.data.save.id}`;
+  expect(
+    (
+      await call(`${run}/choices`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        payload: { choiceId: "roll", action: "roll" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${run}/choices`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        payload: { choiceId: "roll" },
+      })
+    ).status,
+  ).toBe(200);
+  const view = await call(run);
+  expect(
+    view.data.storyNode.outputs.some((o: { id: string }) => o.id === "gated"),
+  ).toBe(true);
+  expect(JSON.stringify(view.data)).not.toMatch(
+    /nodeInputs|inputBindings|private-input-marker/,
+  );
+  const command = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 2,
+    payload: { choiceId: "gated" },
+  };
+  expect(
+    (
+      await call(`${run}/choices`, {
+        ...command,
+        payload: { ...command.payload, inputs: { passed: true } },
+      })
+    ).status,
+  ).toBe(400);
+  const done = await call(`${run}/choices`, command);
+  expect(done.status).toBe(200);
+  expect((await call(`${run}/choices`, command)).data).toEqual(done.data);
+
+  // A distinct edition deliberately supplies false, regardless of its Dice win.
+  for (const route of [dice.success, dice.failure])
+    route.inputBindings!.bindings[1].source = {
+      kind: "constant",
+      value: false,
+    };
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: { story, description: "False inputs" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  const fresh = await call("/playthroughs", {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: story.id },
+  });
+  const nextRun = `/playthroughs/${fresh.data.save.id}`;
+  await call(`${nextRun}/choices`, {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: { choiceId: "roll", action: "roll" },
+  });
+  await call(`${nextRun}/choices`, {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    payload: { choiceId: "roll" },
+  });
+  const hidden = await call(nextRun);
+  expect(
+    hidden.data.storyNode.outputs.some((o: { id: string }) => o.id === "gated"),
+  ).toBe(false);
+  expect(
+    (
+      await call(`${nextRun}/choices`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        payload: { choiceId: "gated" },
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await call(`${nextRun}/choices`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        payload: { choiceId: "Finish" },
+      })
+    ).status,
+  ).toBe(200);
+});
