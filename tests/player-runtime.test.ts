@@ -1,7 +1,13 @@
 import { it, expect, vi } from "vitest";
 import { PlayerSession } from "../apps/web/src/player-session";
 import { EditionCache } from "../services/api/edition-cache";
-import { renderStoryNode, playerRun } from "../packages/domain/player";
+import {
+  renderStoryNode,
+  playerRun,
+  playerInventory,
+  playerItemChanges,
+} from "../packages/domain/player";
+import { playerEventSchema } from "../packages/contracts/player";
 import { baseStats, start } from "../packages/domain/index";
 import { glassHarbor } from "../fixtures/stories";
 import { ApiError } from "../packages/api-client/index";
@@ -24,6 +30,71 @@ const command = {
   path: "/playthroughs/run/choices",
   body: { idempotencyKey: "exact-retry" },
 };
+
+it("projects owned inventory and net item history without revealing unowned metadata", () => {
+  const story = structuredClone(glassHarbor);
+  story.itemCatalogue = {
+    version: 1,
+    items: [
+      {
+        itemId: "glass-harbor:coin",
+        name: "Coin",
+        description: "A brass coin",
+      },
+      {
+        itemId: "glass-harbor:secret",
+        name: "Unseen treasure",
+        description: "Spoiler",
+      },
+    ],
+  };
+  expect(
+    playerInventory(story, {
+      "glass-harbor:coin": 2,
+      "glass-harbor:secret": 0,
+    }),
+  ).toEqual([
+    {
+      itemId: "glass-harbor:coin",
+      name: "Coin",
+      description: "A brass coin",
+      quantity: 2,
+    },
+  ]);
+  expect(playerInventory(story, { "glass-harbor:old": 1 })[0].name).toBe(
+    "glass-harbor:old",
+  );
+  const changes = playerItemChanges(
+    story,
+    { "glass-harbor:coin": 2 },
+    { "glass-harbor:coin": 0, "glass-harbor:old": 1 },
+  );
+  expect(changes.map((i) => i.delta)).toEqual([-2, 1]);
+  expect(
+    playerItemChanges(
+      story,
+      { "glass-harbor:coin": 2 },
+      { "glass-harbor:coin": 2 },
+    ),
+  ).toEqual([]);
+  expect(
+    playerItemChanges(story, {}, { "glass-harbor:coin": 2 })[0].delta,
+  ).toBe(2);
+  const old = { label: "Old event", at: 1, revision: 0 };
+  expect(playerEventSchema.parse(old)).toEqual(old);
+  expect(
+    playerEventSchema.parse({
+      ...old,
+      itemChanges: changes.map((i) => ({ ...i, privateField: "hidden" })),
+    }).itemChanges,
+  ).toEqual(changes);
+  expect(
+    playerEventSchema.safeParse({
+      ...old,
+      itemChanges: [{ ...changes[0], delta: 0 }],
+    }).success,
+  ).toBe(false);
+});
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;

@@ -1,4 +1,5 @@
 import { PromotionalKeyWallet } from "./PromotionalKeys";
+import { PlayerInventory } from "./PlayerInventory";
 import { StoryKeys, StoryEntryKeys } from "./StoryKeys";
 import { transitionTiming } from "./transition-timing";
 import {
@@ -71,6 +72,7 @@ const playerApi = createApi(
 );
 function App() {
   const starting = useRef(false);
+  const logRequest = useRef(0);
   const [importOffer, setImportOffer] = useState<
     | (StoryImportOffer & {
         entry?: {
@@ -421,15 +423,25 @@ function App() {
   };
   const showLog = async (cursor?: string) => {
     if (!player) return;
+    const request = ++logRequest.current;
+    const scope = auth.currentUser?.uid + "|" + location.pathname;
+    const current = () =>
+      request === logRequest.current &&
+      scope === auth.currentUser?.uid + "|" + location.pathname;
+    if (!cursor) {
+      setEvents([]);
+      setLogCursor(null);
+    }
     setLogOpen(true);
     try {
       const r = await api<{ items: Event[]; nextCursor: string | null }>(
         `/playthroughs/${player.save.id}/events${cursor ? `?cursor=${cursor}` : ""}`,
       );
+      if (!current()) return;
       setEvents((old) => (cursor ? [...old, ...r.items] : r.items));
       setLogCursor(r.nextCursor);
     } catch (e) {
-      report(e);
+      if (current()) report(e);
     }
   };
   // Until Firebase restores the session, a signed-in player looks signed out,
@@ -694,6 +706,10 @@ function App() {
                       ✓ Saved · revision {player.save.revision}
                     </span>
                     <button onClick={() => void showLog()}>Story log</button>
+                    <PlayerInventory
+                      key={player.save.id}
+                      inventory={player.inventory}
+                    />
                   </div>
                 </div>
                 {player.save.parentPlaythroughId && (
@@ -924,6 +940,16 @@ function App() {
                               ? ` · d${e.roll.sides}: ${e.roll.value} (target ${e.roll.target})`
                               : ""}
                           </small>
+                          {!!e.itemChanges?.length && (
+                            <ul aria-label="Net item changes">
+                              {e.itemChanges.map((item) => (
+                                <li key={item.itemId}>
+                                  {item.name}: {item.delta > 0 ? "+" : ""}
+                                  {item.delta} (net)
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </li>
                       ))}
                     </ol>

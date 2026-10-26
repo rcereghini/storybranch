@@ -10,6 +10,26 @@ import type { SceneMedia } from "./media";
 
 export const playerContractHeader = "X-Story-Player";
 export const playerContractVersion = "player-view-v1";
+const itemDisplaySchema = z.object({
+  itemId: z
+    .string()
+    .regex(/^[a-z0-9-]+:[a-z0-9-]+$/)
+    .max(100),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500),
+});
+export const playerItemSchema = itemDisplaySchema.extend({
+  quantity: z.number().int().min(1).max(999),
+});
+export const playerItemChangeSchema = itemDisplaySchema.extend({
+  delta: z
+    .number()
+    .int()
+    .min(-999)
+    .max(999)
+    .refine((n) => n !== 0),
+});
+export type PlayerItem = z.infer<typeof playerItemSchema>;
 export const playerRollSchema = z.object({
   storyNodeId: id,
   value: z.number().int(),
@@ -27,6 +47,7 @@ export const playerEventSchema = z.object({
   outcome: z.string().optional(),
   roll: playerRollSchema.optional(),
   completion: completionSchema.optional(),
+  itemChanges: z.array(playerItemChangeSchema).optional(),
 });
 export type PlayerEvent = z.infer<typeof playerEventSchema>;
 export const renderStoryNodeSchema = storyNodeSchema
@@ -62,6 +83,7 @@ export type PlayerView = {
   story: { id: string; title: string; versionId: string };
   user: StoryUser;
   save: PlayerRun;
+  inventory?: PlayerItem[];
   storyNode: RenderStoryNode;
   media?: SceneMedia;
   nextMedia?: SceneMedia;

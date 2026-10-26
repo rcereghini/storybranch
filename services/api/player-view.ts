@@ -1,6 +1,10 @@
 import { liveAccountKeys } from "./account-keys";
 import type { Save, Stats } from "../../packages/contracts/index";
-import { renderStoryNode, playerRun } from "../../packages/domain/player";
+import {
+  renderStoryNode,
+  playerRun,
+  playerInventory,
+} from "../../packages/domain/player";
 import { isResultStoryNode } from "../../packages/domain/index";
 import { db } from "./firebase";
 import { edition } from "./story-store";
@@ -54,6 +58,7 @@ export async function playerView(
   }
   return projectStoredPlayerData(() => ({
     save: playerRun(s),
+    inventory: playerInventory(story, s.items),
     story: {
       id: story.id,
       versionId: story.versionId,

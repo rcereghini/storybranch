@@ -2,13 +2,55 @@ import {
   completionSchema,
   type Save,
   type StoryNode,
+  type Story,
 } from "../contracts/index";
 import {
   renderStoryNodeSchema,
   playerRollSchema,
   type PlayerRun,
+  playerItemSchema,
+  playerItemChangeSchema,
 } from "../contracts/player";
 import { evaluate } from "./index";
+
+function itemDisplay(story: Story, itemId: string) {
+  const definition = story.itemCatalogue?.items.find(
+    (i) => i.itemId === itemId,
+  );
+  return {
+    itemId,
+    name: definition?.name ?? itemId,
+    description: definition?.description ?? "",
+  };
+}
+
+export function playerInventory(story: Story, items: Save["items"]) {
+  return Object.keys(items)
+    .sort()
+    .filter((id) => items[id] > 0)
+    .map((id) =>
+      playerItemSchema.parse({
+        ...itemDisplay(story, id),
+        quantity: items[id],
+      }),
+    );
+}
+
+// Only committed before/after state supplies these facts, never client intent.
+export function playerItemChanges(
+  story: Story,
+  before: Save["items"],
+  after: Save["items"],
+) {
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .sort()
+    .flatMap((id) => {
+      const delta = (after[id] ?? 0) - (before[id] ?? 0);
+      return delta === 0
+        ? []
+        : [playerItemChangeSchema.parse({ ...itemDisplay(story, id), delta })];
+    });
+}
 
 // Explicit allowlist: authored routes, scoring and entry effects stay server-side.
 // Studio uses this same adapter with its disposable, local preview save.

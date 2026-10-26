@@ -5535,6 +5535,145 @@ it("uses earned achievements only through approved consumer permissions and live
   ).not.toHaveProperty("accountKeys");
 });
 
+it("records authoritative net inventory once and projects pinned owned metadata", async () => {
+  const story = starterStory(`inventory-${randomUUID()}`);
+  const itemId = `${story.id}:coin`;
+  story.itemCatalogue = {
+    version: 1,
+    items: [
+      { itemId, name: "Old coin", description: "A worn coin" },
+      {
+        itemId: `${story.id}:secret`,
+        name: "Hidden treasure",
+        description: "Unseen",
+      },
+    ],
+  };
+  const safe = structuredClone(story.storyNodes.opening.choices[0]);
+  story.storyNodes.opening.storyNodeType = "text-options";
+  story.storyNodes.opening.choices.push({
+    ...structuredClone(safe),
+    id: "earn",
+    label: "Earn",
+    outcome: {
+      kind: "direct",
+      route: {
+        targetStoryNodeId: "middle",
+        effects: [{ id: "earn-coin", kind: "item", itemId, delta: 2 }],
+      },
+    },
+  });
+  story.storyNodes.middle = {
+    ...structuredClone(story.storyNodes.opening),
+    id: "middle",
+    choices: [
+      safe,
+      {
+        ...structuredClone(safe),
+        id: "spend",
+        label: "Spend",
+        costs: [{ itemId, quantity: 2 }],
+      },
+    ],
+  };
+  const path = `/studio/${story.id}`;
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 0,
+        draft: { story, description: "Inventory" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  const startCommand = {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: story.id },
+  };
+  const begun = await call("/playthroughs", startCommand);
+  expect(begun.status).toBe(200);
+  expect(begun.data.player.inventory).toEqual([]);
+  const run = `/playthroughs/${begun.data.save.id}`;
+  const earn = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: { choiceId: "earn" },
+  };
+  const earned = await call(`${run}/choices`, earn);
+  expect(earned.status).toBe(200);
+  expect(earned.data.player.inventory).toEqual([
+    { itemId, name: "Old coin", description: "A worn coin", quantity: 2 },
+  ]);
+  expect(JSON.stringify(earned.data)).not.toMatch(
+    /Hidden treasure|itemCatalogue/,
+  );
+  story.itemCatalogue.items[0].name = "New coin";
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: { story, description: "Renamed" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+  expect((await call(run)).data.inventory[0].name).toBe("Old coin");
+  const spend = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 1,
+    payload: { choiceId: "spend" },
+  };
+  const spent = await call(`${run}/choices`, spend);
+  expect(spent.status).toBe(200);
+  expect(spent.data.player.inventory).toEqual([]);
+  expect((await call(`${run}/choices`, spend)).data.player).toEqual(
+    spent.data.player,
+  );
+  expect((await call(`${run}/choices`, earn)).data.player).toEqual(
+    earned.data.player,
+  );
+  const events = (await call(`${run}/events`)).data.items;
+  expect(events).toHaveLength(3);
+  expect(
+    events.map((e: { itemChanges: Array<{ delta: number }> }) =>
+      e.itemChanges.map((i) => i.delta),
+    ),
+  ).toEqual([[], [2], [-2]]);
+  expect(events[2].itemChanges[0].name).toBe("Old coin");
+  expect(JSON.stringify(events)).not.toMatch(/Hidden treasure|commandId/);
+  expect((await call(`${run}/events`, undefined, "progressed")).status).toBe(
+    404,
+  );
+  const fresh = await call("/playthroughs", {
+    ...startCommand,
+    idempotencyKey: randomUUID(),
+  });
+  expect(fresh.data.player.inventory).toEqual([]);
+  const newEarned = await call(`/playthroughs/${fresh.data.save.id}/choices`, {
+    ...earn,
+    idempotencyKey: randomUUID(),
+  });
+  expect(newEarned.data.player.inventory[0].name).toBe("New coin");
+});
+
 it("pins item catalogues to editions and keeps definitions out of player projections", async () => {
   const story = starterStory(`catalogue-${randomUUID()}`);
   const path = `/studio/${story.id}`;

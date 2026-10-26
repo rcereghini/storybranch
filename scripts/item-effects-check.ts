@@ -344,6 +344,64 @@ try {
     await tab
       .getByText(/Published edition-\d+\. Your story is now in Discover\./)
       .waitFor();
+    const started = await api("/playthroughs", {
+      idempotencyKey: randomUUID(),
+      payload: { storyId: story.id },
+    });
+    await tab.goto(`http://127.0.0.1:5173/play/${started.player.save.id}`);
+    const inventory = tab.getByRole("dialog", { name: "Your inventory" });
+    const inventoryButton = tab.getByRole("button", {
+      name: "Inventory",
+      exact: true,
+    });
+    await inventoryButton.click();
+    await inventory.getByText("You haven't collected any items yet.").waitFor();
+    await tab.keyboard.press("Escape");
+    await inventory.waitFor({ state: "hidden" });
+    assert(
+      await inventoryButton.evaluate((el) => document.activeElement === el),
+    );
+    await tab.getByRole("button", { name: /Earn relic/ }).click();
+    await tab
+      .getByRole("heading", { name: "Inventory checkpoint", exact: true })
+      .waitFor();
+    const geometry = await tab.locator(".player-grid").boundingBox();
+    await inventoryButton.click();
+    await inventory.getByText("Golden relic", { exact: true }).waitFor();
+    await inventory.getByLabel("Quantity 2", { exact: true }).waitFor();
+    assert.deepEqual(await tab.locator(".player-grid").boundingBox(), geometry);
+    await tab.keyboard.press("Tab");
+    assert(
+      await inventory.evaluate((el) => el.contains(document.activeElement)),
+    );
+    for (const theme of ["light", "dark"]) {
+      await tab.evaluate((t) => {
+        document.documentElement.dataset.theme = t;
+      }, theme);
+      assert(
+        await inventory.evaluate((el) => el.scrollWidth <= el.clientWidth),
+      );
+      await tab.screenshot({
+        path: `test-results/player-inventory-${width}-${theme}.png`,
+        animations: "disabled",
+      });
+    }
+    await inventory.getByRole("button", { name: "Close inventory" }).click();
+    await tab.getByRole("button", { name: /Spend relic/ }).click();
+    await tab.getByRole("heading", { name: "The end", exact: true }).waitFor();
+    await tab.reload();
+    await inventoryButton.click();
+    await inventory.getByLabel("Quantity 1", { exact: true }).waitFor();
+    await inventory.getByRole("button", { name: "Close inventory" }).click();
+    await tab.getByRole("button", { name: "Story log", exact: true }).click();
+    await tab
+      .locator(".log")
+      .getByText("Golden relic: +2 (net)", { exact: true })
+      .waitFor();
+    await tab
+      .locator(".log")
+      .getByText("Golden relic: -1 (net)", { exact: true })
+      .waitFor();
     assert.deepEqual(errors, []);
     await tab.close();
   }

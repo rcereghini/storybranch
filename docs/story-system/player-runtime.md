@@ -24,6 +24,14 @@ Anything sent to the browser is inspectable. Speculative media is a disclosure d
 
 Require the versioned rendering contract for player endpoints; older player clients must reload/update. Preserve existing stored data and receipt semantics. Old receipts remain replayable without reexecuting actions or rewriting editions. Verification covers response projection, same-key retry, stale/concurrent actions, pending dice, account/navigation races, cache isolation/eviction/expiry and desktop/mobile frame retention. The browser transition check counts requests and records click-to-playing time; the local request/presentation diagnostics below provide the next layer; centralized production aggregation remains future work. No production latency promise follows from local timing alone.
 
+## Owned inventory and item history (S29)
+
+PlayerView adds an optional `inventory` array of positive owned quantities with item ID, name and description. The server selects metadata from the run's pinned edition; uncatalogued IDs use the ID as name and an empty description. Never send the full catalogue or definitions for zero/unowned items. Older responses without this field can render raw IDs from the existing quantities. No new gameplay authority or cross-run inventory is introduced.
+
+New committed run events carry optional `itemChanges`, each with item ID, pinned display metadata and a signed nonzero net quantity delta. Compare authoritative inventory before and after the entire command, including costs, route effects and entry effects. Root and child starts compare against empty inventory, never the parent's inventory. These are net gains/losses, not a breakdown of individual spending and rewards; equal spending and grants have no net entry. Display this meaning explicitly. Store the display snapshot with the event atomically with save/receipt so later reads need no mutable catalogue lookup. Exact retries create no additional event. Old events remain readable without invented history or backfill.
+
+The inventory is a read-only modal drawer inside the Story provider, with Escape, focus containment/restoration and an empty state. It overlays playback without changing player geometry. Current inventory follows accepted server views; the Story log retains past changes even after an item reaches zero. Neither surface reveals future item definitions, routing, conditions or account-key evidence.
+
 ## Implementation map
 
 - Portable presentation contract: packages/contracts/player.ts; pure projection: packages/domain/player.ts.
