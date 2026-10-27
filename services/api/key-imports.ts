@@ -1,8 +1,8 @@
+import type { StagedBattleStory } from "../../packages/contracts/battle-graph";
 import { FieldPath, type Transaction } from "firebase-admin/firestore";
 import {
   GameError,
   type Save,
-  type Story,
   type SourceRunSelection,
 } from "../../packages/contracts/index";
 import type {
@@ -11,7 +11,7 @@ import type {
 } from "../../packages/contracts/key-imports";
 import { readStoryData } from "../../packages/contracts/legacy-story-format";
 import { db } from "./firebase";
-import { edition } from "./story-store";
+import { edition, playerEdition } from "./story-store";
 import { sideStory } from "./side-story";
 import { assertStoryEntry } from "./invitations";
 
@@ -25,19 +25,26 @@ const denied = () =>
 // no account grants are read during publication or the pre-consent offer.
 export async function validateKeyImports(
   tx: Transaction,
-  story: Story,
+  story: StagedBattleStory,
   creatorUid: string,
+  battleCapable = false,
 ) {
   const definitions = story.keyImports?.keys ?? [];
-  const sources = new Map<string, Story>();
+  const sources = new Map<string, StagedBattleStory>();
   for (const key of definitions) {
     const sourceRoot = await tx.get(db.doc(`stories/${key.sourceStoryId}`));
     if (sourceRoot.data()?.creatorUid !== creatorUid) throw denied();
     const identity = `${key.sourceStoryId}/${key.sourceVersionId}`;
     let source = sources.get(identity);
     if (!source) {
-      source = (await edition(tx, key.sourceStoryId, key.sourceVersionId))
-        .story;
+      source = (
+        await playerEdition(
+          tx,
+          key.sourceStoryId,
+          key.sourceVersionId,
+          battleCapable,
+        )
+      ).story;
       sources.set(identity, source);
     }
     const exported = (
@@ -65,7 +72,7 @@ export async function validateKeyImports(
 
 export async function validateKeyExports(
   tx: Transaction,
-  story: Story,
+  story: StagedBattleStory,
   creatorUid: string,
 ) {
   const destinations = new Set(
@@ -90,10 +97,11 @@ export async function validateKeyExports(
 export async function resolveKeyImports(
   tx: Transaction,
   uid: string,
-  story: Story,
+  story: StagedBattleStory,
   consent: boolean,
   now: number,
   selections: SourceRunSelection[] = [],
+  battleCapable = false,
 ): Promise<Save["keyImportSnapshot"]> {
   const definitions = story.keyImports?.keys ?? [];
   for (const selected of selections)
@@ -113,7 +121,7 @@ export async function resolveKeyImports(
   const root = await tx.get(db.doc(`stories/${story.id}`));
   const creatorUid = root.data()?.creatorUid;
   if (!creatorUid) throw denied();
-  await validateKeyImports(tx, story, creatorUid);
+  await validateKeyImports(tx, story, creatorUid, battleCapable);
   const keys: NonNullable<Save["keyImportSnapshot"]>["keys"] = [];
   for (const key of definitions) {
     if (key.selection === "completed-run") {
@@ -227,19 +235,26 @@ export async function storySourceRuns(
   versionId: string,
   keyId: string,
   cursor: string | null,
+  battleCapable = false,
 ): Promise<StorySourceRuns> {
   return db.runTransaction(async (tx) => {
     const listing = await tx.get(db.doc(`catalogue/${storyId}`));
     if (!listing.exists || listing.data()?.hidden === true) throw denied();
     await assertStoryEntry(tx, uid, storyId);
-    const { story } = await edition(tx, storyId, versionId);
-    return sourceRunsForStory(tx, uid, story, keyId, cursor);
+    const { story } = await playerEdition(
+      tx,
+      storyId,
+      versionId,
+      battleCapable,
+    );
+    return sourceRunsForStory(tx, uid, story, keyId, cursor, battleCapable);
   });
 }
 
 export async function storyImportOffer(
   uid: string,
   storyId: string,
+  battleCapable = false,
 ): Promise<StoryImportOffer> {
   return db.runTransaction(async (tx) => {
     const listing = await tx.get(db.doc(`catalogue/${storyId}`));
@@ -250,16 +265,22 @@ export async function storyImportOffer(
       );
     await assertStoryEntry(tx, uid, storyId);
     const root = await tx.get(db.doc(`stories/${storyId}`));
-    const { story } = await edition(
+    const { story } = await playerEdition(
       tx,
       storyId,
       root.data()!.publishedVersionId,
+      battleCapable,
     );
     return {
       storyId,
       versionId: story.versionId,
       title: story.title,
-      keys: await validateKeyImports(tx, story, root.data()!.creatorUid),
+      keys: await validateKeyImports(
+        tx,
+        story,
+        root.data()!.creatorUid,
+        battleCapable,
+      ),
     };
   });
 }
@@ -267,12 +288,13 @@ export async function storyImportOffer(
 async function sourceRunsForStory(
   tx: Transaction,
   uid: string,
-  story: Story,
+  story: StagedBattleStory,
   keyId: string,
   cursor: string | null,
+  battleCapable = false,
 ): Promise<StorySourceRuns> {
   const root = await tx.get(db.doc(`stories/${story.id}`));
-  await validateKeyImports(tx, story, root.data()!.creatorUid);
+  await validateKeyImports(tx, story, root.data()!.creatorUid, battleCapable);
   const key = story.keyImports?.keys.find(
     (k) => k.keyId === keyId && k.selection === "completed-run",
   );
@@ -281,10 +303,11 @@ async function sourceRunsForStory(
       "VALIDATION_FAILED",
       "No completed-run import is declared for that key.",
     );
-  const { story: sourceStory } = await edition(
+  const { story: sourceStory } = await playerEdition(
     tx,
     key.sourceStoryId,
     key.sourceVersionId,
+    battleCapable,
   );
   let query = db
     .collection(`users/${uid}/playthroughs`)

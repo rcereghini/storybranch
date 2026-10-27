@@ -1,3 +1,8 @@
+import {
+  stagedBattleStorySchema,
+  type StagedBattleStory,
+} from "../../packages/contracts/battle-graph";
+import { battleContractVersion } from "../../packages/contracts/battle-player";
 import { EditionCache } from "./edition-cache";
 import type { DocumentData, Transaction } from "firebase-admin/firestore";
 import { db } from "./firebase";
@@ -64,4 +69,46 @@ export async function version(
   versionId: string,
 ): Promise<Story> {
   return (await edition(tx, storyId, versionId)).story;
+}
+
+// Player-only negotiation. Authoring continues to use edition(), which rejects combat.
+export async function playerEdition(
+  tx: Transaction,
+  storyId: string,
+  versionId: string,
+  battleCapable = false,
+): Promise<{
+  story: StagedBattleStory;
+  clips: Record<string, PublishedClip>;
+  battle: boolean;
+}> {
+  const ref = db.doc(`stories/${storyId}/versions/${versionId}`);
+  const manifest = await tx.get(ref);
+  if (!manifest.exists || manifest.data()!.ready !== true)
+    throw new GameError("NOT_FOUND", "Story edition unavailable.");
+  if (!manifest.data()!.battleContract)
+    return { ...(await edition(tx, storyId, versionId)), battle: false };
+  if (
+    !battleCapable ||
+    manifest.data()!.battleContract !== battleContractVersion
+  )
+    throw new GameError(
+      "VALIDATION_FAILED",
+      "Update the player before opening this battle edition.",
+    );
+  const nodes = await tx.get(ref.collection("storyNodes"));
+  const {
+    ready: _,
+    battleContract: __,
+    clips = {},
+    manifestHash: ___,
+    ...data
+  } = manifest.data()!;
+  const story = stagedBattleStorySchema.parse({
+    ...data,
+    storyNodes: Object.fromEntries(nodes.docs.map((n) => [n.id, n.data()])),
+  });
+  if (story.id !== storyId || story.versionId !== versionId)
+    throw new Error("Stored edition identity mismatch.");
+  return { story, clips, battle: true };
 }

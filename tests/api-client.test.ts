@@ -23,17 +23,19 @@ it("negotiates the required contract on every player route", async () => {
   await api("/playthroughs?cursor=next");
   await api("/playthroughs/run/events");
   await api("/playthroughs/run/choices", { intent: true });
+  await api("/story-imports/story");
+  await api("/story-imports/story/v1/runs?keyId=story:key");
   await api("/catalogue");
   expect(
     requests
-      .slice(0, 4)
+      .slice(0, 6)
       .every(
         (headers) =>
           headers.get(playerContractHeader) === playerContractVersion &&
           headers.get(battleContractHeader) === battleContractVersion,
       ),
   ).toBe(true);
-  expect(requests[4].has(playerContractHeader)).toBe(false);
+  expect(requests[6].has(playerContractHeader)).toBe(false);
 });
 
 it.each([

@@ -29,7 +29,7 @@ export function createApi(
       method: body ? "POST" : "GET",
       headers: {
         [storyContractHeader]: storyContractVersion,
-        ...(/^\/playthroughs(?:[/?]|$)/.test(path)
+        ...(/^\/(?:playthroughs|story-imports)(?:[/?]|$)/.test(path)
           ? {
               [playerContractHeader]: playerContractVersion,
               [battleContractHeader]: battleContractVersion,
