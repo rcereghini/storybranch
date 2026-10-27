@@ -1,6 +1,6 @@
 # TurnBasedBattle — S35
 
-Status: **design contract, not implemented**. Established October 26, 2026. These are recommended first-version defaults, not previously user-specified combat rules. Current schemas, APIs and renderers still reject combat. This document owns the initial battle rules and acceptance criteria; read [types](node-types.md), [PlayerContext](player-context.md), [StoryBranch data](branch-data.md), [storage](data-storage.md) and [rendering](node-rendering.md) alongside it.
+Status: **S35a portable foundation implemented; playable combat not implemented**. Established October 26, 2026. These are recommended first-version defaults, not previously user-specified combat rules. Current StoryNode schemas, APIs and renderers still reject combat; standalone battle schemas/rules exist only for the staged implementation. This document owns the initial battle rules and acceptance criteria; read [types](node-types.md), [PlayerContext](player-context.md), [StoryBranch data](branch-data.md), [storage](data-storage.md) and [rendering](node-rendering.md) alongside it.
 
 ## First version
 
@@ -106,4 +106,18 @@ Required evidence before release:
 | Preview | Same outcomes as portable rules; saved battle replay/reload; changed draft assertion failures; old S34 replay compatibility; no published test metadata or real grants |
 | Browser | Shared wrapper at desktop/mobile and both themes; keyboard, reduced motion, readable HP; offline/unknown-result retry; stale tab; terminal result surviving reload; explicit Continue to every outcome; stable layout; unsupported-client recovery |
 
-No implementation or test pass is claimed by this document. Combat balance beyond the example, physical device coverage and hosted rollout remain verification work. Party combat, skills, timed buffs, randomness, inventory consumption and reward design must be separately versioned before expansion.
+The acceptance matrix above is a release requirement, not a claim of complete implementation. S35a verification below covers only the standalone portable foundation. Combat balance beyond the example, physical device coverage and hosted rollout remain verification work. Party combat, skills, timed buffs, randomness, inventory consumption and reward design must be separately versioned before expansion.
+
+## S35a implementation boundary
+
+The first implementation slice adds standalone portable battle config/state/result/intent schemas, entry-input compatibility checks and deterministic round resolution. It does not register `battle` in StoryNode schemas, change Save, expose an endpoint or enable publication. The engine returns a proposed state/health update (or a pending result on Continue); only the later service transaction may persist it, route and consume it. Full graph suppression, result-binding registration, projections and renderer/replay integration remain required follow-up work. Existing editions and saves need no migration for this isolated slice.
+
+### Portable entry points and trust boundary
+
+`packages/contracts/battle.ts` validates battle-1 configuration, identity, bounded state/result and intent. Identity encodes the run, edition, StoryNode and entry revision as a canonical JSON tuple; the strict scalar shape remains below the 8 KiB state bound. `packages/domain/battle.ts` provides `validateBattleEntry` for each incoming edge/default, `resolveBattleInputs`, `startBattle`, `actBattle` and allowlisted `battleResultValue`.
+
+The caller must supply the server-loaded pinned config and owned state. `startBattle` receives health/stats after destination entry effects and resolved values from the correct entry snapshot; it does not apply effects itself. `actBattle` validates identity/phase, expected turn and revision, then returns a fresh update proposal or a validated pending result on Continue. Continue does not advance a save revision, clear the interaction or choose a destination here: the later atomic routing transaction must do all of those together. Input-range helpers are not yet wired into publication, and result scalar extraction does not register a new binding source. No standalone helper substitutes for authorization or receipt replay.
+
+### S35a local verification — October 26, 2026
+
+`pnpm check` passed: TypeScript, 162 tests (including 17 battle tests and the portable dependency-boundary check), and production build. Battle checks exercise both initiative orders, ties/preemptive, bounded bonuses, damage/Guard, final-turn precedence, free Escape, zero-health entry, 30-round exhaustion, strict schema rejection, malformed state, revision/turn/visit guards, deterministic reload and fresh revisit identity, input ranges and the continued rejection of battle by playable Story schemas. No service/renderer is integrated, so emulator/browser checks were not rerun; persistence, graph suppression and end-to-end acceptance remain unverified. Existing build chunk-size warnings remain. Self-review only; independent review pending.
