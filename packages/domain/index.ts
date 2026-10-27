@@ -108,7 +108,7 @@ export function evaluate(
       return !evaluate(c.condition, s, accountKeys);
   }
 }
-function effects(s: Save, list: Effect[], once = false) {
+export function applyEffects(s: Save, list: Effect[], once = false) {
   for (const e of list) {
     if (once && s.appliedEntryEffects.includes(e.id)) continue;
     switch (e.kind) {
@@ -148,10 +148,19 @@ function effects(s: Save, list: Effect[], once = false) {
     if (once) s.appliedEntryEffects.push(e.id);
   }
 }
-function enter(s: Save, story: Story) {
+export function enter(
+  s: Save,
+  story: {
+    id: string;
+    storyNodes: Record<
+      string,
+      Pick<Story["storyNodes"][string], "id" | "kind" | "entryEffects" | "leaf">
+    >;
+  },
+) {
   const n = story.storyNodes[s.storyNodeId];
   if (!n) throw new GameError("VALIDATION_FAILED", "Missing destination.");
-  effects(s, n.entryEffects, true);
+  applyEffects(s, n.entryEffects, true);
   s.status = n.kind === "ending" ? "completed" : "active";
   if (s.status === "completed" && !s.completion) {
     const rewards = (n.leaf?.rewards ?? []).map((reward) => {
@@ -328,7 +337,7 @@ export function transition(
   );
   if (nodeInputs) s.nodeInputs = nodeInputs;
   else delete s.nodeInputs;
-  effects(s, r.effects);
+  applyEffects(s, r.effects);
   s.storyNodeId = r.targetStoryNodeId;
   s.revision++;
   s.updatedAt = now;

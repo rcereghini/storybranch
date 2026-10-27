@@ -50,7 +50,7 @@ export function currentInput(save: Save, name: string): InputValue | undefined {
 }
 
 export function inputBindingIssue(
-  destination: StoryNode,
+  destination: Pick<StoryNode, "id" | "inputs">,
   bindings?: InputBindings,
   dice = false,
 ): string | undefined {
@@ -79,7 +79,7 @@ export function inputBindingIssue(
 }
 
 export function resolveNodeInputs(
-  destination: StoryNode,
+  destination: Pick<StoryNode, "id" | "inputs">,
   revision: number,
   bindings?: InputBindings,
   roll?: Save["lastRoll"],

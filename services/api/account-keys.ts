@@ -10,7 +10,9 @@ import {
   validateAccountKeys as validatePromotional,
 } from "./promotional-keys";
 
-const promotionalStory = (story: Story): Story => ({
+const promotionalStory = (
+  story: Pick<Story, "id" | "accountKeys">,
+): Pick<Story, "id" | "accountKeys"> => ({
   ...story,
   accountKeys: {
     version: 1,
@@ -19,12 +21,12 @@ const promotionalStory = (story: Story): Story => ({
     ),
   },
 });
-const achievementKeys = (story: Story) =>
+const achievementKeys = (story: Pick<Story, "id" | "accountKeys">) =>
   (story.accountKeys?.keys ?? []).filter((k) => k.source === "achievement");
 const definitionRef = (id: string) => db.doc(`achievementDefinitions/${id}`);
 const authorized = (
   d: AchievementDefinition | undefined,
-  story: Story,
+  story: Pick<Story, "id" | "accountKeys">,
   issuer: string | undefined,
 ) =>
   !!issuer &&
@@ -34,7 +36,7 @@ const authorized = (
 
 export async function validateAccountKeys(
   tx: Transaction,
-  story: Story,
+  story: Pick<Story, "id" | "accountKeys">,
   uid: string,
 ) {
   await validatePromotional(tx, promotionalStory(story), uid);
@@ -54,7 +56,7 @@ export async function validateAccountKeys(
 export async function liveAccountKeys(
   tx: Transaction,
   uid: string,
-  story: Story,
+  story: Pick<Story, "id" | "accountKeys">,
 ): Promise<string[]> {
   const facts = await promotionalFacts(tx, uid, promotionalStory(story));
   const keys = achievementKeys(story);

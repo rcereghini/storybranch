@@ -148,3 +148,7 @@ Require all three unconditional battle output routes and validate their destinat
 ### S35c — Staged mixed battle graph compiler
 
 Reuse the conservative publication proof with all three battle outputs required and per-edge consumer range checks. Keep a separate strict staged graph schema; reconstruct original battle nodes/bindings after proof so synthetic scalar values cannot become runtime results. Live publication and player schemas remain unchanged. See [S35c](battle.md#s35c-staged-mixed-graph-compilation).
+
+### S35d — Staged authoritative persistence
+
+Embed the bounded battle state in the owned save and require `X-Story-Battle: battle-v1` plus a matching edition marker. Save revision, health, interaction, event, receipt and any Continue completion claims share one transaction. Replay the exact projected JSON response for an identical receipt; reject changed intent or stale revision after receipt expiry. Reuse entry effects and completion preparation rather than introducing a separate reward path. Live publication, public entry and full player/Studio integration remain gated; there is no browser battle flow in this slice. See [S35d](battle.md#s35d-authoritative-battle-command-boundary).

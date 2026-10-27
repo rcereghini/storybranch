@@ -26,6 +26,11 @@ export async function edition(
   const manifest = await tx.get(ref);
   if (!manifest.exists || !manifest.data()!.ready)
     throw new GameError("NOT_FOUND", "Story edition unavailable.");
+  if (manifest.data()!.battleContract)
+    throw new GameError(
+      "VALIDATION_FAILED",
+      "Update the player before opening this battle edition.",
+    );
   const stored = readStoryData<DocumentData>(manifest.data());
   if (!stored.entryStoryNodeId)
     throw new GameError(
