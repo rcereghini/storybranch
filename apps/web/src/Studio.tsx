@@ -109,7 +109,12 @@ type Listing = {
 // What undo restores: everything the creator edits in a draft.
 type Snapshot = Pick<
   DraftRecord,
-  "story" | "description" | "storyNodePositions" | "comic" | "playtestScenarios"
+  | "story"
+  | "description"
+  | "storyNodePositions"
+  | "comic"
+  | "playtestScenarios"
+  | "battlePlaytests"
 >;
 type Request = { path: string; body: unknown; version: number };
 type SaveState = "idle" | "saving" | "saved" | "error" | "conflict";
@@ -240,6 +245,7 @@ export function Studio({
     storyNodePositions: d.storyNodePositions,
     comic: d.comic,
     playtestScenarios: d.playtestScenarios,
+    battlePlaytests: d.battlePlaytests,
   });
   // Every edit goes through here: it marks the draft for autosave and keeps
   // undo history (quick successive edits, like typing, share one step).
@@ -330,6 +336,9 @@ export function Studio({
           ...(current.comic ? { comic: current.comic } : {}),
           ...(current.playtestScenarios
             ? { playtestScenarios: current.playtestScenarios }
+            : {}),
+          ...(current.battlePlaytests
+            ? { battlePlaytests: current.battlePlaytests }
             : {}),
         },
       },
@@ -1007,6 +1016,10 @@ export function Studio({
           </Button>
           <BattleWorkshop
             story={draft.story}
+            entries={draft.battlePlaytests ?? []}
+            onChange={(battlePlaytests) =>
+              edit((current) => ({ ...current, battlePlaytests }))
+            }
             mediaFor={mediaFor}
             imageFor={(image) =>
               uploads?.items.find((asset) => asset.id === assetIdOf(image))?.url

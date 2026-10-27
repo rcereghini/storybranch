@@ -5719,6 +5719,27 @@ it("records authoritative net inventory once and projects pinned owned metadata"
 it("saves private playtest setups with revision guards and excludes them from editions and real runs", async () => {
   const story = starterStory(`setups-${randomUUID()}`);
   const path = `/studio/${story.id}`;
+  const battleRehearsal = {
+    version: 1,
+    id: "private-battle",
+    name: "Private battle rehearsal",
+    setup: {
+      storyNodeId: "removed-scene",
+      enemy: {
+        name: "Private enemy",
+        maxHealth: 20,
+        attack: 4,
+        defense: 1,
+        agility: 5,
+      },
+      maxTurns: 10,
+      targets: {
+        win: "removed-win",
+        loss: "removed-loss",
+        escape: "removed-escape",
+      },
+    },
+  };
   const entry = {
     id: "returning",
     name: "Private test setup",
@@ -5746,12 +5767,31 @@ it("saves private playtest setups with revision guards and excludes them from ed
   const command = {
     idempotencyKey: randomUUID(),
     expectedRevision: 0,
-    draft: { story, description: "Setups", playtestScenarios: [entry] },
+    draft: {
+      story,
+      description: "Setups",
+      playtestScenarios: [entry],
+      battlePlaytests: [battleRehearsal],
+    },
   };
   const saved = await call(path, command);
   expect(saved.status).toBe(200);
   expect((await call(path, command)).data).toEqual(saved.data);
   expect((await call(path)).data.playtestScenarios).toEqual([entry]);
+  expect((await call(path)).data.battlePlaytests).toEqual([battleRehearsal]);
+  expect(
+    (
+      await call(path, {
+        ...command,
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: {
+          ...command.draft,
+          battlePlaytests: [{ ...battleRehearsal, version: 2 }],
+        },
+      })
+    ).status,
+  ).toBe(400);
   expect((await call(path, undefined, "progressed")).status).toBe(404);
   expect(
     (await call(path, { ...command, idempotencyKey: randomUUID() })).status,
@@ -5787,6 +5827,10 @@ it("saves private playtest setups with revision guards and excludes them from ed
     await db.doc(`stories/${story.id}/versions/edition-1`).get()
   ).data();
   expect(edition).not.toHaveProperty("playtestScenarios");
+  expect(edition).not.toHaveProperty("battlePlaytests");
+  expect(JSON.stringify(edition)).not.toMatch(
+    /Private enemy|Private battle rehearsal|removed-scene/,
+  );
   expect(JSON.stringify(edition)).not.toMatch(
     /Private test setup|private-source|private-choice|playtestScenarios|"replay"/,
   );
@@ -5805,16 +5849,20 @@ it("saves private playtest setups with revision guards and excludes them from ed
   expect(real.status).toBe(200);
   expect(real.data.save.items).toEqual({});
   expect(JSON.stringify(real.data)).not.toMatch(
+    /battlePlaytests|Private enemy|Private battle rehearsal/,
+  );
+  expect(JSON.stringify(real.data)).not.toMatch(
     /Private test setup|retired|removed/,
   );
   const removed = await call(path, {
     ...command,
     idempotencyKey: randomUUID(),
     expectedRevision: 1,
-    draft: { ...command.draft, playtestScenarios: [] },
+    draft: { ...command.draft, playtestScenarios: [], battlePlaytests: [] },
   });
   expect(removed.status).toBe(200);
   expect((await call(path)).data.playtestScenarios).toEqual([]);
+  expect((await call(path)).data.battlePlaytests).toEqual([]);
 });
 
 it("pins item catalogues to editions and keeps definitions out of player projections", async () => {

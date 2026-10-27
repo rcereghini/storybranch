@@ -20,6 +20,11 @@ import { renderStoryNode } from "../../../packages/domain/player";
 import { baseStats } from "../../../packages/domain/index";
 import { Story } from "./Story";
 import { StoryNode } from "./StoryNode";
+import {
+  savedBattlePlaytestsSchema,
+  type SavedBattlePlaytest,
+  type BattleWorkshopSetup as Setup,
+} from "../../../packages/contracts/battle-workshop";
 
 const scenario = battlePlaytestScenarioSchema.parse({
   version: 1,
@@ -35,12 +40,6 @@ const initialEnemy = {
   agility: 5,
 };
 const outcomes = ["win", "loss", "escape"] as const;
-type Setup = {
-  nodeId: string;
-  enemy: typeof initialEnemy;
-  maxTurns: number;
-  targets: Record<(typeof outcomes)[number], string>;
-};
 type Session = ReturnType<typeof startBattlePreview> & {
   history: BattlePlaytestStep[];
   serial: number;
@@ -52,8 +51,12 @@ export function BattleWorkshop({
   mediaFor,
   imageFor,
   panelsFor,
+  entries,
+  onChange,
 }: {
   story: StoryData;
+  entries: SavedBattlePlaytest[];
+  onChange: (entries: SavedBattlePlaytest[]) => void;
   mediaFor: (video: string | undefined) => SceneMedia | undefined;
   imageFor: (image: string | undefined) => string | undefined;
   panelsFor: (node: NodeData) => Array<string | undefined> | undefined;
@@ -75,6 +78,8 @@ export function BattleWorkshop({
           mediaFor={mediaFor}
           imageFor={imageFor}
           panelsFor={panelsFor}
+          entries={entries}
+          onChange={onChange}
           onClose={() => {
             setOpen(false);
             trigger.current?.focus();
@@ -91,6 +96,8 @@ function Workshop({
   imageFor,
   panelsFor,
   onClose,
+  entries,
+  onChange,
 }: Parameters<typeof BattleWorkshop>[0] & { onClose: () => void }) {
   // Snapshot once: unrelated autosave completions cannot replace a running simulation.
   const [source] = useState(() => structuredClone(story));
@@ -101,7 +108,7 @@ function Workshop({
     Object.values(source.storyNodes).find((node) => node.kind !== "scene")
       ?.id ?? "";
   const [setup, setSetup] = useState<Setup>(() => ({
-    nodeId: scenes[0]?.id ?? "",
+    storyNodeId: scenes[0]?.id ?? "",
     enemy: { ...initialEnemy },
     maxTurns: 10,
     targets: { win: leaf, loss: leaf, escape: leaf },
@@ -110,6 +117,9 @@ function Workshop({
   const [session, setSession] = useState<Session>();
   const [message, setMessage] = useState("");
   const [replay, setReplay] = useState("");
+  const [selected, setSelected] = useState("");
+  const [name, setName] = useState("");
+  const entry = entries.find((item) => item.id === selected);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const element = dialog.current;
@@ -133,44 +143,73 @@ function Workshop({
       );
     }
   };
-  const apply = () =>
-    attempt(() => {
-      const original = source.storyNodes[setup.nodeId];
-      if (!original || original.kind !== "scene")
-        throw Error("Select a scene to rehearse as a battle.");
-      const node = stagedBattleNodeSchema.parse({
-        id: original.id,
-        title: original.title,
-        transcript: original.transcript,
-        inputs: original.inputs,
-        entryEffects: original.entryEffects,
-        kind: "scene",
-        storyNodeType: "battle",
-        battle: {
-          version: 1,
-          rules: "battle-1",
-          enemy: setup.enemy,
-          maxTurns: setup.maxTurns,
-        },
-        outputs: Object.fromEntries(
-          outcomes.map((outcome) => [
-            outcome,
-            { targetStoryNodeId: setup.targets[outcome], effects: [] },
-          ]),
-        ),
-      });
-      const next = startBattlePreview(
-        { ...source, storyNodes: { ...source.storyNodes, [node.id]: node } },
-        scenario,
+  const applySetup = (setup: Setup) => {
+    const original = source.storyNodes[setup.storyNodeId];
+    if (!original || original.kind !== "scene")
+      throw Error("Select a scene to rehearse as a battle.");
+    const node = stagedBattleNodeSchema.parse({
+      id: original.id,
+      title: original.title,
+      transcript: original.transcript,
+      inputs: original.inputs,
+      entryEffects: original.entryEffects,
+      kind: "scene",
+      storyNodeType: "battle",
+      battle: {
+        version: 1,
+        rules: "battle-1",
+        enemy: setup.enemy,
+        maxTurns: setup.maxTurns,
+      },
+      outputs: Object.fromEntries(
+        outcomes.map((outcome) => [
+          outcome,
+          { targetStoryNodeId: setup.targets[outcome], effects: [] },
+        ]),
+      ),
+    });
+    const next = startBattlePreview(
+      { ...source, storyNodes: { ...source.storyNodes, [node.id]: node } },
+      scenario,
+    );
+    if (!next.story.storyNodes[node.id])
+      throw Error(
+        "This encounter has no safe reachable path. Check all three destinations and the Story entry.",
       );
-      if (!next.story.storyNodes[node.id])
+    setApplied(structuredClone(setup));
+    setSession({ ...next, history: [], serial: (session?.serial ?? 0) + 1 });
+    setMessage(
+      "Applied. Preview restarted from the Story entry. Draft unchanged.",
+    );
+  };
+  const apply = () => attempt(() => applySetup(setup));
+  const saveSetup = (replace: boolean) =>
+    attempt(() => {
+      if (!session || dirty)
+        throw Error("Apply or reset configuration changes before saving.");
+      const id = replace ? entry?.id : crypto.randomUUID();
+      if (!id) throw Error("Select a saved rehearsal to update.");
+      const saved = {
+        version: 1 as const,
+        id,
+        name,
+        setup: applied,
+        ...(replay.trim() ? { replay: JSON.parse(replay) } : {}),
+      };
+      const parsed = savedBattlePlaytestsSchema.safeParse(
+        replace
+          ? entries.map((item) => (item.id === id ? saved : item))
+          : [...entries, saved],
+      );
+      if (!parsed.success)
         throw Error(
-          "This encounter has no safe reachable path. Check all three destinations and the Story entry.",
+          "Use a unique name (1–60 characters), valid assertions, at most ten rehearsals and 500 total commands.",
         );
-      setApplied(structuredClone(setup));
-      setSession({ ...next, history: [], serial: (session?.serial ?? 0) + 1 });
+      onChange(parsed.data);
+      setSelected(id);
+      setName(parsed.data.find((item) => item.id === id)!.name);
       setMessage(
-        "Applied. Preview restarted from the Story entry. Draft unchanged.",
+        "Rehearsal saved to draft changes. Studio autosaves it; playback progress is not saved.",
       );
     });
   const restart = () =>
@@ -229,8 +268,9 @@ function Workshop({
         <div>
           <h2 id="battle-workshop-title">Battle workshop</h2>
           <p>
-            Private rehearsal. Closing discards this session; your draft is
-            unchanged.
+            Private rehearsal. Save a named setup to keep configuration and
+            assertions. Closing discards unsaved session edits; the Story graph
+            is unchanged.
           </p>
         </div>
         <button className="btn btn-secondary" autoFocus onClick={close}>
@@ -238,6 +278,92 @@ function Workshop({
         </button>
       </header>
       <div className="battle-workshop-body">
+        <details className="battle-workshop-recording">
+          <summary>Saved battle rehearsals ({entries.length}/10)</summary>
+          <p>
+            Save the applied configuration and assertion JSON, not current
+            progress. Loading starts a fresh preview against this Story. Saved
+            rehearsals never change published content.
+          </p>
+          <label>
+            Saved battle rehearsal
+            <select
+              aria-label="Saved battle rehearsal"
+              value={entry?.id ?? ""}
+              onChange={(event) => {
+                setSelected(event.target.value);
+                setName(
+                  entries.find((item) => item.id === event.target.value)
+                    ?.name ?? "",
+                );
+              }}
+            >
+              <option value="">New rehearsal</option>
+              {entries.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Rehearsal name
+            <input
+              maxLength={60}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <div className="battle-workshop-actions">
+            <button
+              className="btn btn-secondary"
+              disabled={!session || dirty || entries.length >= 10}
+              onClick={() => saveSetup(false)}
+            >
+              Save rehearsal as new
+            </button>
+            <button
+              className="btn btn-secondary"
+              disabled={!session || dirty || !entry}
+              onClick={() => saveSetup(true)}
+            >
+              Update saved rehearsal
+            </button>
+            <button
+              className="btn btn-secondary"
+              disabled={!entry}
+              onClick={() =>
+                attempt(() => {
+                  if (!entry) return;
+                  applySetup(entry.setup);
+                  setSetup(structuredClone(entry.setup));
+                  setReplay(
+                    entry.replay ? JSON.stringify(entry.replay, null, 2) : "",
+                  );
+                  setMessage(
+                    "Loaded rehearsal from the Story entry. Run assertions to check for Story changes.",
+                  );
+                })
+              }
+            >
+              Load rehearsal
+            </button>
+            <button
+              className="btn btn-secondary"
+              disabled={!entry}
+              onClick={() => {
+                onChange(entries.filter((item) => item.id !== entry?.id));
+                setSelected("");
+                setName("");
+                setMessage(
+                  "Rehearsal removed from draft changes. Studio undo can restore it.",
+                );
+              }}
+            >
+              Remove rehearsal
+            </button>
+          </div>
+        </details>
         <details open className="battle-workshop-setup">
           <summary>Encounter configuration</summary>
           <p>
@@ -249,8 +375,10 @@ function Workshop({
             <label>
               Scene to rehearse
               <select
-                value={setup.nodeId}
-                onChange={(e) => setSetup({ ...setup, nodeId: e.target.value })}
+                value={setup.storyNodeId}
+                onChange={(e) =>
+                  setSetup({ ...setup, storyNodeId: e.target.value })
+                }
               >
                 <option value="">Select a scene</option>
                 {scenes.map((node) => (
@@ -330,7 +458,7 @@ function Workshop({
                 >
                   <option value="">Select a destination</option>
                   {Object.values(source.storyNodes)
-                    .filter((node) => node.id !== setup.nodeId)
+                    .filter((node) => node.id !== setup.storyNodeId)
                     .map((node) => (
                       <option key={node.id} value={node.id}>
                         {node.title} ({node.id})
@@ -390,7 +518,7 @@ function Workshop({
                       ),
                     );
                     setMessage(
-                      "Path captured as editable assertions. Closing discards it.",
+                      "Path captured as editable assertions. Save a named rehearsal to retain it.",
                     );
                   }}
                 >

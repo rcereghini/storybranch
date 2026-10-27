@@ -1,4 +1,92 @@
 import { it, expect } from "vitest";
+import { savedBattlePlaytestsSchema } from "../packages/contracts/battle-workshop";
+
+it("bounds private battle rehearsals while preserving stale references for repair", () => {
+  const entry = {
+    version: 1,
+    id: "encounter",
+    name: " Guardian ",
+    setup: {
+      storyNodeId: "removed",
+      enemy: {
+        name: "Guardian",
+        maxHealth: 20,
+        attack: 4,
+        defense: 1,
+        agility: 5,
+      },
+      maxTurns: 10,
+      targets: { win: "old-win", loss: "old-loss", escape: "old-escape" },
+    },
+  };
+  expect(savedBattlePlaytestsSchema.parse([entry])[0].name).toBe("Guardian");
+  expect(
+    draftSchema.parse({
+      story: blankStory("rehearsals"),
+      description: "",
+      battlePlaytests: [entry],
+    }).battlePlaytests,
+  ).toHaveLength(1);
+  for (const entries of [
+    [entry, { ...entry, id: "other", name: "guardian" }],
+    [entry, { ...entry, name: "Other" }],
+    [{ ...entry, version: 2 }],
+    [{ ...entry, save: {} }],
+    [{ ...entry, setup: { ...entry.setup, maxTurns: 31 } }],
+    [
+      {
+        ...entry,
+        setup: { ...entry.setup, enemy: { ...entry.setup.enemy, attack: 21 } },
+      },
+    ],
+    [
+      {
+        ...entry,
+        setup: {
+          ...entry.setup,
+          targets: { ...entry.setup.targets, bonus: "extra" },
+        },
+      },
+    ],
+    Array.from({ length: 11 }, (_, i) => ({
+      ...entry,
+      id: `id-${i}`,
+      name: `Setup ${i}`,
+    })),
+  ])
+    expect(savedBattlePlaytestsSchema.safeParse(entries).success).toBe(false);
+  const step = {
+    from: "removed",
+    intent: { kind: "battle", action: "attack" },
+    expected: {
+      storyNodeId: "removed",
+      status: "active",
+      health: 100,
+      battle: null,
+    },
+  };
+  const long = {
+    ...entry,
+    replay: { version: 1, steps: Array.from({ length: 100 }, () => step) },
+  };
+  const five = Array.from({ length: 5 }, (_, i) => ({
+    ...long,
+    id: `id-${i}`,
+    name: `Setup ${i}`,
+  }));
+  expect(savedBattlePlaytestsSchema.safeParse(five).success).toBe(true);
+  expect(
+    savedBattlePlaytestsSchema.safeParse([
+      ...five,
+      { ...long, id: "six", name: "Six" },
+    ]).success,
+  ).toBe(false);
+  expect(
+    savedBattlePlaytestsSchema.safeParse([
+      { ...entry, replay: { version: 1, steps: [{ ...step, damage: 999 }] } },
+    ]).success,
+  ).toBe(false);
+});
 import { recordPreviewStep, runPlaytest } from "../packages/domain/playtest";
 import {
   playtestReplaySchema,
