@@ -6174,3 +6174,216 @@ it("authorizes input-gated choices from the persisted entry and rejects forged v
     ).status,
   ).toBe(200);
 });
+import { start as startBattleRun } from "../packages/domain/index";
+import { initializeBattle } from "../packages/domain/battle-player";
+import { stagedBattleStorySchema } from "../packages/contracts/battle-graph";
+import {
+  battleContractHeader,
+  battleContractVersion,
+  type BattleSave,
+} from "../packages/contracts/battle-player";
+
+async function battleFixture(invalidDestination = false) {
+  const base = starterStory(`battle-${randomUUID()}`);
+  const story = stagedBattleStorySchema.parse({
+    ...base,
+    storyNodes: {
+      ...base.storyNodes,
+      opening: {
+        id: "opening",
+        title: "Guard",
+        transcript: "A guard blocks the way.",
+        kind: "scene",
+        storyNodeType: "battle",
+        entryEffects: [],
+        battle: {
+          version: 1,
+          rules: "battle-1",
+          enemy: {
+            name: "Guard",
+            maxHealth: 1,
+            attack: 4,
+            defense: 0,
+            agility: 1,
+          },
+          maxTurns: 10,
+        },
+        outputs: Object.fromEntries(
+          ["win", "loss", "escape"].map((outcome) => [
+            outcome,
+            { targetStoryNodeId: "ending", effects: [] },
+          ]),
+        ),
+      },
+    },
+  });
+  if (invalidDestination)
+    story.storyNodes.ending.inputs = {
+      version: 1,
+      fields: [{ name: "required", type: "integer", required: true }],
+    };
+  const save = initializeBattle(
+    story,
+    startBattleRun(
+      base,
+      randomUUID(),
+      "player",
+      { strength: 8, agility: 8, resolve: 8, intellect: 8, charisma: 8 },
+      Date.now(),
+    ),
+  );
+  const { storyNodes, ...manifest } = story;
+  const edition = db.doc(`stories/${story.id}/versions/${story.versionId}`);
+  const batch = db.batch();
+  batch.set(edition, {
+    ...manifest,
+    ready: true,
+    battleContract: battleContractVersion,
+  });
+  for (const node of Object.values(storyNodes))
+    batch.set(edition.collection("storyNodes").doc(node.id), node);
+  batch.set(db.doc(`users/player/playthroughs/${save.id}`), save);
+  await batch.commit();
+  return { save, story };
+}
+async function battleCall(
+  save: BattleSave,
+  body?: unknown,
+  who = "player",
+  capable = true,
+) {
+  const response = await handle(
+    new Request(
+      `http://localhost/api/playthroughs/${save.id}/${body ? "battle-actions" : "battle"}`,
+      {
+        method: body ? "POST" : "GET",
+        headers: {
+          [storyContractHeader]: storyContractVersion,
+          [playerContractHeader]: playerContractVersion,
+          ...(capable ? { [battleContractHeader]: battleContractVersion } : {}),
+          Authorization: `Bearer ${tokens[who]}`,
+          "Content-Type": "application/json",
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      },
+    ),
+  );
+  return { status: response.status, data: await response.json() };
+}
+function battleCommand(
+  save: BattleSave,
+  action = "attack",
+  revision = save.revision,
+  turn = save.battle!.turns,
+) {
+  return {
+    idempotencyKey: randomUUID(),
+    expectedRevision: revision,
+    payload: { battleId: save.battle!.battleId, expectedTurn: turn, action },
+  };
+}
+it("persists battle results, reloads an allowlisted view and routes only on explicit Continue", async () => {
+  const { save } = await battleFixture();
+  expect((await battleCall(save, undefined, "player", false)).status).toBe(400);
+  expect((await battleCall(save, undefined, "progressed")).status).toBe(404);
+  expect((await call(`/playthroughs/${save.id}`)).status).toBe(400);
+  const initial = await battleCall(save);
+  expect(initial.status).toBe(200);
+  const serialized = JSON.stringify(initial.data);
+  for (const field of [
+    '"outputs"',
+    '"playerAttack"',
+    '"entryEffects"',
+    '"storyNodes"',
+    '"nodeInputs"',
+  ])
+    expect(serialized).not.toContain(field);
+  const command = battleCommand(save);
+  const result = await battleCall(save, command);
+  expect(result.status).toBe(200);
+  expect(result.data.player.battle.phase).toBe("result-pending");
+  expect(result.data.player.save.storyNodeId).toBe("opening");
+  expect(await battleCall(save)).toEqual(result);
+  expect(await battleCall(save, command)).toEqual(result);
+  expect(
+    (
+      await battleCall(save, {
+        ...command,
+        payload: { ...command.payload, action: "guard" },
+      })
+    ).status,
+  ).toBe(409);
+  const next = battleCommand(save, "continue", 1, 1);
+  const ended = await battleCall(save, next);
+  expect(ended.status).toBe(200);
+  expect(ended.data.player.save.status).toBe("completed");
+  expect(ended.data.player.battle).toBeUndefined();
+  expect(await battleCall(save, next)).toEqual(ended);
+  const events = await db
+    .collection(`users/player/playthroughs/${save.id}/events`)
+    .get();
+  expect(events.size).toBe(2);
+  const stored = (
+    await db.doc(`users/player/playthroughs/${save.id}`).get()
+  ).data()!;
+  expect(stored.battle).toBeUndefined();
+  expect(stored.revision).toBe(2);
+  expect(
+    (await db.doc(`users/player/storyProgress/${save.storyId}`).get()).data()
+      ?.completions,
+  ).toBe(1);
+  await db.doc(receipt("player", "battle", command.idempotencyKey)).delete();
+  expect((await battleCall(save, command)).status).toBe(409);
+});
+it("serializes competing battle commands and rejects client-authored outcomes without writes", async () => {
+  const { save } = await battleFixture();
+  const forged = battleCommand(save);
+  expect(
+    (
+      await battleCall(save, {
+        ...forged,
+        payload: { ...forged.payload, health: 100, outcome: "win" },
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await battleCall(save, {
+        ...forged,
+        payload: { ...forged.payload, battleId: "wrong" },
+      })
+    ).status,
+  ).toBe(400);
+  expect((await battleCall(save, battleCommand(save, "continue"))).status).toBe(
+    400,
+  );
+  const results = await Promise.all([
+    battleCall(save, battleCommand(save, "attack")),
+    battleCall(save, battleCommand(save, "escape")),
+  ]);
+  expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+  expect(
+    (await db.collection(`users/player/playthroughs/${save.id}/events`).get())
+      .size,
+  ).toBe(1);
+});
+it("rolls back battle Continue when a stored destination cannot accept its inputs", async () => {
+  const { save } = await battleFixture(true);
+  expect((await battleCall(save, battleCommand(save))).status).toBe(200);
+  const ref = db.doc(`users/player/playthroughs/${save.id}`);
+  const before = (await ref.get()).data();
+  const command = battleCommand(save, "continue", 1, 1);
+  expect((await battleCall(save, command)).status).toBe(400);
+  expect((await ref.get()).data()).toEqual(before);
+  expect(
+    (await db.doc(receipt("player", "battle", command.idempotencyKey)).get())
+      .exists,
+  ).toBe(false);
+  expect(
+    (await db.collection(`users/player/playthroughs/${save.id}/events`).get())
+      .size,
+  ).toBe(1);
+  expect(
+    (await db.doc(`users/player/storyProgress/${save.storyId}`).get()).exists,
+  ).toBe(false);
+});

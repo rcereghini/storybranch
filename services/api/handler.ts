@@ -1,3 +1,4 @@
+import { battleRoutes } from "./battle";
 import { promotionalRoutes } from "./promotional-keys";
 import { liveAccountKeys } from "./account-keys";
 import { evaluate, usesAccountKey } from "../../packages/domain/index";
@@ -228,6 +229,13 @@ async function handleCanonical(request: Request): Promise<Response> {
           ? "This account is not enabled for the local prototype. Use a seeded account."
           : "This account is not enabled for Storybranch.",
       );
+    if (
+      segments[1] === "playthroughs" &&
+      segments.length === 4 &&
+      ((segments[3] === "battle" && request.method === "GET") ||
+        (segments[3] === "battle-actions" && request.method === "POST"))
+    )
+      return json(await battleRoutes(request, uid, segments[2]));
     // Gated features read the account's flags from the profile just loaded.
     const features = accountFeatures(profile.data());
     if (

@@ -10,7 +10,7 @@ const progressRef = (uid: string, storyId: string) =>
 export async function storyProgressSnapshot(
   tx: Transaction,
   uid: string,
-  story: Story,
+  story: Pick<Story, "id" | "versionId" | "title" | "progression">,
 ) {
   const definitions = story.progression?.keys ?? [];
   const grants = await Promise.all(
@@ -29,7 +29,7 @@ export async function storyProgressSnapshot(
 export async function prepareStoryProgress(
   tx: Transaction,
   uid: string,
-  story: Story,
+  story: Pick<Story, "id" | "versionId" | "title" | "progression">,
   save: Save,
   achievement?: AchievementDefinition,
 ) {

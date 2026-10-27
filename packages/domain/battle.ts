@@ -174,7 +174,7 @@ export function startBattle(
   return { state, health };
 }
 
-function validateState(
+export function validateBattleState(
   config: BattleConfig,
   state: BattleState,
   health: number,
@@ -230,7 +230,7 @@ export function actBattle(
       scope.revision >= scope.identity.entryRevision + state.turns,
     "Stale battle revision.",
   );
-  validateState(config, state, health, scope.identity);
+  validateBattleState(config, state, health, scope.identity);
   requireValid(
     intent.battleId === state.battleId && intent.expectedTurn === state.turns,
     "Stale battle intent.",

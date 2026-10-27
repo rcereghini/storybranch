@@ -35,7 +35,7 @@ function publicDefinition(d: Definition): PromotionalDefinition {
 
 export async function validateAccountKeys(
   tx: Transaction,
-  story: Story,
+  story: Pick<Story, "id" | "accountKeys">,
   uid: string,
 ) {
   for (const key of story.accountKeys?.keys ?? []) {
@@ -58,7 +58,7 @@ export async function validateAccountKeys(
 export async function liveAccountKeys(
   tx: Transaction,
   uid: string,
-  story: Story,
+  story: Pick<Story, "id" | "accountKeys">,
 ): Promise<string[]> {
   const keys = story.accountKeys?.keys ?? [];
   if (!keys.length) return [];
