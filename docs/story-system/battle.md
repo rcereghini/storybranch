@@ -1,0 +1,109 @@
+# TurnBasedBattle — S35
+
+Status: **design contract, not implemented**. Established October 26, 2026. These are recommended first-version defaults, not previously user-specified combat rules. Current schemas, APIs and renderers still reject combat. This document owns the initial battle rules and acceptance criteria; read [types](node-types.md), [PlayerContext](player-context.md), [StoryBranch data](branch-data.md), [storage](data-storage.md) and [rendering](node-rendering.md) alongside it.
+
+## First version
+
+One player fights one enemy. Attack, Guard and Escape are always available while active; Continue is available only after a terminal result. There are no paid actions, consumables, party members, equipment, critical hits, random damage, status stacks or account rewards in this version. Deterministic rules make the initial implementation and private playtests reproducible. Additional mechanics require a new versioned contract rather than hidden exceptions.
+
+Battle uses the player's existing run-local health and stats, not a separate account character. Health damage persists in that run. A loss does not itself complete the Story; explicit Continue follows the loss StoryBranch, which can lead to recovery content or a StoryLeaf. Escape is guaranteed, costs nothing and never becomes a network-error fallback.
+
+## Typed configuration and inputs
+
+Planned type identifier: `battle`; configuration version `1`; combat rules identifier `battle-1`. This is a separate pinned combat rules identifier, not a reinterpretation of the existing Story ruleset. Only scene placements may use it; a battle cannot also be a StoryLeaf. Existing placement title/transcript provide its heading and accessible description.
+
+| Configuration field | Exact first-version contract |
+| --- | --- |
+| `version` / `rules` | Literal `1` / `battle-1` |
+| `enemy` | Exactly `{name, maxHealth, attack, defense, agility}`; trimmed name 1–80 characters; integer maxHealth 1–100, attack 1–20, defense 0–10, agility 1–20 |
+| `maxTurns` | Integer 1–30; creator default 20; exhaustion resolves to loss with reason `turn-limit` |
+| `inputs` | Optional object mapping `preemptive`, `attackBonus`, `defenseBonus` to distinct declared S32 input names; each mapping optional |
+| Outputs | Exactly three unconditional routes, `win`, `loss`, `escape`, each using existing destination/effects/inputBindings semantics; no action costs or conditions on these required exits |
+
+All objects reject unknown fields; finite integer bounds are enforced in portable schemas. No custom expressions, scripts, opponent AI or asset requirement. The editor supplies configuration and output bindings, never runtime state.
+
+Inputs are resolved from the current entry's S32 snapshot before combat begins:
+
+- `preemptive`: boolean, defaults false when no mapping is configured. True makes the player act first in every round of this encounter. False uses agility order; it does not force the enemy first.
+- `attackBonus`: integer 0–10, defaults zero without a mapping; added to player attack for this encounter only.
+- `defenseBonus`: integer 0–10, defaults zero without a mapping; added to player defense for this encounter only.
+
+A configured mapping must refer to a declared required input. Every incoming route, including StoryTrunk entry defaults, must provide it with a compatible type and provable value range. S32 scalar limits alone are insufficient: publication checks the range of the actual constant, default or Dice source. A raw d20 value cannot feed a 0–10 bonus; a constant on the pass/fail route can. No clamping or coercion conceals incompatible authoring. Runtime validates again before committing entry. No mapping may read arbitrary account data, previous combat state or another run.
+
+These bonuses are the first supported form of encounter buffs: one value per attribute, no stacking, fixed for the whole encounter, discarded on exit. General timed effects, debuffs and enemy-first overrides remain deferred.
+
+## Rules and action order
+
+Entry first resolves inputs and applies the existing destination entry effects under their current once-per-run policy. Then snapshot the run's resulting health and stats. Enemy health starts at maxHealth. Player maximum health remains 100; no healing occurs merely from entering or revisiting battle.
+
+- Player attack = `2 + floor(strength / 2) + attackBonus`.
+- Player defense = `floor(resolve / 4) + defenseBonus`.
+- Attack damage = `max(1, attackerAttack - defenderDefense)`.
+- Normal initiative: player first when player agility is greater than or equal to enemy agility; otherwise enemy first. Preemptive true overrides this. Order stays fixed for the encounter.
+- The enemy always attacks. It has no randomness, resource pool or selectable target.
+
+One accepted Attack or Guard command resolves one complete round atomically, then increments `turns` once. The player submits its action before resolution even when the enemy has initiative. Attack deals damage in initiative order. An actor reduced to zero cannot act later in the same round. Guard deals no player damage and halves the enemy's post-defense damage, rounded up; guarding is effective for that entire round regardless of initiative and expires afterward. Health is clamped at zero. Because damage is sequential and there is no reflection or simultaneous damage, both actors cannot be defeated in the same valid round; reject impossible stored state rather than selecting an arbitrary winner.
+
+After each attack, stop immediately on defeat: enemy zero means `win/defeat`; player zero means `loss/defeat`. If both remain alive after the round and turns reaches maxTurns, persist `loss/turn-limit` without extra damage. Defeat takes precedence over the turn limit on the final round. A zero-health player on entry immediately gets `loss/zero-health`, turns 0, with no enemy attack; Continue remains usable at zero health.
+
+Escape immediately persists `escape/escaped`, does not run an enemy action, does not increment turns and retains current health. The active run can remain paused indefinitely; elapsed wall-clock time is not a combat turn. Leaving the browser, going offline or opening a child Story does not secretly resolve a round or escape.
+
+Example: strength 8, resolve 8, agility 5, bonuses zero; enemy health 10, attack 7, defense 1, agility 4. Player attack 6 and defense 2. Attack deals 5, then enemy deals 5. The second Attack defeats the enemy before retaliation: win at turns 2, player health 95 from a starting 100. Guard on round one instead deals zero and receives ceil(5/2) = 3 damage. A maxTurns of 1 produces loss/turn-limit after that round.
+
+## Durable state and commands
+
+Store one optional version-1 battle interaction in the owned save. Its identity is bound to run ID, pinned edition, StoryNode ID and entry revision; encode those fields canonically or use a server-derived ID with collision-free semantics. Never use node ID alone. Entry revision is stable while battle actions advance run revision. Loops create fresh encounters and fresh identities, but retain run health and existing once-only effect markers.
+
+State contains battle identity and entry revision, pinned config version/rules, resolved initiative and derived player attack/defense, enemy health, turns (0–30), phase (`active` or `result-pending`) and terminal result when present. `Save.health` is the sole mutable source of player health; do not maintain a conflicting second health value. Preserve the entry's `nodeInputs` throughout combat. Bound state to 8 KiB serialized UTF-8; no action-history array. Events use the existing paginated log. Reject a missing/corrupt interaction on an already-entered battle instead of silently resetting it; offer retry/support and leave navigation.
+
+Planned command: `POST /playthroughs/{runId}/battle-actions`, with existing authentication, player-contract negotiation, idempotency envelope and expected run revision. Payload contains only `battleId`, `expectedTurn` (integer 0–30), and `action` (`attack`, `guard`, `escape`, `continue`). Strict schemas reject supplied HP, damage, buffs, result, destination or reward fields. This is an extension of the shared command service, not an independent player runtime.
+
+Authorize ownership and edition support; check exact receipt replay before current revision/phase checks. New commands must match the current battle identity, revision, turn and phase. Attack/Guard/Escape require active; Continue requires result-pending. Persist health, interaction, run revision, event and receipt atomically. Two devices using the same revision cannot both advance. Same-key/same-payload retries replay the existing response; changed payload conflicts. After receipt expiry, monotonic revision and visit checks still prevent repeating the original action. No random sampling is needed for battle-1.
+
+Continue selects only the stored outcome. Resolve its destination input bindings from the terminal result, apply existing route effects and destination entry effects, and clear/replace the interaction in the same transaction. If destination entry fails, leave the pending result and all effects untouched. Continue cannot rerun combat or grant an effect twice. A lost response retries its exact key/payload; stale responses reconcile without replaying intent against a new turn.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Entry
+  Entry --> Active: Positive health and valid inputs
+  Entry --> ResultPending: Zero health loss
+  Active --> Active: Nonterminal Attack or Guard committed
+  Active --> ResultPending: Defeat or turn limit or Escape
+  ResultPending --> Destination: Explicit Continue committed
+  Destination --> [*]
+```
+
+## Results, routing and reward ownership
+
+Terminal result is exactly version 1, outcome (`win`, `loss`, `escape`), reason (`defeat`, `turn-limit`, `zero-health`, `escaped`), turns (0–30), playerHealth (0–100) and enemyHealth (0–100). Enforce outcome/reason/health consistency, including maxHealth from config. It stays pending until Continue; it is not overwritten by rendering or reload.
+
+Planned S32 source extension: `{kind: "battle", field}` where field is `won` (boolean derived from outcome), `turns`, `playerHealth` or `enemyHealth` (integers). Legal only on that battle's three terminal routes and resolved only on Continue from that visit's stored result. No generic `lastBattle` input lookup. Unselected routes do not bind or grant effects. Existing constant/Dice sources keep their behavior.
+
+All three outcomes must reach safe StoryLeaves through the effective graph. A missing/unsafe required route suppresses the whole battle and propagates upstream with creator diagnostics; never hide Escape or turn a loss into a win to compensate. Required routes cannot depend on inventory, health, key or input conditions, including at zero health. Existing graph validation must also prove a usable continuation downstream under its conservative policy.
+
+There is no automatic loot or XP on a terminal attack. Authored existing run-local route effects apply on Continue under existing semantics and can repeat on legitimate revisits; show this to creators. Permanent keys/achievements use existing StoryLeaf claim policies. No battle action grants paid, subscriber, account or cross-Story rights. General once-per-encounter rewards and item spending are separate future contracts.
+
+## Rendering, disclosure and isolated preview
+
+The battle child renderer lives inside `Story` and shared `StoryNode`. The wrapper dispatches actions, controls busy/offline/reconciliation states, and owns Continue. Show enemy name/current/max health, player current/max health, turn/maxTurns, initiative, available actions and the current authoritative action summary/result. Project only these fields plus battle identity/version and current command guards; do not ship routes, conditions, full configuration, raw inputs, receipts or unselected outcomes. Displayed facts are intentionally inspectable in developer tools.
+
+Reserve a stable battle/status area. Animations are cosmetic, skippable and reduced-motion aware; they never authorize damage or block a committed Continue. Keyboard controls, labeled health values and a concise live announcement accompany every accepted round. Reload shows the committed state without replaying attacks. Unknown request outcomes retain that view with the shared recovery controls. Infrastructure failure never selects loss or escape.
+
+Studio must configure all routes and show range errors, simulate the same pure rules and use the same wrapper. Before exposing battle in Studio, extend S34's versioned replay schema for battle actions and HP/outcome assertions. Existing S34 records remain valid and unchanged; do not disguise battle turns as ordinary `continue` steps. Preview remains disposable with no real player mutations or account grants.
+
+## Delivery slices and release gates
+
+1. Portable contracts/domain: strict config, consumer input ranges, battle state/result/intent schemas, pure rounds, all-output validation and battle result bindings. Keep authoring/publication disabled until the end-to-end path is ready.
+2. Authority and persistence: transaction integration, projection, version/capability handling, exact receipts, concurrency, reload and Continue. Old editions/saves stay untouched; optional battle state is absent on existing saves. No new collection, direct Firestore permission or backfill is planned. Retain implementations of issued combat rules for pinned saves.
+3. Shared rendering and Studio: battle controls, editor diagnostics, repeatable preview support, accessibility and browser verification. Enable publication only after all gates pass. Define and test client capability negotiation so an unsupported client is rejected before starting/advancing into an encounter and receives an upgrade/recovery message, never a fallback renderer. Exact wire negotiation must be documented with the API slice.
+
+Required evidence before release:
+
+| Layer | Acceptance cases |
+| --- | --- |
+| Portable | Every bound and unknown field; constants/Dice input range analysis on every edge; agility ties/preemptive; Attack/Guard in both orders; zero health; final-turn defeat precedence; Escape; fresh revisit; unsafe win/loss/escape suppression; result bindings on Continue only |
+| Service | Forged stats/results/destinations; wrong owner/visit/turn/revision; duplicate and competing commands; failure after commit then same-key retry; receipt expiry; reload after each phase; atomic Continue/reward effects; pinned edition edits; isolated child runs; no private graph/input leakage |
+| Preview | Same outcomes as portable rules; saved battle replay/reload; changed draft assertion failures; old S34 replay compatibility; no published test metadata or real grants |
+| Browser | Shared wrapper at desktop/mobile and both themes; keyboard, reduced motion, readable HP; offline/unknown-result retry; stale tab; terminal result surviving reload; explicit Continue to every outcome; stable layout; unsupported-client recovery |
+
+No implementation or test pass is claimed by this document. Combat balance beyond the example, physical device coverage and hosted rollout remain verification work. Party combat, skills, timed buffs, randomness, inventory consumption and reward design must be separately versioned before expansion.

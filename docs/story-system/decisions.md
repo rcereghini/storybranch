@@ -25,7 +25,7 @@ S13 — User-authorized naming and compatibility: use canonical StoryNode names 
 
 | Topic | Required before | Starting design and unresolved part |
 | --- | --- | --- |
-| Battle rules | Combat implementation | Turn/action persistence and typed inputs are fixed boundaries; concrete formulas, initiative, stacking, reward balance, escape and turn-limit disposition need versioned encounter rules |
+| Battle expansion | Beyond S35 battle-1 | [S35](battle.md) fixes initial formulas, inputs, persistence, guaranteed escape and turn-limit loss. Party combat, skills, timed effects, randomness and additional rewards require new rules. Client capability negotiation is a release gate for the API slice. |
 | Typed state limits and versions | Further schema expansion | S32 fixes limits/version 1 for constant and current-Dice scalar inputs; enums, additional sources/consumers and migration adapters still need implementation design |
 | Conditional graph analysis | Publishing richer graphs | Guarantee usable continuations; choose bounded analyzer/abstract state strategy and require fallbacks where safety cannot be established |
 | Cross-creator exports | Broader sequel/progression release | Need namespace governance, author/user permission, integrity revocation and handling of revoked source facts |
@@ -132,3 +132,7 @@ Expose S32 declarations/bindings through explicit Apply/Reset controls and priva
 ## S34 — Recorded private playtest assertions
 
 Extend existing draft-only saved setups with bounded Dice controls and recorded command paths containing exact draws and expected destinations/statuses. A pure runner starts from the setup against the current effective draft graph and reports the first mismatch without mutating active preview or real state. History is bounded, recording is explicit, and passing a partial path is not full-Story verification. See [Studio S34](../17-creator-studio.md#s34--recorded-and-repeatable-private-playtests).
+
+## S35 — Bounded authoritative TurnBasedBattle contract
+
+Design default, implementation deferred: start with one player and one enemy, deterministic Attack/Guard rounds, guaranteed Escape and a finite turn limit resolving to loss. Use run health/stats plus declared entry bonuses, persist every round under revision/visit guards, and route only on explicit Continue. Three unconditional safe outcome routes are mandatory. No automatic loot or account grants. [Battle](battle.md) owns formulas, typed boundaries, disclosure and acceptance gates. This is a documentation-only decision; no current API or edition gains battle support.
