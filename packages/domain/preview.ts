@@ -1,3 +1,4 @@
+import type { StagedBattleStory } from "../contracts/battle-graph";
 import { storyItems } from "./story-items";
 import { currentInput } from "./branch-data";
 import {
@@ -13,12 +14,12 @@ import {
 import { start, baseStats, evaluate, routesOf } from "./index";
 import { renderStoryNode } from "./player";
 
-export function previewItemIds(story: Story): string[] {
+export function previewItemIds(story: StagedBattleStory): string[] {
   return storyItems(story).map((i) => i.itemId);
 }
 
 export function previewScenarioIssues(
-  story: Story,
+  story: StagedBattleStory,
   scenario: PreviewScenario,
 ): string[] {
   const groups = [
@@ -65,7 +66,7 @@ export function previewPreset(
 }
 
 export function startPreview(
-  story: Story,
+  story: StagedBattleStory,
   input: PreviewScenario,
   now: number,
 ): Save {

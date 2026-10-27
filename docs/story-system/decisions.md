@@ -168,3 +168,7 @@ Enable marked editions through the existing authorized root-start transaction an
 ### S35h — Isolated child battle entry
 
 Reuse parent-scoped branch authorization and consent for marked editions, initialize fresh child combat before committing, and retain parent-stat copying without transferring health, keys, inventory or encounters. Ordinary placements in active root runs may offer child entry; combat placements, nested children and completed runs may not. Exact committed retries preserve their original child. Studio/publication remain follow-ups. See [S35h](battle.md#s35h-isolated-child-entry-boundary).
+
+### S35i — Staged repeatable battle playtests
+
+Establish the pure recorder/runner before enabling Studio battle controls. Reuse disposable preview scenarios and the combat/choice engines; derive encounter identity from each simulated visit and retain separate Roll/Next and result/Continue. Keep the staged bounded replay separate from existing saved setup and real command schemas until the UI and persistence acceptance path is verified. See [S35i](battle.md#s35i-staged-repeatable-playtest-engine).
