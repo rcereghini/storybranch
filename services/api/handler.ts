@@ -325,6 +325,7 @@ async function handleCanonical(request: Request): Promise<Response> {
           keyId,
           cursor,
           storyId,
+          battleCapable,
         ),
       );
     }
@@ -537,13 +538,27 @@ async function handleCanonical(request: Request): Promise<Response> {
         if (!snapshot.exists)
           throw new GameError("NOT_FOUND", "Adventure not found.");
         const current = readStoryData<Save>(snapshot.data());
-        const { story } = await edition(tx, current.storyId, current.versionId);
+        const { story } =
+          kind === "branch"
+            ? await playerEdition(
+                tx,
+                current.storyId,
+                current.versionId,
+                battleCapable,
+              )
+            : await edition(tx, current.storyId, current.versionId);
         progressStory = story;
         if (kind === "choice") {
           previousItems = current.items;
           const c = choiceCommandSchema.parse(command);
           const accountKeys = await liveAccountKeys(tx, uid, story);
-          const selected = story.storyNodes[current.storyNodeId]?.choices.find(
+          const node = story.storyNodes[current.storyNodeId];
+          if (node?.storyNodeType === "battle")
+            throw new GameError(
+              "VALIDATION_FAILED",
+              "Use the battle controls to continue.",
+            );
+          const selected = node?.choices.find(
             (choice) => choice.id === c.payload.choiceId,
           );
           if (
@@ -581,6 +596,7 @@ async function handleCanonical(request: Request): Promise<Response> {
             c.expectedRevision,
             c.payload.versionId,
             c.payload.storyId,
+            battleCapable,
           );
           if (
             childStory.keyImports?.keys.length &&
@@ -597,6 +613,7 @@ async function handleCanonical(request: Request): Promise<Response> {
             c.payload.importConsent === true,
             now,
             c.payload.sourceRuns,
+            battleCapable,
           );
           progressStory = childStory;
           save = start(
@@ -609,6 +626,7 @@ async function handleCanonical(request: Request): Promise<Response> {
             await storyProgressSnapshot(tx, uid, childStory),
             imports,
           );
+          initializeBattle(childStory, save);
           event = {
             label: "Entered community side quest",
             from: null,

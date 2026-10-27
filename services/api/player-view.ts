@@ -28,21 +28,19 @@ export async function playerView(
   profile: { stats: Stats; achievements?: string[] },
   battleCapable = false,
 ) {
-  const { story, clips, accountKeys, battle } = await db.runTransaction(
-    async (tx) => {
-      const stored = await playerEdition(
-        tx,
-        s.storyId,
-        s.versionId,
-        battleCapable,
-      );
-      return {
-        ...stored,
-        accountKeys: await liveAccountKeys(tx, uid, stored.story),
-      };
-    },
-  );
-  return fullPlayerView(story, clips, accountKeys, s, uid, profile, !battle);
+  const { story, clips, accountKeys } = await db.runTransaction(async (tx) => {
+    const stored = await playerEdition(
+      tx,
+      s.storyId,
+      s.versionId,
+      battleCapable,
+    );
+    return {
+      ...stored,
+      accountKeys: await liveAccountKeys(tx, uid, stored.story),
+    };
+  });
+  return fullPlayerView(story, clips, accountKeys, s, uid, profile);
 }
 
 export async function fullPlayerView(
@@ -52,7 +50,6 @@ export async function fullPlayerView(
   s: BattleSave,
   uid: string,
   profile: { stats: Stats; achievements?: string[] },
-  allowSideStories = true,
 ) {
   const storyNode = story.storyNodes[s.storyNodeId];
   const next =
@@ -66,7 +63,8 @@ export async function fullPlayerView(
   let branches: unknown[] = [];
   let featuredId: string | null = null;
   if (
-    allowSideStories &&
+    !s.parentPlaythroughId &&
+    s.status === "active" &&
     storyNode.storyNodeType !== "battle" &&
     storyNode.branchLocation
   ) {

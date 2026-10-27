@@ -164,3 +164,7 @@ Extend the rendering projection, not the authoring schema, with typed battle sta
 ### S35g — Root start and replay
 
 Enable marked editions through the existing authorized root-start transaction and consent flow. Initialize encounters before writes and keep exact committed run/snapshot identity on retries. Replay starts a separate run; it never carries the previous encounter. Use a separate player edition loader so this cannot enable creator publication. Child starts/offers and Studio remain separate gates. See [S35g](battle.md#s35g-root-start-and-replay-boundary).
+
+### S35h — Isolated child battle entry
+
+Reuse parent-scoped branch authorization and consent for marked editions, initialize fresh child combat before committing, and retain parent-stat copying without transferring health, keys, inventory or encounters. Ordinary placements in active root runs may offer child entry; combat placements, nested children and completed runs may not. Exact committed retries preserve their original child. Studio/publication remain follow-ups. See [S35h](battle.md#s35h-isolated-child-entry-boundary).

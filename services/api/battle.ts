@@ -65,15 +65,7 @@ async function view(
   uid: string,
   profile: { stats: Stats; achievements?: string[] },
 ) {
-  const player = await fullPlayerView(
-    story,
-    clips,
-    keys,
-    save,
-    uid,
-    profile,
-    false,
-  );
+  const player = await fullPlayerView(story, clips, keys, save, uid, profile);
   // Retain the earlier staged reload/action alias while sharing the player contract.
   return {
     ...player,

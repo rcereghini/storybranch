@@ -6597,18 +6597,16 @@ async function battleRootFixture() {
   await db
     .doc(`stories/${fixture.story.id}`)
     .set({ creatorUid: "player", publishedVersionId: fixture.story.versionId });
-  await db
-    .doc(`catalogue/${fixture.story.id}`)
-    .set({
-      id: fixture.story.id,
-      title: fixture.story.title,
-      versionId: fixture.story.versionId,
-      hidden: false,
-      genre: "Adventure",
-      creator: "Test",
-      duration: "1 min",
-      description: "Battle start fixture",
-    });
+  await db.doc(`catalogue/${fixture.story.id}`).set({
+    id: fixture.story.id,
+    title: fixture.story.title,
+    versionId: fixture.story.versionId,
+    hidden: false,
+    genre: "Adventure",
+    creator: "Test",
+    duration: "1 min",
+    description: "Battle start fixture",
+  });
   return fixture;
 }
 it("starts and replays marked battle editions with fresh isolated state and idempotent receipts", async () => {
@@ -6858,4 +6856,292 @@ it("lists only owned completed battle runs for explicit imported local facts", a
     },
   };
   expect((await battleRootRequest("/playthroughs", foreign)).status).toBe(403);
+});
+async function childBattleFixture(markedParent = true, markedChild = true) {
+  const parentFixture = await battleFixture(false, "text");
+  const childFixture = await battleFixture();
+  const parent = markedParent
+    ? parentFixture.story
+    : starterStory(parentFixture.story.id);
+  const child = markedChild
+    ? childFixture.story
+    : starterStory(childFixture.story.id);
+  const location = `location-${randomUUID()}`,
+    branchId = `branch-${randomUUID()}`;
+  const opening = parent.storyNodes.opening;
+  if (opening.storyNodeType === "battle") throw Error();
+  opening.branchLocation = location;
+  opening.storyNodeType = "text";
+  const save = startBattleStory(
+    parent,
+    parentFixture.save.id,
+    "player",
+    parentFixture.save.stats,
+    Date.now(),
+  );
+  save.keys.push(`${parent.id}:parent-only`);
+  save.health = 42;
+  for (const [story, marked] of [
+    [parent, markedParent],
+    [child, markedChild],
+  ] as const) {
+    const { storyNodes, ...manifest } = story;
+    const ref = db.doc(`stories/${story.id}/versions/${story.versionId}`);
+    await ref.set({
+      ...manifest,
+      ready: true,
+      ...(marked ? { battleContract: battleContractVersion } : {}),
+    });
+    // An ordinary fixture excludes the staged battle placement entirely.
+    for (const record of (await ref.collection("storyNodes").get()).docs)
+      if (!storyNodes[record.id]) await record.ref.delete();
+    for (const node of Object.values(storyNodes))
+      await ref.collection("storyNodes").doc(node.id).set(node);
+    await db
+      .doc(`stories/${story.id}`)
+      .set({ creatorUid: "player", publishedVersionId: story.versionId });
+  }
+  await db.doc(`users/player/playthroughs/${save.id}`).set(save);
+  await db
+    .doc(`branches/${branchId}`)
+    .set({
+      id: branchId,
+      title: "Child battle",
+      author: "Test",
+      locationId: location,
+      sourceVersionId: parent.versionId,
+      storyId: child.id,
+      versionId: child.versionId,
+    });
+  await db.doc(`placements/${location}`).set({ nominatedBranchId: branchId });
+  return { parent, child, save, branchId };
+}
+it.each([
+  [true, true],
+  [false, true],
+  [true, false],
+])(
+  "starts isolated child Stories with marked parent=%s child=%s",
+  async (markedParent, markedChild) => {
+    const { parent, child, save, branchId } = await childBattleFixture(
+      markedParent,
+      markedChild,
+    );
+    const path = `/playthroughs/${save.id}/branches`,
+      offer = `${path}/${branchId}/imports?expectedRevision=0`;
+    const before = (
+      await db.doc(`users/player/playthroughs/${save.id}`).get()
+    ).data();
+    const view = await battleRootRequest(`/playthroughs/${save.id}`);
+    expect(view.data.branches).toContainEqual({
+      id: branchId,
+      title: "Child battle",
+      author: "Test",
+    });
+    expect((await battleRootRequest(offer)).status).toBe(200);
+    expect((await battleRootRequest(offer, undefined, false)).status).toBe(400);
+    const command = {
+      idempotencyKey: randomUUID(),
+      expectedRevision: 0,
+      payload: { branchId, storyId: child.id, versionId: child.versionId },
+    };
+    expect((await battleRootRequest(path, command, false)).status).toBe(400);
+    const started = await battleRootRequest(path, command);
+    expect(started.status).toBe(200);
+    expect(started.data.player.save.parentPlaythroughId).toBe(save.id);
+    expect(started.data.player.branches).toEqual([]);
+    const childRef = db.doc(
+      `users/player/playthroughs/${started.data.player.save.id}`,
+    );
+    const stored = (await childRef.get()).data() as BattleSave;
+    expect(stored.stats).toEqual(save.stats);
+    expect(stored.keys).not.toContain(`${parent.id}:parent-only`);
+    expect(stored.health).toBe(100);
+    expect(stored.battle?.identity.runId).toBe(
+      markedChild ? stored.id : undefined,
+    );
+    expect(await battleRootRequest(path, command)).toEqual(started);
+    expect(
+      (await db.doc(`users/player/playthroughs/${save.id}`).get()).data(),
+    ).toEqual(before);
+    expect(
+      (
+        await battleRootRequest(`/playthroughs/${stored.id}/branches`, {
+          ...command,
+          idempotencyKey: randomUUID(),
+        })
+      ).status,
+    ).toBe(403);
+    if (markedChild) {
+      await battleCall(stored, battleCommand(stored));
+      const done = await battleCall(
+        stored,
+        battleCommand(stored, "continue", 1, 1),
+      );
+      expect(done.data.player.save.status).toBe("completed");
+      expect(done.data.player.save.parentPlaythroughId).toBe(save.id);
+    }
+    expect(
+      (await db.doc(`users/player/playthroughs/${save.id}`).get()).data(),
+    ).toEqual(before);
+    // A committed entry is stable even after the parent advances or the offer changes.
+    await db
+      .doc(`users/player/playthroughs/${save.id}`)
+      .update({ revision: 1 });
+    await db.doc(`branches/${branchId}`).update({ versionId: "new-edition" });
+    expect(await battleRootRequest(path, command)).toEqual(started);
+    expect(
+      (
+        await battleRootRequest(path, {
+          ...command,
+          idempotencyKey: randomUUID(),
+        })
+      ).status,
+    ).toBe(409);
+  },
+);
+it("rejects stale, foreign, wrong-location and invitation-blocked battle child entry without writes", async () => {
+  const { child, save, branchId } = await childBattleFixture();
+  const path = `/playthroughs/${save.id}/branches`;
+  const command = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: { branchId, storyId: child.id, versionId: child.versionId },
+  };
+  expect(
+    (
+      await call(
+        `${path}/${branchId}/imports?expectedRevision=0`,
+        undefined,
+        "progressed",
+      )
+    ).status,
+  ).toBe(404);
+  expect(
+    (await battleRootRequest(path, { ...command, expectedRevision: 1 })).status,
+  ).toBe(409);
+  expect(
+    (
+      await battleRootRequest(path, {
+        ...command,
+        payload: { ...command.payload, versionId: "wrong" },
+      })
+    ).status,
+  ).toBe(409);
+  const branch = db.doc(`branches/${branchId}`),
+    original = (await branch.get()).data()!;
+  await branch.update({ locationId: "wrong-location" });
+  expect((await battleRootRequest(path, command)).status).toBe(400);
+  await branch.set(original);
+  await db
+    .doc(`stories/${child.id}`)
+    .update({
+      creatorUid: "progressed",
+      entryPolicy: { version: 1, revision: 1, invitationRequired: true },
+    });
+  expect(
+    (await battleRootRequest(`${path}/${branchId}/imports?expectedRevision=0`))
+      .status,
+  ).toBe(403);
+  expect((await battleRootRequest(path, command)).status).toBe(403);
+  expect(
+    (await db.doc(receipt("player", "branch", command.idempotencyKey)).get())
+      .exists,
+  ).toBe(false);
+  expect(
+    (
+      await db
+        .collection("users/player/playthroughs")
+        .where("parentPlaythroughId", "==", save.id)
+        .get()
+    ).empty,
+  ).toBe(true);
+  // Combat is never a branch location, even if a client retained an earlier offer.
+  await stagedChoice(save, stagedChoiceCommand(0));
+  expect(
+    (await battleRootRequest(path, { ...command, expectedRevision: 1 })).status,
+  ).toBe(400);
+});
+it("requires separate child consent and selected battle source evidence without inheriting parent facts", async () => {
+  const { child, save, branchId } = await childBattleFixture();
+  const source = await battleRootFixture();
+  const key = `${source.story.id}:local`,
+    alias = `${child.id}:imported`;
+  await db
+    .doc(`stories/${source.story.id}/versions/${source.story.versionId}`)
+    .update({
+      runKeyExports: {
+        version: 1,
+        keys: [{ keyId: key, label: "Local", exportToStoryIds: [child.id] }],
+      },
+    });
+  await db
+    .doc(`stories/${child.id}/versions/${child.versionId}`)
+    .update({
+      keyImports: {
+        version: 1,
+        keys: [
+          {
+            keyId: alias,
+            label: "Remembered",
+            selection: "completed-run",
+            sourceStoryId: source.story.id,
+            sourceVersionId: source.story.versionId,
+            sourceKeyId: key,
+            required: true,
+          },
+        ],
+      },
+    });
+  await battleCall(source.save, battleCommand(source.save));
+  await battleCall(source.save, battleCommand(source.save, "continue", 1, 1));
+  const path = `/playthroughs/${save.id}/branches`,
+    base = `${path}/${branchId}/imports`;
+  expect(
+    (await battleRootRequest(`${base}?expectedRevision=0`)).data.keys[0].label,
+  ).toBe("Remembered");
+  const list = await battleRootRequest(
+    `${base}/runs?expectedRevision=0&storyId=${child.id}&versionId=${child.versionId}&keyId=${alias}`,
+  );
+  expect(list.status).toBe(200);
+  expect(list.data.items[0].runId).toBe(source.save.id);
+  const command = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    payload: {
+      branchId,
+      storyId: child.id,
+      versionId: child.versionId,
+      importConsent: false,
+      sourceRuns: [] as {
+        sourceStoryId: string;
+        sourceVersionId: string;
+        runId: string;
+      }[],
+    },
+  };
+  expect((await battleRootRequest(path, command)).status).toBe(403);
+  command.payload.importConsent = true;
+  command.payload.sourceRuns = [
+    {
+      sourceStoryId: source.story.id,
+      sourceVersionId: source.story.versionId,
+      runId: source.save.id,
+    },
+  ];
+  const response = await battleRootRequest(path, command);
+  expect(response.status).toBe(200);
+  const stored = (
+    await db
+      .doc(`users/player/playthroughs/${response.data.player.save.id}`)
+      .get()
+  ).data()!;
+  expect(stored.keyImportSnapshot).toMatchObject({
+    consented: true,
+    keys: [
+      { keyId: alias, present: false, sourceRun: { runId: source.save.id } },
+    ],
+  });
+  expect(JSON.stringify(response.data)).not.toContain("keyImportSnapshot");
+  expect(await battleRootRequest(path, command)).toEqual(response);
 });
