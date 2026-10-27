@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { StoryNode } from "../../../packages/contracts/index";
 import { comicLimits } from "../../../packages/contracts/index";
-import type { DraftRecord } from "../../../packages/contracts/authoring";
+import type { OrdinaryDraftRecord as DraftRecord } from "../../../packages/contracts/authoring";
 import type {
   AssistResult,
   ComicBrief,

@@ -3,7 +3,7 @@ import type { Comic, StoryNode } from "../../../packages/contracts/index";
 import {
   maxCast,
   type ComicStudio,
-  type DraftRecord,
+  type OrdinaryDraftRecord as DraftRecord,
 } from "../../../packages/contracts/authoring";
 import {
   assetIdOf,

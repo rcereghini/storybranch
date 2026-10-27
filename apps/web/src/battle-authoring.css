@@ -1,0 +1,72 @@
+.battle-authoring {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  height: calc(100dvh - 65px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.battle-authoring > header {
+  flex-shrink: 0;
+}
+.battle-authoring h1 {
+  margin: 0;
+  font-size: 24px;
+}
+.battle-authoring-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 350px;
+  min-height: 0;
+  flex: 1;
+}
+.battle-authoring-layout > aside {
+  padding: 16px;
+  min-width: 0;
+  max-height: 100%;
+  overflow-y: auto;
+}
+.battle-authoring-map {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+}
+.battle-authoring fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.battle-authoring label {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+.battle-authoring input,
+.battle-authoring select,
+.battle-authoring textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.battle-authoring-status {
+  height: 4em;
+  padding: 8px 16px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
+}
+@media (max-width: 1100px) {
+  .battle-authoring {
+    height: auto;
+    overflow: visible;
+  }
+  .battle-authoring-layout {
+    grid-template-columns: 1fr;
+  }
+  .battle-authoring-layout > aside {
+    max-height: none;
+  }
+  .battle-authoring-map {
+    height: 600px;
+  }
+}
