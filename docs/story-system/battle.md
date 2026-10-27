@@ -1,6 +1,6 @@
 # TurnBasedBattle — S35
 
-Status: **S35a/b portable foundation and output routing implemented; playable combat not implemented**. Established October 26, 2026. These are recommended first-version defaults, not previously user-specified combat rules. Current StoryNode schemas, APIs and renderers still reject combat; standalone battle schemas/rules exist only for the staged implementation. This document owns the initial battle rules and acceptance criteria; read [types](node-types.md), [PlayerContext](player-context.md), [StoryBranch data](branch-data.md), [storage](data-storage.md) and [rendering](node-rendering.md) alongside it.
+Status: **S35a–c portable foundation, output routing and staged graph compilation implemented; playable combat not implemented**. Established October 26, 2026. These are recommended first-version defaults, not previously user-specified combat rules. Current StoryNode schemas, APIs and renderers still reject combat; standalone battle schemas/rules exist only for the staged implementation. This document owns the initial battle rules and acceptance criteria; read [types](node-types.md), [PlayerContext](player-context.md), [StoryBranch data](branch-data.md), [storage](data-storage.md) and [rendering](node-rendering.md) alongside it.
 
 ## First version
 
@@ -133,3 +133,15 @@ S35b adds Story ID to the canonical battle identity and bounds its serialized co
 ### S35b local verification — October 26, 2026
 
 `pnpm check` passed: TypeScript, 176 tests (14 new battle-routing cases plus the 17 battle-engine cases), and production build. Tests cover win/loss/escape, pending-only Continue, result/default/constant binding, whole-plan rejection of unsafe required destinations, disconnected targets, missing required inputs, strict output shapes, conservative inventory-effect rejection, stale/foreign identity guards and no input mutation. Maximum-length scoped identity and rejection of battle sources by current real Story schemas are checked. No service/UI integration is present, so emulator/browser checks were not rerun. Mixed battle graphs and authoritative persistence remain unverified. Existing bundle warnings remain; review was self-review.
+
+## S35c staged mixed-graph compilation
+
+A separate strict staged Story schema accepts normal placements plus battle scenes with `battle` configuration and exactly three `outputs`. Battle scenes reuse id/title/transcript/inputs/entryEffects; no ordinary choices, leaf role, media or reusable-library fields are accepted yet. Maximum graph size remains 80 placements. Live Story/draft/API schemas remain unchanged and reject combat.
+
+The staged compiler uses the existing conservative publication algorithm with all-outcomes-required battle nodes and per-edge battle input checks. An internal proof view expresses battle outputs as typed routes; battle result sources are replaced only in that proof with conservative upper-bound scalar witnesses. `won` is constant per output; turns ranges to maxTurns, playerHealth to 100 and enemyHealth to maxHealth (zero on win). This proves types/ranges, never a real combat result. The returned graph restores original battle configs/bindings; proof nodes and values cannot become a playable edition.
+
+Each incoming edge, including Dice alternatives and battle-to-battle outputs, validates mapped required inputs and bonus bounds. Entry battle defaults must also pass. Any unsafe required outcome removes its battle and propagates upstream; optional incoming choices can be hidden while a safe fallback remains. Disconnected content stays in the draft. Existing conservative inventory-effect, condition and graph checks are retained. Runtime commands/Continue integration and player capability gating remain subsequent work; this compiler cannot enable publication by itself.
+
+### S35c local verification — October 26, 2026
+
+`pnpm check` passed: TypeScript, 189 unit tests (including 13 mixed-graph cases), and production build. All 58 emulator integration regression tests passed after the shared compiler extension. Graph tests cover preservation/idempotence, live-publication rejection, each required output, upstream battle/Dice suppression, entry defaults, per-edge constants/Dice ranges, battle-to-battle result bounds, preemptive booleans, cycles, inventory-effect safety, strict schemas and ordinary-graph parity. Markdown links and whitespace were checked. No battle UI or authoritative endpoint exists yet; browser/device and hosted battle acceptance were not run. Existing bundle warnings remain. Self-review only.

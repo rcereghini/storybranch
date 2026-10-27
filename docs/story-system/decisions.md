@@ -144,3 +144,7 @@ Implement the strict standalone battle schemas and pure deterministic engine bef
 ### S35b — Terminal battle route proposals
 
 Require all three unconditional battle output routes and validate their destinations against the current effective safe Story graph before returning a proposal. Continue must pass the battle engine guards and derive the selected outcome and scalar bindings from its pending result. Include Story identity alongside edition/run/entry identity. Keep the binding union separate from ordinary live routes until mixed graph compilation and authoritative runtime integration are ready. See [S35b](battle.md#s35b-terminal-routing-boundary).
+
+### S35c — Staged mixed battle graph compiler
+
+Reuse the conservative publication proof with all three battle outputs required and per-edge consumer range checks. Keep a separate strict staged graph schema; reconstruct original battle nodes/bindings after proof so synthetic scalar values cannot become runtime results. Live publication and player schemas remain unchanged. See [S35c](battle.md#s35c-staged-mixed-graph-compilation).

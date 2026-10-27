@@ -21,12 +21,27 @@ export type PublicationReview = {
 // Conservative proof: a cost-free, unconditional strategy reaches a leaf.
 // All server-selected outcomes must be safe; random results are never filtered.
 export function reviewPublication(input: unknown): PublicationReview {
+  return reviewGraph(input);
+}
+
+// Internal compiler extension; live publication never accepts caller-provided rules.
+export function reviewGraph(
+  input: unknown,
+  rules?: {
+    allChoicesRequired: ReadonlySet<string>;
+    choiceIssue: (sourceId: string, choice: Choice) => string | undefined;
+    entryIssue: () => string | undefined;
+  },
+): PublicationReview {
   const diagnostics: StoryDiagnostic[] = [];
   try {
     const draft = storySchema.parse(input);
+    const entryIssue = rules?.entryIssue();
+    if (entryIssue) throw new Error(entryIssue);
     const safe = new Set<string>();
     const nodes = Object.values(draft.storyNodes);
-    const routesSafe = (c: Choice) =>
+    const routesSafe = (c: Choice, sourceId: string) =>
+      !rules?.choiceIssue(sourceId, c) &&
       !choiceInputIssue(c, draft.storyNodes) &&
       routesOf(c).every((r) => safe.has(r.targetStoryNodeId)) &&
       (c.outcome.kind !== "reveal" ||
@@ -105,7 +120,12 @@ export function reviewPublication(input: unknown): PublicationReview {
       changed = false;
       for (const n of nodes) {
         if (safe.has(n.id) || invalid.has(n.id)) continue;
-        if (n.choices.some((c) => guaranteed(c) && routesSafe(c))) {
+        const safeChoice = (c: Choice) => guaranteed(c) && routesSafe(c, n.id);
+        if (
+          rules?.allChoicesRequired.has(n.id)
+            ? n.choices.length > 0 && n.choices.every(safeChoice)
+            : n.choices.some(safeChoice)
+        ) {
           safe.add(n.id);
           changed = true;
         }
@@ -114,17 +134,23 @@ export function reviewPublication(input: unknown): PublicationReview {
     const effective: Story = { ...draft, storyNodes: {} };
     for (const n of nodes) {
       if (!safe.has(n.id)) {
+        const failedRequired = rules?.allChoicesRequired.has(n.id)
+          ? n.choices.find((c) => !guaranteed(c) || !routesSafe(c, n.id))
+          : undefined;
         diagnostics.push({
           storyNodeId: n.id,
           message:
             invalid.get(n.id) ??
+            (failedRequired
+              ? `Required output ${failedRequired.id} is unsafe: ${rules?.choiceIssue(n.id, failedRequired) ?? choiceInputIssue(failedRequired, draft.storyNodes) ?? "destination or route has no guaranteed continuation."}`
+              : undefined) ??
             "No guaranteed path to a StoryLeaf. Add an unconditional, cost-free exit; every required outcome must be safe.",
         });
         continue;
       }
       const choices = n.choices.filter((c) => {
         const allowed =
-          routesSafe(c) &&
+          routesSafe(c, n.id) &&
           (c.outcome.kind !== "reveal" ||
             c.outcome.results.every(
               (r) =>
@@ -134,7 +160,7 @@ export function reviewPublication(input: unknown): PublicationReview {
           diagnostics.push({
             storyNodeId: n.id,
             choiceId: c.id,
-            message: `“${c.label}” is hidden: ${choiceInputIssue(c, draft.storyNodes) ?? "a required destination is missing or unsafe."}`,
+            message: `“${c.label}” is hidden: ${rules?.choiceIssue(n.id, c) ?? choiceInputIssue(c, draft.storyNodes) ?? "a required destination is missing or unsafe."}`,
           });
         return allowed;
       });
