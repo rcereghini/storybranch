@@ -1,6 +1,7 @@
+import type { StagedBattleStory } from "../contracts/battle-graph";
 import type { Story } from "../contracts/index";
 
-export function itemReferences(story: Story) {
+export function itemReferences(story: StagedBattleStory) {
   const refs: {
     itemId: string;
     storyNodeId: string;
@@ -34,14 +35,18 @@ export function itemReferences(story: Story) {
       }
     };
     visit(node.entryEffects, "on entry", "entryEffects");
-    node.choices.forEach((choice, i) =>
-      visit(choice, choice.label, `choices.${i}`),
-    );
+    if (node.storyNodeType === "battle")
+      for (const [outcome, route] of Object.entries(node.outputs))
+        visit(route, outcome, `outputs.${outcome}`);
+    else
+      node.choices.forEach((choice, i) =>
+        visit(choice, choice.label, `choices.${i}`),
+      );
   }
   return refs;
 }
 
-export function storyItems(story: Story) {
+export function storyItems(story: StagedBattleStory) {
   const entries = story.itemCatalogue?.items ?? [];
   const ids = new Set([
     ...entries.map((i) => i.itemId),
