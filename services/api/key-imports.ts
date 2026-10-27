@@ -11,7 +11,7 @@ import type {
 } from "../../packages/contracts/key-imports";
 import { readStoryData } from "../../packages/contracts/legacy-story-format";
 import { db } from "./firebase";
-import { edition, playerEdition } from "./story-store";
+import { playerEdition } from "./story-store";
 import { sideStory } from "./side-story";
 import { assertStoryEntry } from "./invitations";
 
@@ -348,6 +348,7 @@ export async function sideStoryImports(
   keyId?: string,
   cursor: string | null = null,
   storyId?: string,
+  battleCapable = false,
 ) {
   return db.runTransaction(async (tx) => {
     const record = await tx.get(
@@ -356,7 +357,12 @@ export async function sideStoryImports(
     if (!record.exists)
       throw new GameError("NOT_FOUND", "Adventure not found.");
     const parent = readStoryData<Save>(record.data());
-    const { story } = await edition(tx, parent.storyId, parent.versionId);
+    const { story } = await playerEdition(
+      tx,
+      parent.storyId,
+      parent.versionId,
+      battleCapable,
+    );
     const child = await sideStory(
       tx,
       uid,
@@ -366,14 +372,21 @@ export async function sideStoryImports(
       expectedRevision,
       versionId,
       storyId,
+      battleCapable,
     );
-    if (keyId) return sourceRunsForStory(tx, uid, child, keyId, cursor);
+    if (keyId)
+      return sourceRunsForStory(tx, uid, child, keyId, cursor, battleCapable);
     const root = await tx.get(db.doc(`stories/${child.id}`));
     return {
       storyId: child.id,
       versionId: child.versionId,
       title: child.title,
-      keys: await validateKeyImports(tx, child, root.data()!.creatorUid),
+      keys: await validateKeyImports(
+        tx,
+        child,
+        root.data()!.creatorUid,
+        battleCapable,
+      ),
     } satisfies StoryImportOffer;
   });
 }

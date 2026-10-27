@@ -1,11 +1,8 @@
+import type { StagedBattleStory } from "../../packages/contracts/battle-graph";
 import type { Transaction } from "firebase-admin/firestore";
-import {
-  GameError,
-  type Save,
-  type Story,
-} from "../../packages/contracts/index";
+import { GameError, type Save } from "../../packages/contracts/index";
 import { db } from "./firebase";
-import { edition } from "./story-store";
+import { playerEdition } from "./story-store";
 import { assertStoryEntry } from "./invitations";
 
 // Shared by consent reads and the committing command: an offer is not authority.
@@ -13,11 +10,12 @@ export async function sideStory(
   tx: Transaction,
   uid: string,
   parent: Save,
-  story: Story,
+  story: StagedBattleStory,
   branchId: string,
   expectedRevision: number,
   versionId?: string,
   storyId?: string,
+  battleCapable = false,
 ) {
   if (parent.playerUid !== uid)
     throw new GameError("FORBIDDEN", "Adventure unavailable.");
@@ -29,7 +27,9 @@ export async function sideStory(
   if (parent.parentPlaythroughId || parent.status !== "active")
     throw new GameError("FORBIDDEN", "Nested branches are unavailable.");
   const branch = (await tx.get(db.doc(`branches/${branchId}`))).data();
-  const location = story.storyNodes[parent.storyNodeId]?.branchLocation;
+  const node = story.storyNodes[parent.storyNodeId];
+  const location =
+    node?.storyNodeType !== "battle" ? node?.branchLocation : undefined;
   if (
     !location ||
     !branch ||
@@ -48,7 +48,12 @@ export async function sideStory(
       "STALE_REVISION",
       "This side Story changed. Reload and review its imports again.",
     );
-  const { story: child } = await edition(tx, branch.storyId, branch.versionId);
+  const { story: child } = await playerEdition(
+    tx,
+    branch.storyId,
+    branch.versionId,
+    battleCapable,
+  );
   await assertStoryEntry(tx, uid, child.id);
   return child;
 }

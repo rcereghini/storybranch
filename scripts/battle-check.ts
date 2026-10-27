@@ -9,7 +9,7 @@ import { battleContractVersion } from "../packages/contracts/battle-player";
 import { launchBrowser } from "./browser";
 if (config.mode !== "emulator" || config.projectId !== "demo-storybranch")
   throw Error("Demo emulators required");
-async function seed(outcome: string) {
+async function seed(outcome: string, child = false) {
   const base = starterStory("000-battle-ui-" + randomUUID());
   base.storyNodes.opening.title = "Before the battle";
   base.storyNodes.opening.storyNodeType = "text";
@@ -57,6 +57,7 @@ async function seed(outcome: string) {
       },
     },
   });
+  if (child) story.entryStoryNodeId = "fight";
   const save = startBattleStory(
     story,
     randomUUID(),
@@ -78,16 +79,17 @@ async function seed(outcome: string) {
     creatorUid: "player",
     publishedVersionId: story.versionId,
   });
-  batch.set(db.doc(`catalogue/${story.id}`), {
-    id: story.id,
-    title: story.title,
-    versionId: story.versionId,
-    hidden: false,
-    genre: "Adventure",
-    creator: "Test",
-    duration: "1 min",
-    description: "Battle entry check",
-  });
+  if (!child)
+    batch.set(db.doc(`catalogue/${story.id}`), {
+      id: story.id,
+      title: story.title,
+      versionId: story.versionId,
+      hidden: false,
+      genre: "Adventure",
+      creator: "Test",
+      duration: "1 min",
+      description: "Battle entry check",
+    });
   await batch.commit();
   return save;
 }
@@ -239,10 +241,73 @@ try {
         0,
       );
     }
+    const parent = await seed("win"),
+      child = await seed("win", true);
+    const branchId = "battle-child-" + randomUUID(),
+      location = "battle-location-" + randomUUID();
+    await db
+      .doc(
+        `stories/${parent.storyId}/versions/${parent.versionId}/storyNodes/opening`,
+      )
+      .update({ branchLocation: location });
+    await db.doc(`branches/${branchId}`).set({
+      id: branchId,
+      title: "Visit the child battle",
+      author: "Test",
+      locationId: location,
+      sourceVersionId: parent.versionId,
+      storyId: child.storyId,
+      versionId: child.versionId,
+    });
+    await db.doc(`placements/${location}`).set({ nominatedBranchId: branchId });
+    await tab.goto(`http://127.0.0.1:5173/s/${parent.storyId}`);
+    await tab.getByRole("button", { name: "Start a new journey" }).click();
+    await tab.waitForURL("**/play/*");
+    const parentUrl = tab.url(),
+      parentId = new URL(parentUrl).pathname.split("/").at(-1)!;
+    const beforeChild = (
+      await db.doc(`users/player/playthroughs/${parentId}`).get()
+    ).data();
+    await tab.getByRole("button", { name: /Visit the child battle/ }).click();
+    await tab.getByRole("button", { name: "Attack", exact: true }).click();
+    await tab.getByRole("button", { name: "Continue", exact: true }).click();
+    await tab
+      .getByRole("heading", {
+        name: starterStory("tmp").storyNodes.ending.title,
+        exact: true,
+      })
+      .waitFor();
+    await tab
+      .getByRole("button", { name: /Return to main adventure/ })
+      .waitFor();
+    const childId = new URL(tab.url()).pathname.split("/").at(-1)!;
+    assert.notEqual(childId, parentId);
+    assert.equal(
+      (await db.doc(`users/player/playthroughs/${childId}`).get()).data()
+        ?.status,
+      "completed",
+    );
+    assert.equal(
+      (await db.doc(`users/player/playthroughs/${childId}`).get()).data()
+        ?.parentPlaythroughId,
+      parentId,
+    );
+    await tab.screenshot({
+      path: `test-results/battle-child-${width}.png`,
+      fullPage: true,
+    });
+    await tab.reload();
+    await tab.getByRole("button", { name: /Return to main adventure/ }).click();
+    await tab.getByRole("button", { name: /Enter battle/ }).waitFor();
+    assert.equal(tab.url(), parentUrl);
+    assert.deepEqual(
+      (await db.doc(`users/player/playthroughs/${parentId}`).get()).data(),
+      beforeChild,
+    );
     await context.close();
   }
   console.log(
-    "Battle shared-player browser flows passed: desktop/mobile, light/dark, reduced motion, keyboard, offline, lost-response retry, stale-tab reconciliation, root starts, isolated replay, reload and all three outcomes.",
+    "Battle shared-player browser flows passed: desktop/mobile, light/dark, reduced motion, keyboard, offline, lost-response retry, stale-tab reconciliation, root starts, isolated replay, child battle completion/return, reload and all three outcomes.",
   );
 } catch (error) {
   for (const context of browser.contexts())
