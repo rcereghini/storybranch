@@ -184,3 +184,7 @@ Keep named battle experiments in bounded, versioned private draft metadata, foll
 ### S35l — Actual mixed draft graphs with a publication gate
 
 Allow strict Battle StoryNodes in private `Draft.story`, sharing the existing owned revisioned save command. Use real outputs in the canvas and compile actual mixed graphs for preview. The mixed authoring view explicitly applies typed configuration and saves, retains uncertain requests for retry, and diagnoses unsafe paths. Specialized ordinary editors remain behind an ordinary-schema guard. Publication explicitly rejects every draft containing battle nodes, even disconnected ones. No issued edition or run is rewritten. See [S35l](battle.md#s35l-persisted-battle-graph-authoring).
+
+### S35m — Visual bindings preserve incomplete authored intent
+
+Expose compatible constants and battle-result sources on each required output, using existing version-1 bindings. Destination changes preserve stale mappings until explicit repair/removal. Pending-node compiler diagnostics include conservative battle-to-battle ranges; Apply/Reset and draft Save remain distinct. No publication, command, projection or persistence schema changes. See [S35m](battle.md#s35m-visual-battle-output-bindings).

@@ -33,6 +33,7 @@ import {
 } from "../../../packages/contracts/media";
 import { StoryGraph } from "./StoryGraph";
 import { StoryOutline } from "./StoryOutline";
+import { BattleOutputBindingsEditor } from "./BattleOutputBindingsEditor";
 import { StoryInputsEditor } from "./StoryInputsEditor";
 import { Story } from "./Story";
 import { StoryNode } from "./StoryNode";
@@ -469,6 +470,12 @@ function NodeEditor({
     }
   };
   const battle = value.storyNodeType === "battle" ? value : null;
+  const pendingReview = battle
+    ? reviewBattleGraph({
+        ...story,
+        storyNodes: { ...story.storyNodes, [value.id]: value },
+      })
+    : null;
   const updateBattle = (change: Partial<StagedBattleNode["battle"]>) => {
     if (battle)
       setValue({ ...battle, battle: { ...battle.battle, ...change } });
@@ -589,33 +596,75 @@ function NodeEditor({
             ),
           )}
           {outcomes.map((outcome) => (
-            <label key={outcome}>
-              {outcome} destination
-              <select
-                aria-label={`${outcome} destination`}
-                value={battle.outputs[outcome].targetStoryNodeId}
-                onChange={(event) =>
+            <div key={outcome}>
+              <label>
+                {outcome} destination
+                <select
+                  aria-label={`${outcome} destination`}
+                  value={battle.outputs[outcome].targetStoryNodeId}
+                  onChange={(event) =>
+                    setValue({
+                      ...battle,
+                      outputs: {
+                        ...battle.outputs,
+                        [outcome]: {
+                          ...battle.outputs[outcome],
+                          targetStoryNodeId: event.target.value,
+                        },
+                      },
+                    })
+                  }
+                >
+                  <option value="unfinished">Unfinished</option>
+                  {battle.outputs[outcome].targetStoryNodeId !== "unfinished" &&
+                    !story.storyNodes[
+                      battle.outputs[outcome].targetStoryNodeId
+                    ] && (
+                      <option value={battle.outputs[outcome].targetStoryNodeId}>
+                        Missing: {battle.outputs[outcome].targetStoryNodeId}
+                      </option>
+                    )}
+                  {Object.values(story.storyNodes).map((target) => (
+                    <option key={target.id} value={target.id}>
+                      {target.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <BattleOutputBindingsEditor
+                outcome={outcome}
+                inputs={
+                  story.storyNodes[battle.outputs[outcome].targetStoryNodeId]
+                    ?.inputs
+                }
+                value={battle.outputs[outcome].inputBindings}
+                onChange={(inputBindings) =>
                   setValue({
                     ...battle,
                     outputs: {
                       ...battle.outputs,
                       [outcome]: {
                         ...battle.outputs[outcome],
-                        targetStoryNodeId: event.target.value,
+                        inputBindings,
                       },
                     },
                   })
                 }
-              >
-                <option value="unfinished">Unfinished</option>
-                {Object.values(story.storyNodes).map((target) => (
-                  <option key={target.id} value={target.id}>
-                    {target.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
           ))}
+          <div
+            className="battle-binding-diagnostics"
+            aria-label="Pending battle diagnostics"
+            role="status"
+          >
+            {pendingReview?.error}
+            {pendingReview?.diagnostics
+              .filter((item) => item.storyNodeId === value.id)
+              .map((item, index) => (
+                <p key={index}>{item.message}</p>
+              ))}
+          </div>
         </>
       )}
       <button className="btn btn-primary" onClick={() => apply(value)}>
