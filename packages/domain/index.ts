@@ -1,3 +1,4 @@
+import type { StagedBattleStory } from "../contracts/battle-graph";
 import {
   storySchema,
   comicLimits,
@@ -185,7 +186,7 @@ export function enter(
   return s;
 }
 export function start(
-  story: Story,
+  story: Story | StagedBattleStory,
   id: string,
   uid: string,
   stats: Stats,
@@ -239,7 +240,7 @@ export function start(
   );
 }
 export function transition(
-  story: Story,
+  story: Story | StagedBattleStory,
   input: Save,
   choiceId: string,
   revision: number,
@@ -255,9 +256,11 @@ export function transition(
       "STALE_REVISION",
       "Progress changed on another device. Reload current progress.",
     );
-  const c = story.storyNodes[input.storyNodeId]?.choices.find(
-    (c) => c.id === choiceId,
-  );
+  const node = story.storyNodes[input.storyNodeId];
+  const c =
+    node?.storyNodeType !== "battle"
+      ? node?.choices.find((c) => c.id === choiceId)
+      : undefined;
   if (
     !c ||
     input.status !== "active" ||

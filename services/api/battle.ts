@@ -1,6 +1,10 @@
-import { createHash } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import type { Transaction } from "firebase-admin/firestore";
-import { GameError, id } from "../../packages/contracts/index";
+import {
+  GameError,
+  id,
+  choiceCommandSchema,
+} from "../../packages/contracts/index";
 import {
   battleStateSchema,
   battleHealthSchema,
@@ -15,9 +19,16 @@ import {
   stagedBattleStorySchema,
   type StagedBattleStory,
 } from "../../packages/contracts/battle-graph";
-import { advanceBattle } from "../../packages/domain/battle-player";
+import {
+  advanceBattle,
+  advanceBattleChoice,
+} from "../../packages/domain/battle-player";
 import { validateBattleState } from "../../packages/domain/battle";
-import { playerRun, renderStoryNode } from "../../packages/domain/player";
+import {
+  playerRun,
+  renderStoryNode,
+  playerItemChanges,
+} from "../../packages/domain/player";
 import { db } from "./firebase";
 import * as paths from "./paths";
 import { prepareAchievement } from "./achievements";
@@ -123,6 +134,7 @@ export async function battleRoutes(
   request: Request,
   uid: string,
   runId: string,
+  choice = false,
 ) {
   id.parse(runId);
   if (request.headers.get(battleContractHeader) !== battleContractVersion)
@@ -144,13 +156,22 @@ export async function battleRoutes(
       throw new GameError("VALIDATION_FAILED", "Invalid JSON.");
     }
   }
-  const command = action ? battleCommandSchema.parse(parsed) : undefined;
+  const command = action
+    ? (choice ? choiceCommandSchema : battleCommandSchema).parse(parsed)
+    : undefined;
   const digest = command
     ? createHash("sha256")
-        .update(JSON.stringify({ runId, command }))
+        .update(
+          JSON.stringify({
+            runId,
+            ...(choice ? { kind: "choice" } : {}),
+            command,
+          }),
+        )
         .digest("hex")
     : "";
   const now = Date.now();
+  const rolls = new Map<number, number>();
   return db.runTransaction(async (tx) => {
     const ref = db.doc(paths.save(uid, runId)),
       snapshot = await tx.get(ref);
@@ -165,7 +186,11 @@ export async function battleRoutes(
       return { player: view(story, current, keys) };
     }
     const receipt = db.doc(
-      paths.receipt(uid, "battle", command.idempotencyKey),
+      paths.receipt(
+        uid,
+        choice ? "battle-choice" : "battle",
+        command.idempotencyKey,
+      ),
     );
     const prior = await tx.get(receipt);
     if (prior.exists) {
@@ -176,7 +201,20 @@ export async function battleRoutes(
         );
       return prior.data()!.response;
     }
-    const moved = advanceBattle(story, current, command, now);
+    const keys = await liveAccountKeys(tx, uid, story);
+    const moved = choice
+      ? advanceBattleChoice(
+          story,
+          current,
+          command,
+          now,
+          (sides) => {
+            if (!rolls.has(sides)) rolls.set(sides, randomInt(1, sides + 1));
+            return rolls.get(sides)!;
+          },
+          keys,
+        )
+      : advanceBattle(story, current, command, now);
     const achievement = await prepareAchievement(tx, uid, moved.save);
     const progress = await prepareStoryProgress(
       tx,
@@ -185,7 +223,6 @@ export async function battleRoutes(
       moved.save,
       achievement.approved,
     );
-    const keys = await liveAccountKeys(tx, uid, story);
     // Persist exactly the JSON response: optional projection fields may be undefined.
     const response = JSON.parse(
       JSON.stringify({ player: view(story, moved.save, keys) }),
@@ -199,6 +236,7 @@ export async function battleRoutes(
       ),
       {
         ...moved.event,
+        itemChanges: playerItemChanges(story, current.items, moved.save.items),
         commandId: command.idempotencyKey,
         ...(moved.save.completion?.revision === moved.save.revision
           ? { completion: moved.save.completion }
@@ -214,4 +252,22 @@ export async function battleRoutes(
     });
     return response;
   });
+}
+
+// Dispatch hint only. The command transaction re-reads ownership and edition.
+export async function isBattleRun(uid: string, runId: string) {
+  id.parse(runId);
+  const save = await db.doc(paths.save(uid, runId)).get();
+  if (
+    !save.exists ||
+    save.data()!.playerUid !== uid ||
+    save.data()!.id !== runId
+  )
+    return false;
+  const manifest = await db
+    .doc(
+      "stories/" + save.data()!.storyId + "/versions/" + save.data()!.versionId,
+    )
+    .get();
+  return !!manifest.data()?.battleContract;
 }
