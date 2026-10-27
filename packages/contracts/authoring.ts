@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { savedPlaytestScenariosSchema } from "./preview";
+import { savedBattlePlaytestsSchema } from "./battle-workshop";
 import { id, storySchema, storyTrunkContextSchema } from "./index";
 // The trunk is a configuration view, not a playable placement. Existing root
 // metadata stays the sole source of truth; editions need no duplicate title.
@@ -71,6 +72,7 @@ export const draftSchema = z
     storyNodePositions: storyNodePositionsSchema.optional(),
     comic: comicStudioSchema.optional(),
     playtestScenarios: savedPlaytestScenariosSchema.optional(),
+    battlePlaytests: savedBattlePlaytestsSchema.optional(),
   })
   .strict()
   .superRefine((draft, ctx) => {

@@ -1,6 +1,6 @@
 # Creator Studio alpha
 
-The [Battle workshop](story-system/battle.md#s35j-disposable-studio-battle-workshop) rehearses a battle in a disposable copy of the current Story. Configure an enemy and Win/Loss/Escape destinations, Apply to restart, then record and replay assertions through the shared player. Closing discards the workshop; battle draft saving and publication are not enabled.
+The [Battle workshop](story-system/battle.md#s35j-disposable-studio-battle-workshop) rehearses a battle in a disposable copy of the current Story. Configure an enemy and Win/Loss/Escape destinations, Apply to restart, then record and replay assertions through the shared player. [Named rehearsals](story-system/battle.md#s35k-saved-battle-rehearsals) save applied configuration and assertions as private draft metadata using Studio autosave/undo. Closing discards unsaved session edits. Battle placements in the saved Story graph and their publication remain gated.
 
 This document describes current Studio behavior. Future authoring changes must also read [StoryNodes](story-system/story-nodes.md), [type contracts](story-system/node-types.md) and [AI authoring](story-system/ai-authoring.md). New Story starts blank. Starter, Quiz and Comic templates are explicit choices. Preview and publication compile a safe effective graph with creator diagnostics.
 

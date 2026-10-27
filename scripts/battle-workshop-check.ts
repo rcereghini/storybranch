@@ -273,6 +273,159 @@ try {
         "Draft must remain unchanged",
       );
       assert.deepEqual(errors, []);
+      // Explicit saves persist rehearsal metadata only, through Studio autosave/undo.
+      const savedWrite = () =>
+        tab.waitForResponse(
+          (response) =>
+            response.url().endsWith(`/api/studio/${story.id}`) &&
+            response.request().method() === "POST" &&
+            response.status() === 200,
+        );
+      await launcher.click();
+      await workshop.getByRole("button", { name: "Apply and restart" }).click();
+      await workshop
+        .getByRole("button", { name: "Escape", exact: true })
+        .click();
+      await workshop
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await workshop
+        .getByText("Recorded battle playtest", { exact: true })
+        .click();
+      await workshop
+        .getByRole("button", { name: "Capture battle assertions" })
+        .click();
+      await workshop
+        .getByText("Saved battle rehearsals (0/10)", { exact: true })
+        .click();
+      await workshop
+        .getByLabel("Rehearsal name", { exact: true })
+        .fill("Escape test");
+      let write = savedWrite();
+      await workshop
+        .getByRole("button", { name: "Save rehearsal as new" })
+        .click();
+      await write;
+      const persisted = await api(`/studio/${story.id}`);
+      assert.equal(persisted.battlePlaytests[0].name, "Escape test");
+      assert.equal(persisted.battlePlaytests[0].replay.steps.length, 2);
+      assert.deepEqual(persisted.story, saved.story);
+      await workshop.getByRole("button", { name: "Close workshop" }).click();
+      write = savedWrite();
+      if (width < 1240) await tab.keyboard.press("Control+z");
+      else await tab.getByRole("button", { name: "Undo", exact: true }).click();
+      await write;
+      assert.equal(
+        (await api(`/studio/${story.id}`)).battlePlaytests?.length ?? 0,
+        0,
+      );
+      write = savedWrite();
+      if (width < 1240) await tab.keyboard.press("Control+Shift+z");
+      else await tab.getByRole("button", { name: "Redo", exact: true }).click();
+      await write;
+      await tab.reload();
+      await tab.getByRole("button", { name: new RegExp(story.title) }).click();
+      await launcher.click();
+      await workshop
+        .getByText("Saved battle rehearsals (1/10)", { exact: true })
+        .click();
+      await workshop
+        .getByLabel("Saved battle rehearsal", { exact: true })
+        .selectOption(persisted.battlePlaytests[0].id);
+      await workshop
+        .getByRole("button", { name: "Load rehearsal", exact: true })
+        .click();
+      await workshop
+        .getByRole("button", { name: "Attack", exact: true })
+        .waitFor();
+      await workshop
+        .getByText("Recorded battle playtest", { exact: true })
+        .click();
+      await workshop
+        .getByRole("button", { name: "Run battle assertions" })
+        .click();
+      await notice
+        .filter({ hasText: "PASS: 2 assertions passed. Story completed." })
+        .waitFor();
+      await workshop.getByLabel("Battle assertions JSON").fill("{}");
+      await workshop
+        .getByRole("button", { name: "Update saved rehearsal" })
+        .click();
+      await notice.filter({ hasText: "valid assertions" }).waitFor();
+      assert.deepEqual(
+        (await api(`/studio/${story.id}`)).battlePlaytests,
+        persisted.battlePlaytests,
+      );
+      await workshop
+        .getByRole("button", { name: "Load rehearsal", exact: true })
+        .click();
+      await workshop
+        .getByLabel("Rehearsal name", { exact: true })
+        .fill("Escape renamed");
+      write = savedWrite();
+      await workshop
+        .getByRole("button", { name: "Update saved rehearsal" })
+        .click();
+      await write;
+      assert.equal(
+        (await api(`/studio/${story.id}`)).battlePlaytests[0].name,
+        "Escape renamed",
+      );
+      await tab.screenshot({
+        path: `test-results/saved-battle-${width}-${colorScheme}.png`,
+      });
+      assert(
+        await workshop.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+      );
+      // Simulate a saved rehearsal whose source was removed by later Story editing.
+      await workshop.getByRole("button", { name: "Close workshop" }).click();
+      const latest = await api(`/studio/${story.id}`);
+      await api(`/studio/${story.id}`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: latest.revision,
+        draft: {
+          story: latest.story,
+          description: latest.description,
+          battlePlaytests: latest.battlePlaytests.map(
+            (item: { setup: object }) => ({
+              ...item,
+              setup: { ...item.setup, storyNodeId: "removed-source" },
+            }),
+          ),
+        },
+      });
+      await tab.reload();
+      await tab.getByRole("button", { name: new RegExp(story.title) }).click();
+      await launcher.click();
+      await workshop.getByRole("button", { name: "Apply and restart" }).click();
+      await workshop
+        .getByText("Saved battle rehearsals (1/10)", { exact: true })
+        .click();
+      await workshop
+        .getByLabel("Saved battle rehearsal", { exact: true })
+        .selectOption(persisted.battlePlaytests[0].id);
+      await workshop
+        .getByRole("button", { name: "Load rehearsal", exact: true })
+        .click();
+      await notice.filter({ hasText: "Select a scene" }).waitFor();
+      await workshop
+        .getByRole("button", { name: "Attack", exact: true })
+        .waitFor();
+      assert.equal(
+        await workshop.getByLabel("Scene to rehearse").inputValue(),
+        "dice",
+      );
+      write = savedWrite();
+      await workshop.getByRole("button", { name: "Remove rehearsal" }).click();
+      await write;
+      assert.deepEqual((await api(`/studio/${story.id}`)).battlePlaytests, []);
+      assert(
+        mutations.every((url: string) =>
+          url.endsWith(`/api/studio/${story.id}`),
+        ),
+        "Only draft metadata may be written",
+      );
+      assert.deepEqual(errors, []);
       await tab.close();
       console.log(`Battle workshop passed: ${width}px ${colorScheme}`);
     }

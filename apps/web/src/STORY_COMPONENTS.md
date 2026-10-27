@@ -1,6 +1,6 @@
 # Story component documentation
 
-`BattleWorkshop.tsx` rehearses a disposable battle substitution in Studio through the shared Story/StoryNode wrapper and S35i recorder. Read [S35j](../../../docs/story-system/battle.md#s35j-disposable-studio-battle-workshop). Explicit Apply/Reset, safe graph compilation and independent assertion playback preserve the active preview on errors; no battle draft persistence or real player commands are enabled.
+`BattleWorkshop.tsx` rehearses a disposable battle substitution in Studio through the shared Story/StoryNode wrapper and S35i recorder. Read [S35j](../../../docs/story-system/battle.md#s35j-disposable-studio-battle-workshop) and [S35k saved rehearsals](../../../docs/story-system/battle.md#s35k-saved-battle-rehearsals). Explicit Apply/Reset and Load preserve the active preview on errors. Named configurations/assertions persist only as private draft metadata through Studio autosave/undo; they are never a published graph overlay or real player commands.
 
 Read this guide before planning Story-related work in this directory or any descendant. The [Story system index](../../../docs/story-system/README.md) defines target architecture and reading sets; [the current Story/StoryNode contract](../../../docs/16-story-nodes.md) records shipped behavior. New StoryNodes do not introduce a second player hierarchy.
 

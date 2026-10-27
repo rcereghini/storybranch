@@ -176,3 +176,7 @@ Establish the pure recorder/runner before enabling Studio battle controls. Reuse
 ### S35j — Disposable Studio battle rehearsal
 
 Expose the staged simulator in a native Studio modal before widening the draft/publication contracts. Rehearse one scene substitution in a snapshot, validate all required destinations on Apply, and retain separate result/Continue and Dice Roll/Next through the shared wrapper. Record and replay bounded assertions without writes or grants. Closing discards the session. Persistent battle authoring and saved setups remain explicit follow-ups. See [S35j](battle.md#s35j-disposable-studio-battle-workshop).
+
+### S35k — Save rehearsal configurations, not battle graph overlays
+
+Keep named battle experiments in bounded, versioned private draft metadata, following Studio undo/autosave and revision-checked commands. Explicit Save/Update retains the applied S35j substitution and validated S35i assertions; Load compiles against the current Story snapshot and preserves active preview on failure. Publication consumes only the actual Story graph and cannot turn an experiment into playable combat. See [S35k](battle.md#s35k-saved-battle-rehearsals). Persistent battle graph editing remains a separate authoring change.
