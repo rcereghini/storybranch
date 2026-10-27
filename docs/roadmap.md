@@ -1,6 +1,6 @@
 # Current delivery checklist
 
-Reviewed October 26, 2026 against merged main `1cbf98c` (through PR54), with the S35 battle design documented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means the named deliverable is complete; a design-only item is explicitly labeled and does not imply runtime support or hosted/device acceptance. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
+Reviewed October 26, 2026 against merged main `a86bfce` (through PR55), with the S35a portable battle foundation implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means the named deliverable is complete; a design-only item is explicitly labeled and does not imply runtime support or hosted/device acceptance. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
 
 ## Implemented foundation
 
@@ -22,7 +22,8 @@ Implementation details: [player runtime](story-system/player-runtime.md), [Studi
 - [x] S33 visual input/binding editor, creator-only resolved-input diagnostics and typed input conditions with guaranteed exits (merged PR53).
 - [x] S34 repeatable private playtests: saved Dice controls, bounded route history and editable destination/status assertions, merged PR54. See [Studio](17-creator-studio.md#s34--recorded-and-repeatable-private-playtests).
 - [x] S35 concrete [TurnBasedBattle design](story-system/battle.md): deterministic one-on-one rules, input/output contracts, bounded turns, guaranteed escape and release gates. Documentation only.
-- [ ] Implement S35 portable battle contracts/domain, then authoritative persistence/projections, shared rendering, Studio and repeatable playtests. Publication remains disabled until the full acceptance path is verified.
+- [x] S35a standalone portable battle schemas, input-range helpers and deterministic round engine. No playable type registration.
+- [ ] Integrate S35 graph/output validation and result bindings, then authoritative persistence/projections, shared rendering, Studio and repeatable playtests. Publication remains disabled until the full acceptance path is verified.
 - [ ] Checkpoint restore with explicit roll/visit semantics; broader item use and reward configuration without duplicating permanent claims.
 
 ## Remaining product work

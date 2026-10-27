@@ -136,3 +136,7 @@ Extend existing draft-only saved setups with bounded Dice controls and recorded 
 ## S35 — Bounded authoritative TurnBasedBattle contract
 
 Design default, implementation deferred: start with one player and one enemy, deterministic Attack/Guard rounds, guaranteed Escape and a finite turn limit resolving to loss. Use run health/stats plus declared entry bonuses, persist every round under revision/visit guards, and route only on explicit Continue. Three unconditional safe outcome routes are mandatory. No automatic loot or account grants. [Battle](battle.md) owns formulas, typed boundaries, disclosure and acceptance gates. This is a documentation-only decision; no current API or edition gains battle support.
+
+### S35a — Portable battle foundation
+
+Implement the strict standalone battle schemas and pure deterministic engine before registering a playable type. Input range validation is explicit per incoming edge; helpers return state proposals only. Publication wiring, server authorization/receipts, graph routing, client negotiation and rendering remain gated follow-up work. See [S35a](battle.md#s35a-implementation-boundary). No existing save/edition or real-player contract changes.
