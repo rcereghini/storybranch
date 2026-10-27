@@ -140,3 +140,7 @@ Design default, implementation deferred: start with one player and one enemy, de
 ### S35a — Portable battle foundation
 
 Implement the strict standalone battle schemas and pure deterministic engine before registering a playable type. Input range validation is explicit per incoming edge; helpers return state proposals only. Publication wiring, server authorization/receipts, graph routing, client negotiation and rendering remain gated follow-up work. See [S35a](battle.md#s35a-implementation-boundary). No existing save/edition or real-player contract changes.
+
+### S35b — Terminal battle route proposals
+
+Require all three unconditional battle output routes and validate their destinations against the current effective safe Story graph before returning a proposal. Continue must pass the battle engine guards and derive the selected outcome and scalar bindings from its pending result. Include Story identity alongside edition/run/entry identity. Keep the binding union separate from ordinary live routes until mixed graph compilation and authoritative runtime integration are ready. See [S35b](battle.md#s35b-terminal-routing-boundary).

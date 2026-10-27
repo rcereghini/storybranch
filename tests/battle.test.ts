@@ -30,6 +30,7 @@ const stats = {
 };
 const identity = {
   runId: "run",
+  storyId: "story",
   versionId: "edition-1",
   storyNodeId: "fight",
   entryRevision: 3,
