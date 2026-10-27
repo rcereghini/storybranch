@@ -1,3 +1,4 @@
+import { Battle } from "./Battle";
 import { transitionTiming } from "./transition-timing";
 import { Button } from "./ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -25,6 +26,7 @@ export function StoryNode({
   children,
   onPlaybackChange,
   onOutput,
+  onBattleAction,
   disabled,
   transitioning,
   result,
@@ -39,6 +41,7 @@ export function StoryNode({
   children: ReactNode;
   onPlaybackChange: (playing: boolean) => void;
   onOutput: (output: StoryNodeOutput) => void;
+  onBattleAction?: (action: "attack" | "guard" | "escape" | "continue") => void;
   disabled: boolean;
   transitioning: boolean;
 }) {
@@ -86,6 +89,20 @@ export function StoryNode({
     onOutput(output);
   };
   const heading = useRef<HTMLHeadingElement>(null);
+  const battleControls = useRef<HTMLDivElement>(null);
+  const previousBattle = useRef<string>(undefined);
+  useEffect(() => {
+    if (disabled) return;
+    const battle = storyNode.battle;
+    if (
+      battle?.phase === "result-pending" &&
+      previousBattle.current === battle.battleId + ":active"
+    )
+      battleControls.current?.querySelector("button")?.focus();
+    previousBattle.current = battle
+      ? battle.battleId + ":" + battle.phase
+      : undefined;
+  }, [disabled, storyNode.battle]);
   const type = storyNode.storyNodeType;
   const video = type === "video" || type === "video-options";
   useEffect(() => {
@@ -125,6 +142,29 @@ export function StoryNode({
               ? "YOUR ANSWERS ARE IN"
               : "WHAT WILL YOU DO?"}
       </p>
+      {type === "battle" && storyNode.battle && (
+        <div
+          ref={battleControls}
+          className="battle-actions"
+          aria-label="Battle actions"
+        >
+          {storyNode.battle.actions.map((action) => (
+            <Button
+              key={action}
+              disabled={disabled || !onBattleAction}
+              onClick={() => {
+                if (disabled || emitted.current || !onBattleAction) return;
+                emitted.current = true;
+                onBattleAction(action);
+              }}
+            >
+              {action === "continue"
+                ? "Continue"
+                : action[0].toUpperCase() + action.slice(1)}
+            </Button>
+          ))}
+        </div>
+      )}
       {storyNode.outputs.map((output, i) => {
         const locked = !output.enabled;
         return (
@@ -221,13 +261,15 @@ export function StoryNode({
           <p className="eyebrow">
             {type === "dice"
               ? "DICE ROLL"
-              : type === "reveal"
-                ? "QUIZ"
-                : result
-                  ? "YOUR RESULT"
-                  : type === "comic"
-                    ? "COMIC"
-                    : "STORYNODE"}
+              : type === "battle"
+                ? "BATTLE"
+                : type === "reveal"
+                  ? "QUIZ"
+                  : result
+                    ? "YOUR RESULT"
+                    : type === "comic"
+                      ? "COMIC"
+                      : "STORYNODE"}
           </p>
           <h1 ref={heading} tabIndex={-1}>
             {storyNode.title}
@@ -238,6 +280,9 @@ export function StoryNode({
             image && <img className="story-node-photo" src={image} alt="" />
           )}
           <p className="story-node-copy">{storyNode.transcript}</p>
+          {type === "battle" && storyNode.battle && (
+            <Battle battle={storyNode.battle} />
+          )}
           {type === "dice" && (
             <DiceRoll
               sides={storyNode.diceSides}

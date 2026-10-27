@@ -382,6 +382,22 @@ function App() {
         payload: { choiceId, ...(action ? { action } : {}) },
       },
     });
+  const battleAction = (action: "attack" | "guard" | "escape" | "continue") => {
+    const battle = player?.storyNode.battle;
+    if (!player || !battle) return;
+    return command({
+      path: `/playthroughs/${player.save.id}/battle-actions`,
+      body: {
+        idempotencyKey: crypto.randomUUID(),
+        expectedRevision: player.save.revision,
+        payload: {
+          battleId: battle.battleId,
+          expectedTurn: battle.turns,
+          action,
+        },
+      },
+    });
+  };
   const branch = async (branchId: string) => {
     if (!player || busy || offline || pending || stale || starting.current)
       return;
@@ -731,6 +747,7 @@ function App() {
                       onOutput={(output) =>
                         choose(output.choiceId, output.action)
                       }
+                      onBattleAction={battleAction}
                       storyNode={player.storyNode}
                       result={player.result}
                       media={player.media}

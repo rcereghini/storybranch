@@ -1,3 +1,7 @@
+import {
+  battleContractHeader,
+  battleContractVersion,
+} from "../packages/contracts/battle-player";
 import { expect, it } from "vitest";
 import { createApi } from "../packages/api-client/index";
 import apiFunction from "../services/functions/api";
@@ -25,7 +29,8 @@ it("negotiates the required contract on every player route", async () => {
       .slice(0, 4)
       .every(
         (headers) =>
-          headers.get(playerContractHeader) === playerContractVersion,
+          headers.get(playerContractHeader) === playerContractVersion &&
+          headers.get(battleContractHeader) === battleContractVersion,
       ),
   ).toBe(true);
   expect(requests[4].has(playerContractHeader)).toBe(false);

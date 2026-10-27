@@ -1,3 +1,4 @@
+import { battleResultSchema } from "./battle";
 import { z } from "zod";
 import {
   id,
@@ -50,6 +51,42 @@ export const playerEventSchema = z.object({
   itemChanges: z.array(playerItemChangeSchema).optional(),
 });
 export type PlayerEvent = z.infer<typeof playerEventSchema>;
+export const renderBattleSchema = z
+  .object({
+    version: z.literal(1),
+    battleId: z.string().min(1).max(400),
+    phase: z.enum(["active", "result-pending"]),
+    turns: z.number().int().min(0).max(30),
+    maxTurns: z.number().int().min(1).max(30),
+    initiative: z.enum(["player", "enemy"]),
+    playerHealth: z.number().int().min(0).max(100),
+    playerMaxHealth: z.literal(100),
+    enemy: z
+      .object({
+        name: z.string().min(1).max(80),
+        health: z.number().int().min(0).max(100),
+        maxHealth: z.number().int().min(1).max(100),
+      })
+      .strict(),
+    actions: z
+      .array(z.enum(["attack", "guard", "escape", "continue"]))
+      .min(1)
+      .max(3),
+    result: battleResultSchema.optional(),
+  })
+  .strict()
+  .superRefine((b, ctx) => {
+    const expected =
+      b.phase === "active" ? ["attack", "guard", "escape"] : ["continue"];
+    if (
+      JSON.stringify(b.actions) !== JSON.stringify(expected) ||
+      (b.phase === "result-pending") !== !!b.result ||
+      b.enemy.health > b.enemy.maxHealth ||
+      b.turns > b.maxTurns
+    )
+      ctx.addIssue({ code: "custom", message: "Invalid battle presentation." });
+  });
+export type RenderBattle = z.infer<typeof renderBattleSchema>;
 export const renderStoryNodeSchema = storyNodeSchema
   .pick({
     id: true,
@@ -62,6 +99,17 @@ export const renderStoryNodeSchema = storyNodeSchema
     comic: true,
   })
   .extend({
+    storyNodeType: z.enum([
+      "text",
+      "video",
+      "dice",
+      "reveal",
+      "text-options",
+      "video-options",
+      "comic",
+      "battle",
+    ]),
+    battle: renderBattleSchema.optional(),
     outputs: z
       .array(
         z
@@ -88,7 +136,18 @@ export const renderStoryNodeSchema = storyNodeSchema
       .max(20),
     diceSides: z.number().int().positive().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((node, ctx) => {
+    if (
+      node.storyNodeType === "battle"
+        ? !node.battle || node.kind !== "scene" || node.outputs.length !== 0
+        : !!node.battle
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Battle presentation must match its StoryNode type.",
+      });
+  });
 export type RenderStoryNode = z.infer<typeof renderStoryNodeSchema>;
 export type PlayerRun = Omit<Save, "scores" | "appliedEntryEffects">;
 export type PlayerView = {

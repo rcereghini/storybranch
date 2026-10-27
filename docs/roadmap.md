@@ -1,6 +1,6 @@
 # Current delivery checklist
 
-Reviewed October 27, 2026 against merged main `4bd6a1d` (through PR59), with S35e staged mixed-Story traversal implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means the named deliverable is complete; a design-only item is explicitly labeled and does not imply runtime support or hosted/device acceptance. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
+Reviewed October 27, 2026 against merged main `312f46a` (through PR60), with S35f shared battle player rendering implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means the named deliverable is complete; a design-only item is explicitly labeled and does not imply runtime support or hosted/device acceptance. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
 
 ## Implemented foundation
 
@@ -27,7 +27,8 @@ Implementation details: [player runtime](story-system/player-runtime.md), [Studi
 - [x] S35c staged mixed battle graph schema/compiler, all-required output safety, incoming edge/default validation and battle-to-battle result range checks. Live Story schemas still reject combat.
 - [x] S35d staged authoritative battle action/reload endpoints, owned embedded state, atomic Continue/effects/completion, receipts and capability gating. No public battle start or renderer.
 - [x] S35e staged mixed-Story start/choice helpers and capability-gated ordinary choice transactions, including Dice Next entry, revisits and live account-key checks. Public battle starts remain disabled.
-- [ ] Integrate public battle start and full player projection/media, shared rendering, Studio and repeatable playtests. Publication remains disabled until the full acceptance path is verified.
+- [x] S35f full staged player projection/media and shared battle rendering with existing session recovery. Public starts and side-Story offers remain gated.
+- [ ] Integrate public root/child/replay starts, Studio and repeatable battle playtests. Publication remains disabled until the full acceptance path is verified.
 - [ ] Checkpoint restore with explicit roll/visit semantics; broader item use and reward configuration without duplicating permanent claims.
 
 ## Remaining product work
