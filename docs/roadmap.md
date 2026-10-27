@@ -1,6 +1,6 @@
 # Current delivery checklist
 
-Reviewed October 26, 2026 against merged main `ffe3fca` (through PR52), with S33 implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means an implemented capability, not that every product milestone or hosted/device acceptance test is complete. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
+Reviewed October 26, 2026 against merged main `e20bd40` (through PR53), with S34 implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means an implemented capability, not that every product milestone or hosted/device acceptance test is complete. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
 
 ## Implemented foundation
 
@@ -19,8 +19,8 @@ Implementation details: [player runtime](story-system/player-runtime.md), [Studi
 ## Next architecture slices
 
 - [x] S32 typed input declarations, constant/Dice mappings, per-entry server snapshots and safe publication validation (merged PR52). Contract: [StoryBranch data](story-system/branch-data.md).
-- [x] S33 visual input/binding editor, creator-only resolved-input diagnostics and typed input conditions with guaranteed exits, implemented in this change. Merge/deployment remains separate from implementation.
-- [ ] Repeatable playtests: saved Dice controls, route history and assertions. Existing saved setups contain starting state only.
+- [x] S33 visual input/binding editor, creator-only resolved-input diagnostics and typed input conditions with guaranteed exits (merged PR53).
+- [x] S34 repeatable private playtests: saved Dice controls, bounded route history and editable destination/status assertions, implemented in this change. Merge/deployment remains separate. See [Studio](17-creator-studio.md#s34--recorded-and-repeatable-private-playtests).
 - [ ] A concrete TurnBasedBattle contract, then authoritative turns, reload/retry, inputs/results and shared rendering. Decide combat rules, limits and escape before implementation.
 - [ ] Checkpoint restore with explicit roll/visit semantics; broader item use and reward configuration without duplicating permanent claims.
 

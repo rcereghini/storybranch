@@ -1,13 +1,143 @@
 import { it, expect } from "vitest";
+import { recordPreviewStep, runPlaytest } from "../packages/domain/playtest";
+import {
+  playtestReplaySchema,
+  previewScenarioSchema,
+  type PlaytestStep,
+} from "../packages/contracts/preview";
+
+it("records exact Dice commands and replays separate Roll/Next assertions without mutation", () => {
+  for (const value of [14, 16]) {
+    const story = branchDataStory();
+    const scenario = {
+      ...previewPreset(story, "first"),
+      dice: { mode: "fixed" as const, value },
+    };
+    let save = startPreview(story, scenario, 0);
+    let history: PlaytestStep[] = [];
+    for (const [choice, action] of [
+      ["roll", "roll"],
+      ["roll", "continue"],
+      ["Finish", "continue"],
+    ] as const) {
+      ({ save, history } = recordPreviewStep(
+        story,
+        save,
+        scenario,
+        history,
+        choice,
+        action,
+        history.length + 1,
+      ));
+    }
+    expect(history[0]).toMatchObject({
+      roll: value,
+      expected: { storyNodeId: "dice", status: "active" },
+    });
+    expect(history[1]).not.toHaveProperty("roll");
+    const replay = { version: 1 as const, steps: history };
+    const input = { ...scenario, replay };
+    const before = JSON.stringify({ story, save, input });
+    expect(runPlaytest(story, input)).toMatchObject({
+      passed: true,
+      checked: 3,
+      total: 3,
+    });
+    expect(runPlaytest(story, { ...input, dice: { mode: "lowest" } })).toEqual(
+      runPlaytest(story, input),
+    );
+    expect(JSON.stringify({ story, save, input })).toBe(before);
+    const partial = runPlaytest(story, {
+      ...input,
+      replay: { version: 1, steps: history.slice(0, 1) },
+    });
+    expect(partial.passed).toBe(true);
+    expect(partial.message).toContain("Partial path");
+    const wrong = structuredClone(input);
+    wrong.replay.steps[1].expected.storyNodeId = "ending";
+    expect(runPlaytest(story, wrong)).toMatchObject({
+      passed: false,
+      checked: 1,
+      message: expect.stringContaining("Step 2: expected ending"),
+    });
+    const changed = structuredClone(story);
+    const dice = changed.storyNodes.dice.choices[0].outcome;
+    if (dice.kind !== "dice") throw new Error("Fixture");
+    dice.sides = 6;
+    dice.target = 4;
+    expect(runPlaytest(changed, input)).toMatchObject({
+      passed: false,
+      checked: 0,
+      message: expect.stringContaining("Step 1"),
+    });
+    delete changed.storyNodes.summary;
+    expect(runPlaytest(changed, input).passed).toBe(false);
+  }
+});
+
+it("bounds replay syntax and rejects invalid or exhausted preview rolls without recording", () => {
+  const story = branchDataStory();
+  const scenario = previewPreset(story, "first");
+  const save = startPreview(story, scenario, 0);
+  const history: PlaytestStep[] = [];
+  const original = JSON.stringify(save);
+  expect(() =>
+    recordPreviewStep(
+      story,
+      save,
+      { ...scenario, dice: { mode: "fixed", value: 21 } },
+      history,
+      "roll",
+      "roll",
+      1,
+    ),
+  ).toThrow();
+  expect(JSON.stringify(save)).toBe(original);
+  expect(history).toEqual([]);
+  const step = {
+    from: "dice",
+    choiceId: "roll",
+    action: "roll" as const,
+    roll: 16,
+    expected: { storyNodeId: "dice", status: "active" as const },
+  };
+  expect(() =>
+    recordPreviewStep(
+      story,
+      save,
+      scenario,
+      Array(100).fill(step),
+      "roll",
+      "roll",
+      1,
+    ),
+  ).toThrow("100 commands");
+  for (const steps of [
+    [],
+    Array(101).fill(step),
+    [{ ...step, roll: undefined }],
+    [{ ...step, action: "continue" }],
+    [{ ...step, roll: 101 }],
+  ])
+    expect(playtestReplaySchema.safeParse({ version: 1, steps }).success).toBe(
+      false,
+    );
+  expect(
+    previewScenarioSchema.safeParse({
+      ...scenario,
+      dice: { mode: "fixed", value: 0 },
+    }).success,
+  ).toBe(false);
+  expect(runPlaytest(story, scenario)).toMatchObject({
+    passed: false,
+    checked: 0,
+  });
+});
 import {
   reviewPublication,
   validatePublication,
 } from "../packages/domain/authoring";
-import {
-  start,
-  baseStats,
-  transition,
-} from "../packages/domain/index";
+import { start, baseStats, transition } from "../packages/domain/index";
 import { conditionSchema } from "../packages/contracts/index";
 import { blankStory } from "../apps/web/src/studio-model";
 import { draftSchema } from "../packages/contracts/authoring";

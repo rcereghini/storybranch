@@ -6,6 +6,7 @@ import {
   type PreviewScenario,
 } from "../../../packages/contracts/preview";
 import { previewScenarioIssues } from "../../../packages/domain/preview";
+import { runPlaytest } from "../../../packages/domain/playtest";
 
 export function SavedPlaytestScenarios({
   story,
@@ -46,9 +47,9 @@ export function SavedPlaytestScenarios({
       <details>
         <summary>Saved playtest setups ({entries.length}/20)</summary>
         <p>
-          Save the applied starting stats, items and key selections. This does
-          not save the current position or items earned during preview. Apply
-          pending test edits first.
+          Save applied starting stats, items, keys, Dice controls and captured
+          assertions. This does not save the current position or items earned
+          during preview. Apply pending test edits first.
         </p>
         <label>
           Saved setup
@@ -109,6 +110,20 @@ export function SavedPlaytestScenarios({
             }
           >
             Load setup
+          </button>
+          <button
+            className="btn btn-secondary"
+            disabled={!entry?.scenario.replay}
+            onClick={() => {
+              if (entry) {
+                const report = runPlaytest(story, entry.scenario);
+                setStatus(
+                  `${report.passed ? "PASS" : "FAIL"}: ${report.message}`,
+                );
+              }
+            }}
+          >
+            Run saved assertions
           </button>
           <button
             className="btn btn-secondary"

@@ -30,6 +30,7 @@ try {
   await import("./key-conditions-check");
   await import("./item-effects-check");
   await import("./saved-scenarios-check");
+  await import("./repeatable-playtests-check");
   await import("./branch-data-check");
   await import("./promotional-keys-check");
   await import("./earned-account-keys-check");

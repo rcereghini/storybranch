@@ -5728,6 +5728,19 @@ it("saves private playtest setups with revision guards and excludes them from ed
       importedKeys: [],
       accountKeys: [],
       items: { [`${story.id}:retired`]: 5 },
+      dice: { mode: "fixed", value: 14 },
+      replay: {
+        version: 1,
+        steps: [
+          {
+            from: "private-source",
+            choiceId: "private-choice",
+            action: "roll",
+            roll: 14,
+            expected: { storyNodeId: "private-source", status: "active" },
+          },
+        ],
+      },
     },
   };
   const command = {
@@ -5774,7 +5787,9 @@ it("saves private playtest setups with revision guards and excludes them from ed
     await db.doc(`stories/${story.id}/versions/edition-1`).get()
   ).data();
   expect(edition).not.toHaveProperty("playtestScenarios");
-  expect(JSON.stringify(edition)).not.toContain("Private test setup");
+  expect(JSON.stringify(edition)).not.toMatch(
+    /Private test setup|private-source|private-choice|playtestScenarios|"replay"/,
+  );
   expect(
     (
       await call("/playthroughs", {
