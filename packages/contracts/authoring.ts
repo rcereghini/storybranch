@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { savedPlaytestScenariosSchema } from "./preview";
 import { savedBattlePlaytestsSchema } from "./battle-workshop";
+import { stagedBattleStorySchema } from "./battle-graph";
 import { id, storySchema, storyTrunkContextSchema } from "./index";
 // The trunk is a configuration view, not a playable placement. Existing root
 // metadata stays the sole source of truth; editions need no duplicate title.
@@ -67,7 +68,7 @@ export type CastMember = ComicStudio["cast"][number];
 
 export const draftSchema = z
   .object({
-    story: storySchema,
+    story: z.union([storySchema, stagedBattleStorySchema]),
     description: z.string().max(500),
     storyNodePositions: storyNodePositionsSchema.optional(),
     comic: comicStudioSchema.optional(),
@@ -106,6 +107,10 @@ export type Draft = z.infer<typeof draftSchema>;
 export type DraftRecord = Draft & {
   revision: number;
   publishedVersionId: string | null;
+};
+// Existing specialized editors accept only ordinary graphs, after Studio's guard.
+export type OrdinaryDraftRecord = Omit<DraftRecord, "story"> & {
+  story: z.infer<typeof storySchema>;
 };
 export const draftCommandSchema = z
   .object({

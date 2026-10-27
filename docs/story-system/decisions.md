@@ -180,3 +180,7 @@ Expose the staged simulator in a native Studio modal before widening the draft/p
 ### S35k — Save rehearsal configurations, not battle graph overlays
 
 Keep named battle experiments in bounded, versioned private draft metadata, following Studio undo/autosave and revision-checked commands. Explicit Save/Update retains the applied S35j substitution and validated S35i assertions; Load compiles against the current Story snapshot and preserves active preview on failure. Publication consumes only the actual Story graph and cannot turn an experiment into playable combat. See [S35k](battle.md#s35k-saved-battle-rehearsals). Persistent battle graph editing remains a separate authoring change.
+
+### S35l — Actual mixed draft graphs with a publication gate
+
+Allow strict Battle StoryNodes in private `Draft.story`, sharing the existing owned revisioned save command. Use real outputs in the canvas and compile actual mixed graphs for preview. The mixed authoring view explicitly applies typed configuration and saves, retains uncertain requests for retry, and diagnoses unsafe paths. Specialized ordinary editors remain behind an ordinary-schema guard. Publication explicitly rejects every draft containing battle nodes, even disconnected ones. No issued edition or run is rewritten. See [S35l](battle.md#s35l-persisted-battle-graph-authoring).

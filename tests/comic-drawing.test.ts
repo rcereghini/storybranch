@@ -1,5 +1,5 @@
 import { it, expect, vi } from "vitest";
-import type { DraftRecord } from "../packages/contracts/authoring";
+import type { OrdinaryDraftRecord as DraftRecord } from "../packages/contracts/authoring";
 import {
   counts,
   currentDrawing,

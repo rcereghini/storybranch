@@ -1,4 +1,6 @@
-import type { Story, StoryNode } from "../contracts/index";
+import type { Story as OrdinaryStory } from "../contracts/index";
+import type { StagedBattleStory as Story } from "../contracts/battle-graph";
+type StoryNode = Story["storyNodes"][string];
 import type { StoryNodePositions } from "../contracts/authoring";
 
 export type StoryNodeConnection = {
@@ -8,6 +10,13 @@ export type StoryNodeConnection = {
   target: string;
 };
 export function connections(storyNode: StoryNode): StoryNodeConnection[] {
+  if (storyNode.storyNodeType === "battle")
+    return (["win", "loss", "escape"] as const).map((outcome) => ({
+      choiceId: outcome,
+      slot: 0,
+      label: outcome[0].toUpperCase() + outcome.slice(1),
+      target: storyNode.outputs[outcome].targetStoryNodeId,
+    }));
   return storyNode.choices.flatMap((c) => {
     const o = c.outcome;
     const base = { choiceId: c.id };
@@ -39,6 +48,18 @@ export function connections(storyNode: StoryNode): StoryNodeConnection[] {
   });
 }
 export function connectStoryNode(
+  story: OrdinaryStory,
+  source: string,
+  edge: Pick<StoryNodeConnection, "choiceId" | "slot">,
+  target: string,
+): OrdinaryStory;
+export function connectStoryNode(
+  story: Story,
+  source: string,
+  edge: Pick<StoryNodeConnection, "choiceId" | "slot">,
+  target: string,
+): Story;
+export function connectStoryNode(
   story: Story,
   source: string,
   edge: Pick<StoryNodeConnection, "choiceId" | "slot">,
@@ -47,6 +68,29 @@ export function connectStoryNode(
   const storyNode = story.storyNodes[source];
   if (!storyNode || !story.storyNodes[target])
     throw new Error("Choose an existing destination StoryNode.");
+  if (storyNode.storyNodeType === "battle") {
+    const outcome = (["win", "loss", "escape"] as const).find(
+      (key) => key === edge.choiceId,
+    );
+    if (!outcome || edge.slot !== 0)
+      throw new Error("This output no longer exists.");
+    return {
+      ...story,
+      storyNodes: {
+        ...story.storyNodes,
+        [source]: {
+          ...storyNode,
+          outputs: {
+            ...storyNode.outputs,
+            [outcome]: {
+              ...storyNode.outputs[outcome],
+              targetStoryNodeId: target,
+            },
+          },
+        },
+      },
+    };
+  }
   const c = storyNode.choices.find((c) => c.id === edge.choiceId);
   if (
     !c ||

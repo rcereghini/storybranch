@@ -74,7 +74,7 @@ export function StoryInputsEditor({
   node,
   onApply,
 }: {
-  node: StoryNode;
+  node: Pick<StoryNode, "id" | "inputs">;
   onApply: (inputs: NodeInputs | undefined) => void;
 }) {
   const initial = () =>

@@ -1,4 +1,50 @@
 import { expect, it } from "vitest";
+import { draftSchema } from "../packages/contracts/authoring";
+import {
+  connections,
+  connectStoryNode,
+  arrangeStoryNodes,
+} from "../packages/domain/story-graph";
+
+it("persists actual mixed draft graphs and reconnects battle outputs without rewriting bindings", () => {
+  const story = fixture();
+  fight(story).outputs.win.inputBindings = {
+    version: 1,
+    bindings: [{ input: "won", source: { kind: "battle", field: "won" } }],
+  };
+  const draft = draftSchema.parse({ story, description: "Battle draft" });
+  expect(draft.story.storyNodes.fight).toEqual(story.storyNodes.fight);
+  expect(
+    connections(story.storyNodes.fight).map((edge) => edge.choiceId),
+  ).toEqual(["win", "loss", "escape"]);
+  const updated = connectStoryNode(
+    story,
+    "fight",
+    { choiceId: "win", slot: 0 },
+    "opening",
+  );
+  expect(fight(updated).outputs.win).toEqual({
+    ...fight(story).outputs.win,
+    targetStoryNodeId: "opening",
+  });
+  expect(fight(updated).outputs.loss).toEqual(fight(story).outputs.loss);
+  expect(fight(story).outputs.win.targetStoryNodeId).toBe("ending");
+  expect(Object.keys(arrangeStoryNodes(updated))).toEqual(
+    Object.keys(updated.storyNodes),
+  );
+  expect(() =>
+    connectStoryNode(story, "fight", { choiceId: "win", slot: 1 }, "ending"),
+  ).toThrow();
+  expect(() =>
+    connectStoryNode(story, "fight", { choiceId: "other", slot: 0 }, "ending"),
+  ).toThrow();
+  expect(reviewPublication(draft.story).story).toBeUndefined();
+  fight(story).outputs.loss.targetStoryNodeId = "unfinished";
+  expect(
+    draftSchema.safeParse({ story, description: "Incomplete battle" }).success,
+  ).toBe(true);
+  expect(reviewBattleGraph(story).story?.storyNodes.fight).toBeUndefined();
+});
 import { starterStory } from "../apps/web/src/studio-model";
 import { reviewBattleGraph } from "../packages/domain/battle-graph";
 import { reviewPublication } from "../packages/domain/authoring";

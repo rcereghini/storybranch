@@ -231,7 +231,10 @@ async function runTool(
               storyNodeType: storyNode.storyNodeType,
               kind: storyNode.kind,
               excerpt: excerpt(storyNode.transcript, 240),
-              choices: storyNode.choices.map((choice) => ({
+              choices: (storyNode.storyNodeType === "battle"
+                ? []
+                : storyNode.choices
+              ).map((choice) => ({
                 label: choice.label,
                 outcome: choice.outcome.kind,
                 leadsTo:

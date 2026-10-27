@@ -22,6 +22,7 @@
     "test:integration": "vitest run tests/integration.test.ts",
     "test:battle": "tsx scripts/battle-check.ts",
     "test:battle-workshop": "tsx scripts/battle-workshop-check.ts",
+    "test:battle-authoring": "tsx scripts/battle-authoring-check.ts",
     "test:browser": "tsx scripts/browser-check.ts",
     "test:auth": "tsx scripts/auth-check.ts",
     "test:audio": "tsx scripts/audio-check.ts",

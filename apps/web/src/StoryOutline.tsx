@@ -1,4 +1,5 @@
-import type { Story, StoryNode } from "../../../packages/contracts/index";
+import type { StagedBattleStory as Story } from "../../../packages/contracts/battle-graph";
+type StoryNode = Story["storyNodes"][string];
 import { connections } from "../../../packages/domain/story-graph";
 
 export const storyNodeTypeNames: Record<StoryNode["storyNodeType"], string> = {
@@ -9,6 +10,7 @@ export const storyNodeTypeNames: Record<StoryNode["storyNodeType"], string> = {
   dice: "Dice roll",
   reveal: "Quiz result",
   comic: "Comic",
+  battle: "Battle",
 };
 
 // StoryNodes in reading order: breadth-first from the first StoryNode, then any StoryNode

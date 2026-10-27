@@ -6,7 +6,7 @@ import type {
 } from "../../../packages/contracts/index";
 import type {
   CastMember,
-  DraftRecord,
+  OrdinaryDraftRecord as DraftRecord,
 } from "../../../packages/contracts/authoring";
 import type {
   ComicBrief,

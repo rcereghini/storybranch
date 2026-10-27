@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { DraftRecord } from "../../../packages/contracts/authoring";
+import type { OrdinaryDraftRecord as DraftRecord } from "../../../packages/contracts/authoring";
 import type { ImageCommand } from "../../../packages/contracts/generation";
 import {
   assetIdOf,

@@ -4,6 +4,8 @@ Status: current implementation contract and enduring `Story`/`StoryNode` invaria
 
 ## Required contract for every StoryNode type
 
+Battle is now supported in private mixed drafts and previews through [S35l](story-system/battle.md#s35l-persisted-battle-graph-authoring). It consumes typed boolean preemptive and bounded integer attack/defense bonus inputs, resolves Attack/Guard/Escape through the battle engine, retains a pending result, and follows exactly one Win/Loss/Escape StoryBranch on explicit Continue. Real play remains server-authoritative; creator publication of any battle draft remains gated. This adds no fallback type to the ordinary edition schema.
+
 This is a requirement for all current and future types, including RPG turn-based battles. A StoryNode type is a child renderer of `StoryNode`, never a parallel player architecture. It must declare **Input → StoryNode type → Completion event → Output(s)**. A StoryNode must lead onward or deliberately close its branch; an unexplained dead end is invalid.
 
 | Authoring contract | Completion event | Logical outputs |

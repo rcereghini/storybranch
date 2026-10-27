@@ -1,6 +1,12 @@
 import { ConditionEditor } from "./ConditionEditor";
 import { PlaytestTools } from "./PlaytestTools";
 import { BattleWorkshop } from "./BattleWorkshop";
+import { BattleDraftEditor } from "./BattleDraftEditor";
+import {
+  draftSchema,
+  type DraftRecord as AnyDraftRecord,
+} from "../../../packages/contracts/authoring";
+import { storySchema } from "../../../packages/contracts/index";
 import { recordPreviewStep } from "../../../packages/domain/playtest";
 import type { PlaytestStep } from "../../../packages/contracts/preview";
 import {
@@ -35,7 +41,7 @@ import {
 } from "../../../packages/contracts/index";
 import {
   storyTrunkOf,
-  type DraftRecord,
+  type OrdinaryDraftRecord as DraftRecord,
 } from "../../../packages/contracts/authoring";
 import type { AssistChoice } from "../../../packages/contracts/assist";
 import {
@@ -139,6 +145,7 @@ export function Studio({
   const [listing, setListing] = useState<Listing | null>(null);
   const [uploads, setUploads] = useState<UploadListing | null>(null);
   const [draft, setDraft] = useState<DraftRecord | null>(null);
+  const [battleDraft, setBattleDraft] = useState<AnyDraftRecord | null>(null);
   const [selected, setSelected] = useState("opening");
   const [dirty, setDirty] = useState(false);
   useEffect(() => {
@@ -198,9 +205,12 @@ export function Studio({
   }, [dirty]);
   // The editor takes the whole window; the footer and phone tabs step aside.
   useEffect(() => {
-    document.documentElement.classList.toggle("studio-editing", !!draft);
+    document.documentElement.classList.toggle(
+      "studio-editing",
+      !!draft || !!battleDraft,
+    );
     return () => document.documentElement.classList.remove("studio-editing");
-  }, [!!draft]);
+  }, [!!draft, !!battleDraft]);
   // Editor messages clear themselves after a moment.
   useEffect(() => {
     if (!notice || !draft) return;
@@ -425,7 +435,19 @@ export function Studio({
     return () => removeEventListener("keydown", keys);
   });
 
-  const resetEditor = (loaded: DraftRecord, isDirty: boolean) => {
+  const resetEditor = (input: AnyDraftRecord, isDirty: boolean) => {
+    const ordinary = storySchema.safeParse(input.story);
+    if (!ordinary.success) {
+      const { revision, publishedVersionId, ...body } = input;
+      draftSchema.parse(body);
+      draftRef.current = null;
+      setDraft(null);
+      setDirty(false);
+      setBattleDraft(input);
+      return;
+    }
+    const loaded: DraftRecord = { ...input, story: ordinary.data };
+    setBattleDraft(null);
     // Images drawn in the background while this draft was closed.
     const d = withDrawnImages(loaded);
     if (d !== loaded) isDirty = true;
@@ -823,6 +845,17 @@ export function Studio({
     </div>
   );
 
+  if (battleDraft)
+    return (
+      <BattleDraftEditor
+        initial={battleDraft}
+        onDirtyChange={onDirtyChange}
+        onExit={() => {
+          setBattleDraft(null);
+          void loadList();
+        }}
+      />
+    );
   if (!draft)
     return (
       <section className="studio">
@@ -1013,6 +1046,24 @@ export function Studio({
             onClick={startPreview}
           >
             Preview
+          </Button>
+          <Button
+            className="btn btn-secondary btn-small"
+            disabled={busy || offline}
+            onClick={() =>
+              void work(async () => {
+                if (!(await flush())) return;
+                const current = draftRef.current;
+                if (current) {
+                  setBattleDraft(current);
+                  draftRef.current = null;
+                  setDraft(null);
+                  setDirty(false);
+                }
+              })
+            }
+          >
+            Battle authoring
           </Button>
           <BattleWorkshop
             story={draft.story}

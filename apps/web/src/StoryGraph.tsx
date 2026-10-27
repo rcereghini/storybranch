@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Story } from "../../../packages/contracts/index";
+import type { StagedBattleStory as Story } from "../../../packages/contracts/battle-graph";
 import type { StoryNodePositions } from "../../../packages/contracts/authoring";
 import {
   arrangeStoryNodes,
@@ -38,6 +38,7 @@ export function StoryGraph({
   onConnect,
   onAdd,
   onBranch,
+  onAddBattle,
 }: {
   story: Story;
   positions?: StoryNodePositions;
@@ -53,7 +54,8 @@ export function StoryGraph({
     target: string,
   ) => void;
   onAdd: (type: NewStoryNode) => void;
-  onBranch: () => void;
+  onBranch?: () => void;
+  onAddBattle?: () => void;
 }) {
   const [view, setView] = useState<View>({ x: 40, y: 40, z: 1 });
   const [kind, setKind] = useState<NewStoryNode>("text");
@@ -519,17 +521,30 @@ export function StoryGraph({
             + Add StoryNode
           </Button>
         </div>
-        <Button
-          disabled={
-            disabled ||
-            !branchable ||
-            storyNodes.length >= 80 ||
-            story.storyNodes[selected].choices.length >= 20
-          }
-          onClick={onBranch}
-        >
-          + Add branch
-        </Button>
+        {onBranch && (
+          <Button
+            disabled={
+              disabled ||
+              !branchable ||
+              storyNodes.length >= 80 ||
+              story.storyNodes[selected]?.storyNodeType === "battle" ||
+              ("choices" in (story.storyNodes[selected] ?? {}) &&
+                "choices" in story.storyNodes[selected] &&
+                story.storyNodes[selected].choices.length >= 20)
+            }
+            onClick={onBranch}
+          >
+            + Add branch
+          </Button>
+        )}
+        {onAddBattle && (
+          <Button
+            disabled={disabled || storyNodes.length >= 80}
+            onClick={onAddBattle}
+          >
+            + Add Battle
+          </Button>
+        )}
         <Button
           disabled={disabled}
           onClick={() => {

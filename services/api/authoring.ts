@@ -1,7 +1,7 @@
 import { validateAccountKeys } from "./account-keys";
 import { createHash } from "node:crypto";
 import { FieldPath, type DocumentReference } from "firebase-admin/firestore";
-import { GameError } from "../../packages/contracts/index";
+import { GameError, storySchema } from "../../packages/contracts/index";
 import {
   draftCommandSchema,
   publishCommandSchema,
@@ -121,6 +121,16 @@ export async function authoring(
       tx.set(ref, result);
     } else {
       if (!old) throw new GameError("NOT_FOUND", "Save your draft first.");
+      if (
+        Object.values(old.story.storyNodes).some(
+          (node) => node.storyNodeType === "battle",
+        )
+      )
+        throw new GameError(
+          "VALIDATION_FAILED",
+          "Battle publication is not enabled. Your draft remains saved.",
+        );
+      const ordinaryStory = storySchema.parse(old.story);
       const versionId = `edition-${old.revision}`;
       const story = validatePublication({ ...old.story, versionId });
       await validateKeyExports(tx, story, uid);
@@ -140,8 +150,9 @@ export async function authoring(
           if (
             root?.ownerUid !== uid ||
             !source ||
-            JSON.stringify(contentOf(old.story.storyNodes[storyNode.id])) !==
-              JSON.stringify(source.content)
+            JSON.stringify(
+              contentOf(ordinaryStory.storyNodes[storyNode.id]),
+            ) !== JSON.stringify(source.content)
           )
             throw new GameError(
               "VALIDATION_FAILED",

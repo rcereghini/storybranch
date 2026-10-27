@@ -7193,3 +7193,102 @@ it("requires separate child consent and selected battle source evidence without 
   expect(JSON.stringify(response.data)).not.toContain("keyImportSnapshot");
   expect(await battleRootRequest(path, command)).toEqual(response);
 });
+
+it("saves mixed battle drafts with retry guards and blocks even disconnected battles from publication", async () => {
+  const story = starterStory(`battle-draft-${randomUUID()}`);
+  const battle = {
+    id: "fight",
+    title: "Private battle",
+    transcript: "An encounter",
+    kind: "scene",
+    storyNodeType: "battle",
+    entryEffects: [],
+    battle: {
+      version: 1,
+      rules: "battle-1",
+      enemy: {
+        name: "Guardian",
+        maxHealth: 20,
+        attack: 4,
+        defense: 1,
+        agility: 5,
+      },
+      maxTurns: 10,
+    },
+    outputs: {
+      win: { targetStoryNodeId: "ending", effects: [] },
+      loss: { targetStoryNodeId: "unfinished", effects: [] },
+      escape: { targetStoryNodeId: "ending", effects: [] },
+    },
+  };
+  const mixed = {
+    ...story,
+    storyNodes: { ...story.storyNodes, fight: battle },
+  };
+  const path = `/studio/${story.id}`;
+  const command = {
+    idempotencyKey: randomUUID(),
+    expectedRevision: 0,
+    draft: { story: mixed, description: "Mixed draft" },
+  };
+  const first = await call(path, command);
+  expect(first.status).toBe(200);
+  expect(first.data.story.storyNodes.fight).toEqual(battle);
+  expect((await call(path, command)).data).toEqual(first.data);
+  expect((await call(path)).data.story).toEqual(mixed);
+  expect((await call(path, undefined, "progressed")).status).toBe(404);
+  expect(
+    (await call(path, { ...command, idempotencyKey: randomUUID() })).status,
+  ).toBe(409);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (await db.doc(`stories/${story.id}/versions/edition-1`).get()).exists,
+  ).toBe(false);
+  expect((await call(path)).data.story).toEqual(mixed);
+  expect(
+    (
+      await call(path, {
+        ...command,
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: {
+          ...command.draft,
+          story: {
+            ...mixed,
+            storyNodes: {
+              ...mixed.storyNodes,
+              fight: { ...battle, battle: { ...battle.battle, maxTurns: 31 } },
+            },
+          },
+        },
+      })
+    ).status,
+  ).toBe(400);
+  // Removing the gated type explicitly permits ordinary publication again.
+  expect(
+    (
+      await call(path, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 1,
+        draft: { story, description: "Ordinary again" },
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(`${path}/publish`, {
+        idempotencyKey: randomUUID(),
+        expectedRevision: 2,
+        policyVersion: "creator-alpha-1",
+      })
+    ).status,
+  ).toBe(200);
+});

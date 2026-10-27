@@ -18,7 +18,7 @@ export const stagedBattleNodeSchema = storyNodeSchema
     outputs: battleOutputsSchema,
   })
   .strict();
-// Used by staged battle services; not registered in drafts, publication or rendering.
+// Used by battle services and private drafts. Ordinary publication remains gated.
 export const stagedBattleStorySchema = storySchema
   .innerType()
   .extend({
