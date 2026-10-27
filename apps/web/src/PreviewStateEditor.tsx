@@ -1,6 +1,7 @@
 import { itemLabel } from "../../../packages/domain/story-items";
 import { useEffect, useState } from "react";
-import { statId, type Story } from "../../../packages/contracts/index";
+import { statId } from "../../../packages/contracts/index";
+import type { StagedBattleStory } from "../../../packages/contracts/battle-graph";
 import {
   previewScenarioSchema,
   type PreviewScenario,
@@ -13,7 +14,7 @@ export function PreviewStateEditor({
   scenario,
   onRestart,
 }: {
-  story: Story;
+  story: StagedBattleStory;
   scenario: PreviewScenario;
   onRestart: (scenario: PreviewScenario) => void;
 }) {

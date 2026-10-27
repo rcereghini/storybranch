@@ -65,7 +65,7 @@ export function storyItems(story: StagedBattleStory) {
   });
 }
 
-export function itemLabel(story: Story, itemId: string) {
+export function itemLabel(story: Pick<Story, "itemCatalogue">, itemId: string) {
   const name = story.itemCatalogue?.items.find(
     (i) => i.itemId === itemId,
   )?.name;

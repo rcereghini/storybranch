@@ -1,6 +1,6 @@
 # Current delivery checklist
 
-Reviewed October 27, 2026 against merged main `6882dbe` (through PR63), with S35i portable repeatable battle playtests implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means the named deliverable is complete; a design-only item is explicitly labeled and does not imply runtime support or hosted/device acceptance. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
+Reviewed October 27, 2026 against merged main `bb3241e` (through PR68), with S35n configurable mixed graph previews implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means the named deliverable is complete; a design-only item is explicitly labeled and does not imply runtime support or hosted/device acceptance. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
 
 ## Implemented foundation
 
@@ -31,7 +31,12 @@ Implementation details: [player runtime](story-system/player-runtime.md), [Studi
 - [x] S35g capability-aware root/replay starts with entry authorization, consented key imports and fresh isolated encounters.
 - [x] S35h isolated battle child starts, separate import consent and parent-preserving completion/return.
 - [x] S35i portable mixed-path battle recorder/replay with bounded state assertions and disposable preview scenarios.
-- [ ] Integrate Studio battle authoring, shared preview controls and saved repeatable battle playtests. Publication remains disabled until the full acceptance path is verified.
+- [x] S35j/k disposable Studio battle workshop and named saved substitution rehearsals.
+- [x] S35l actual mixed draft graph persistence/authoring and shared-wrapper previews, merged PR67.
+- [x] S35m visual Win/Loss/Escape input bindings with stale-reference repair, merged PR68.
+- [x] S35n session-only starting stats/inventory, Dice setup and resolved-input inspection for actual mixed graph previews. See [battle previews](story-system/battle.md#s35n-configurable-mixed-graph-previews).
+- [ ] Durable named setups/assertions for actual mixed graphs, including key scenarios (saved substitution rehearsals are a separate feature).
+- [ ] Richer visual ordinary-node editing within mixed graphs and end-to-end battle publication acceptance. Publication remains disabled until the full acceptance path is verified.
 - [ ] Checkpoint restore with explicit roll/visit semantics; broader item use and reward configuration without duplicating permanent claims.
 
 ## Remaining product work

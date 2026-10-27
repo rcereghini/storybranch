@@ -458,7 +458,13 @@ export function BranchInputsEditor({
   );
 }
 
-export function PreviewInputs({ story, save }: { story: Story; save: Save }) {
+export function PreviewInputs({
+  story,
+  save,
+}: {
+  story: { storyNodes: Record<string, Pick<StoryNode, "inputs">> };
+  save: Save;
+}) {
   const fields = story.storyNodes[save.storyNodeId]?.inputs?.fields ?? [];
   return (
     <details className="key-condition-editor">
