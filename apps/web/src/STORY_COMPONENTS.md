@@ -1,5 +1,7 @@
 # Story component documentation
 
+`BattleWorkshop.tsx` rehearses a disposable battle substitution in Studio through the shared Story/StoryNode wrapper and S35i recorder. Read [S35j](../../../docs/story-system/battle.md#s35j-disposable-studio-battle-workshop). Explicit Apply/Reset, safe graph compilation and independent assertion playback preserve the active preview on errors; no battle draft persistence or real player commands are enabled.
+
 Read this guide before planning Story-related work in this directory or any descendant. The [Story system index](../../../docs/story-system/README.md) defines target architecture and reading sets; [the current Story/StoryNode contract](../../../docs/16-story-nodes.md) records shipped behavior. New StoryNodes do not introduce a second player hierarchy.
 
 Follow [the canonical terminology](../../../docs/story-system/terminology.md): Story, StoryTrunk, StoryNode, StoryBranch and StoryLeaf. The portable `StoryNode` data type and shared `StoryNode` rendering component describe the same graph placement; alias the type locally as `StoryNodeData` when both are imported. In-story StoryBranch navigation does not create a child Story save.
