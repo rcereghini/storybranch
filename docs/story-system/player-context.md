@@ -67,3 +67,5 @@ Test two independent runs, version-pinned resume, same-command retry, stale acti
 S32 stores optional server-only nodeInputs for the current placement entry revision. Every entry replaces or removes them; Roll preserves the current entry snapshot. Old saves remain unchanged and child starts resolve their own defaults. See [StoryBranch data](branch-data.md) for bounds and compatibility. This is not an unbounded visit history or a generic variable store.
 
 S33 adds no persistence shape: input comparisons read the S32 snapshot already stored for this entry. They never recompute defaults on resume or accept client-supplied replacements. See [S33](branch-data.md#s33--visual-bindings-and-current-entry-input-conditions).
+
+S35 proposes a single bounded battle interaction in the owned save, identified by run/edition/StoryNode/entry revision, with run health as the sole mutable player-health source. Entry snapshots persist through rounds; Continue clears/replaces the interaction atomically. This is not implemented; see [battle state and commands](battle.md#durable-state-and-commands).

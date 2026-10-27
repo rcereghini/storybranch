@@ -32,6 +32,7 @@ Always read this index, [terminology](terminology.md) and [the current contract]
 | Create nodes, graph connections, blank stories, library placements | [StoryNodes](story-nodes.md), [types](node-types.md), [examples](examples.md) |
 | Render a StoryNode, add a type, change completion or transitions | [Player runtime](player-runtime.md), [StoryNode rendering](node-rendering.md), [types](node-types.md), [StoryNodes](story-nodes.md) |
 | Story definitions and runtime composition | [StoryContext](story-context.md), [architecture](architecture.md) |
+| Design or implement TurnBasedBattle | [Battle S35](battle.md), [types](node-types.md), [PlayerContext](player-context.md), [StoryBranch data](branch-data.md), [storage](data-storage.md), [rendering](node-rendering.md) |
 | Saves, visits, rolls, battle state and replay | [PlayerContext](player-context.md), [data/storage](data-storage.md) |
 | Accounts, account progress and safe user projection | [UserContext](user-context.md), [keys](keys.md) |
 | Keys, items, achievements, subscriptions, sequels | [Keys and imports](keys.md), [UserContext](user-context.md), [PlayerContext](player-context.md) |

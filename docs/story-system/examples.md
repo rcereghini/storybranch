@@ -135,3 +135,7 @@ These are target validation examples, not current player behavior. Current publi
 | Battle input accepts only a roll but one incoming edge is Text | Incompatible input on one predecessor | Add explicit mapping/default or change the graph |
 | Ad provider unavailable with no exit | External dependency traps the story | Bind unavailable/skip fallback |
 | Creator key named premium grants paid access | Namespace label lacks issuer authority | Use verified entitlement projection |
+
+## First battle example (S35, not implemented)
+
+A Dice StoryNode routes both outcomes to a battle. Each route supplies a declared required boolean preemptive input: true on pass, false on fail. The battle uses existing run health/stats and a pinned enemy. Attack/Guard persist rounds; Escape ends the encounter without retaliation. The terminal result stays visible until Continue selects win/loss/escape. Bind all three to safe StoryLeaves or onward StoryNodes; a missing loss or escape path makes the whole battle unavailable. See [S35](battle.md) for the numeric example, result bindings and exact rules.

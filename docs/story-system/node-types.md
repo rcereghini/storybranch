@@ -17,7 +17,7 @@ Status: current mappings plus target contracts. Read [StoryNodes](story-nodes.md
 | GraphicNovel — deferred distinct type | Config: bounded ordered spreads/panels, reading direction, captions/alt and optional explicit choice slots; Input: bookmark and declared choice state | Reading between spreads stays in the node; explicit Finish or chosen ending option commits `lastSpreadId`/option ID | Linear `next` OR declared option outputs → destinations; not implicit completion from scrolling |
 | Form — deferred | Config: versioned allowlisted fields, validation, output mappings and required cancel policy; Input: typed defaults and optional persisted response draft | Explicit Submit after server validation; bounded typed response or private response reference; Cancel if enabled | `submitted` and enabled `cancelled` → destinations; conditional result routing is server-derived; invalid entries stay on the form |
 | DiceRoll — current `dice` | Config: integer sides and threshold; Input: permitted run state; modifiers deferred until versioned | Roll persists `{value, sides, threshold, passed}`; separate Next consumes result | `fail` (display 0), `pass` (display 1) → destinations |
-| TurnBasedBattle — deferred | Config: versioned encounter, actors, actions, rules, rewards and escape/turn-limit policies; Input: party snapshot, resources, validated initiative/buffs | Valid actions persist turns; terminal `{outcome, turns, remainingResources}`; explicit Continue routes | `win`, `loss`, configured `escape` → destinations; turn-limit disposition must bind to an authored outcome |
+| TurnBasedBattle — S35 contract, implementation deferred | Config: battle-1, one enemy, 1–30 rounds; Input: run health/stats, optional preemptive and 0–10 attack/defense bonuses | Attack/Guard persist a round; guaranteed Escape; terminal outcome/reason/turns/HP; explicit Continue routes | Required unconditional `win`, `loss`, `escape` → safe destinations; turn limit resolves to loss |
 | Advertisement — deferred | Config: labeled placement, mode, provider capability and fallback policy; Input: verified eligibility/consent and access projection | Provider-verified completion if rewarded, or explicit continue/skip for non-rewarded; persisted receipt/status | `completed`, `skipped`, `unavailable` → destinations; optional verified reward only on `completed` |
 | Reveal — current `reveal` | Config: ordered score/result mappings; Input: run scores | Reveal; server selects highest score, first listed on tie | One output per result → StoryLeaf/result ending |
 | StoryLeaf — endpoint role, current semantic mapping `kind: ending` | Config: ending presentation, completion scope, end-of-path rewards and optional summary/export rules; Input: validated ending summary | Committed entry completes the run once and applies authorized rewards under their claim scope; generalized rewards are target work | No in-story StoryBranch; shared replay, parent-return and discovery actions |
@@ -42,7 +42,7 @@ The raw roll and selected output are distinct. A following node can explicitly b
 
 ## Battle inputs and turn state
 
-Before combat implementation, define concrete schemas for the following:
+[S35](battle.md) now defines the concrete first-version contract: one opponent, deterministic rounds, guaranteed Escape and a loss at the turn limit. The table below remains the broader extension boundary; party combat, general status effects and additional rewards are deferred. S35 takes precedence for initial implementation.
 
 | Field | Source and rule |
 | --- | --- |
