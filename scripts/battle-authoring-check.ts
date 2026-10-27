@@ -38,6 +38,21 @@ try {
     for (const colorScheme of ["light", "dark"] as const) {
       const story = branchDataStory(`battle-author-${randomUUID()}`);
       story.title = `Battle draft ${width} ${colorScheme}`;
+      story.storyNodes.ending.inputs = {
+        version: 1,
+        fields: [
+          { name: "rounds", type: "integer", required: false },
+          { name: "victory", type: "boolean", required: false },
+          { name: "health", type: "integer", required: false },
+          { name: "enemy", type: "integer", required: false },
+          {
+            name: "message",
+            type: "string",
+            required: false,
+            default: "finished",
+          },
+        ],
+      };
       await api(`/studio/${story.id}`, {
         idempotencyKey: randomUUID(),
         expectedRevision: 0,
@@ -125,6 +140,44 @@ try {
       await tab
         .getByLabel("attackBonus input", { exact: true })
         .selectOption("bonus");
+      // Each outcome carries its own mappings; all scalar/result types are visual.
+      for (const outcome of ["win", "loss", "escape"]) {
+        await tab
+          .getByLabel(`${outcome} rounds source`, { exact: true })
+          .selectOption("battle:turns");
+        await tab
+          .getByLabel(`${outcome} victory source`, { exact: true })
+          .selectOption("battle:won");
+        await tab
+          .getByLabel(`${outcome} health source`, { exact: true })
+          .selectOption("battle:playerHealth");
+        await tab
+          .getByLabel(`${outcome} enemy source`, { exact: true })
+          .selectOption("battle:enemyHealth");
+        await tab
+          .getByLabel(`${outcome} message source`, { exact: true })
+          .selectOption("constant:string");
+        await tab
+          .getByLabel(`${outcome} message value`, { exact: true })
+          .fill(`${outcome} message`);
+      }
+      // Exercise typed constants before returning to authoritative result sources.
+      await tab
+        .getByLabel("win rounds source", { exact: true })
+        .selectOption("constant:integer");
+      await tab.getByLabel("win rounds value", { exact: true }).fill("4");
+      await tab
+        .getByLabel("win victory source", { exact: true })
+        .selectOption("constant:boolean");
+      await tab
+        .getByLabel("win victory value", { exact: true })
+        .selectOption("true");
+      await tab
+        .getByLabel("win rounds source", { exact: true })
+        .selectOption("battle:turns");
+      await tab
+        .getByLabel("win victory source", { exact: true })
+        .selectOption("battle:won");
       await tab
         .getByRole("button", { name: "Apply node changes", exact: true })
         .click();
@@ -164,6 +217,29 @@ try {
         "bonus",
       );
       assert.deepEqual(saved.story.storyNodes.dice, story.storyNodes.dice);
+      for (const outcome of ["win", "loss", "escape"]) {
+        const actual = saved.story.storyNodes[battle.id].outputs[outcome]
+          .inputBindings.bindings as { input: string; source: unknown }[];
+        assert.deepEqual(
+          [...actual].sort((a, b) => a.input.localeCompare(b.input)),
+          [
+            {
+              input: "health",
+              source: { kind: "battle", field: "playerHealth" },
+            },
+            {
+              input: "enemy",
+              source: { kind: "battle", field: "enemyHealth" },
+            },
+            {
+              input: "message",
+              source: { kind: "constant", value: `${outcome} message` },
+            },
+            { input: "rounds", source: { kind: "battle", field: "turns" } },
+            { input: "victory", source: { kind: "battle", field: "won" } },
+          ].sort((a, b) => a.input.localeCompare(b.input)),
+        );
+      }
       await tab.reload();
       await tab.getByRole("button", { name: new RegExp(story.title) }).click();
       await tab
@@ -270,6 +346,85 @@ try {
       await tab
         .getByRole("button", { name: "Edit New battle", exact: true })
         .click();
+      assert.equal(
+        await tab.getByLabel("win message value", { exact: true }).inputValue(),
+        "win message",
+      );
+      // Reconnecting preserves stale mappings, with explicit repair and Reset.
+      await tab
+        .getByLabel("win destination", { exact: true })
+        .selectOption("summary");
+      await tab
+        .getByText(
+          "rounds: Unknown destination input — remove or reconnect to repair.",
+          { exact: true },
+        )
+        .waitFor();
+      await tab
+        .getByRole("button", { name: "Remove win rounds binding", exact: true })
+        .click();
+      await tab
+        .getByLabel("win roll source", { exact: true })
+        .selectOption("battle:turns");
+      await tab
+        .getByLabel("win passed source", { exact: true })
+        .selectOption("battle:won");
+      assert(
+        await tab
+          .getByRole("button", { name: "Save battle draft" })
+          .isDisabled(),
+      );
+      await tab
+        .getByRole("button", { name: "Reset node changes", exact: true })
+        .click();
+      assert.equal(
+        await tab.getByLabel("win destination", { exact: true }).inputValue(),
+        "ending",
+      );
+      assert.equal(
+        await tab.getByLabel("win rounds source", { exact: true }).inputValue(),
+        "battle:turns",
+      );
+      // Removing an optional binding restores the destination default only on Apply.
+      await tab
+        .getByRole("button", {
+          name: "Remove win message binding",
+          exact: true,
+        })
+        .click();
+      assert.equal(
+        await tab
+          .getByLabel("win message source", { exact: true })
+          .inputValue(),
+        "",
+      );
+      await tab
+        .getByRole("button", { name: "Reset node changes", exact: true })
+        .click();
+      // Required inputs and stale names are diagnosed before committing node edits.
+      await tab
+        .getByLabel("win destination", { exact: true })
+        .selectOption("summary");
+      for (const name of ["rounds", "victory", "health", "enemy", "message"])
+        await tab
+          .getByRole("button", {
+            name: `Remove win ${name} binding`,
+            exact: true,
+          })
+          .click();
+      await tab
+        .getByLabel("Pending battle diagnostics")
+        .getByText(/Required input has no source: roll/)
+        .waitFor();
+      await tab
+        .getByRole("button", { name: "Reset node changes", exact: true })
+        .click();
+      await tab
+        .getByRole("group", { name: "win input bindings", exact: true })
+        .scrollIntoViewIfNeeded();
+      await tab.screenshot({
+        path: `test-results/battle-bindings-${width}-${colorScheme}.png`,
+      });
       await tab
         .getByLabel("loss destination", { exact: true })
         .selectOption("unfinished");
