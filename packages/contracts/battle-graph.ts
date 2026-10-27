@@ -18,7 +18,7 @@ export const stagedBattleNodeSchema = storyNodeSchema
     outputs: battleOutputsSchema,
   })
   .strict();
-// This schema is not registered in drafts, APIs, publication or player rendering.
+// Used by staged battle services; not registered in drafts, publication or rendering.
 export const stagedBattleStorySchema = storySchema
   .innerType()
   .extend({

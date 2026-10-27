@@ -1,4 +1,8 @@
-import { battleRoutes } from "./battle";
+import {
+  battleContractHeader,
+  battleContractVersion,
+} from "../../packages/contracts/battle-player";
+import { battleRoutes, isBattleRun } from "./battle";
 import { promotionalRoutes } from "./promotional-keys";
 import { liveAccountKeys } from "./account-keys";
 import { evaluate, usesAccountKey } from "../../packages/domain/index";
@@ -236,6 +240,15 @@ async function handleCanonical(request: Request): Promise<Response> {
         (segments[3] === "battle-actions" && request.method === "POST"))
     )
       return json(await battleRoutes(request, uid, segments[2]));
+    if (
+      request.method === "POST" &&
+      segments[1] === "playthroughs" &&
+      segments.length === 4 &&
+      segments[3] === "choices" &&
+      request.headers.get(battleContractHeader) === battleContractVersion &&
+      (await isBattleRun(uid, segments[2]))
+    )
+      return json(await battleRoutes(request, uid, segments[2], true));
     // Gated features read the account's flags from the profile just loaded.
     const features = accountFeatures(profile.data());
     if (

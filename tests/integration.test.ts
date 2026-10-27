@@ -6175,7 +6175,10 @@ it("authorizes input-gated choices from the persisted entry and rejects forged v
   ).toBe(200);
 });
 import { start as startBattleRun } from "../packages/domain/index";
-import { initializeBattle } from "../packages/domain/battle-player";
+import {
+  initializeBattle,
+  startBattleStory,
+} from "../packages/domain/battle-player";
 import { stagedBattleStorySchema } from "../packages/contracts/battle-graph";
 import {
   battleContractHeader,
@@ -6183,7 +6186,10 @@ import {
   type BattleSave,
 } from "../packages/contracts/battle-player";
 
-async function battleFixture(invalidDestination = false) {
+async function battleFixture(
+  invalidDestination = false,
+  mixed?: "text" | "dice",
+) {
   const base = starterStory(`battle-${randomUUID()}`);
   const story = stagedBattleStorySchema.parse({
     ...base,
@@ -6217,6 +6223,36 @@ async function battleFixture(invalidDestination = false) {
       },
     },
   });
+  if (mixed) {
+    const battle = story.storyNodes.opening;
+    if (battle.storyNodeType !== "battle") throw Error();
+    battle.id = "fight";
+    battle.entryEffects = [{ id: "first-fight", kind: "health", delta: -5 }];
+    battle.outputs.escape = { targetStoryNodeId: "opening", effects: [] };
+    story.storyNodes.fight = battle;
+    const opening = structuredClone(base.storyNodes.opening);
+    opening.storyNodeType = mixed;
+    const route = { targetStoryNodeId: "fight", effects: [] };
+    opening.choices = [
+      {
+        id: "enter",
+        label: "Enter",
+        costs: [],
+        unavailableDisplay: "hidden",
+        outcome:
+          mixed === "dice"
+            ? {
+                kind: "dice",
+                sides: 20,
+                target: 10,
+                success: route,
+                failure: route,
+              }
+            : { kind: "direct", route },
+      },
+    ];
+    story.storyNodes.opening = opening;
+  }
   if (invalidDestination)
     story.storyNodes.ending.inputs = {
       version: 1,
@@ -6232,6 +6268,11 @@ async function battleFixture(invalidDestination = false) {
       Date.now(),
     ),
   );
+  if (mixed)
+    Object.assign(
+      save,
+      startBattleStory(story, save.id, "player", save.stats, Date.now()),
+    );
   const { storyNodes, ...manifest } = story;
   const edition = db.doc(`stories/${story.id}/versions/${story.versionId}`);
   const batch = db.batch();
@@ -6386,4 +6427,87 @@ it("rolls back battle Continue when a stored destination cannot accept its input
   expect(
     (await db.doc(`users/player/storyProgress/${save.storyId}`).get()).exists,
   ).toBe(false);
+});
+async function stagedChoice(save: BattleSave, body: unknown, capable = true) {
+  const response = await handle(
+    new Request(`http://localhost/api/playthroughs/${save.id}/choices`, {
+      method: "POST",
+      headers: {
+        [storyContractHeader]: storyContractVersion,
+        [playerContractHeader]: playerContractVersion,
+        ...(capable ? { [battleContractHeader]: battleContractVersion } : {}),
+        Authorization: `Bearer ${tokens.player}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }),
+  );
+  return { status: response.status, data: await response.json() };
+}
+const stagedChoiceCommand = (
+  revision: number,
+  action?: "roll" | "continue",
+) => ({
+  idempotencyKey: randomUUID(),
+  expectedRevision: revision,
+  payload: { choiceId: "enter", ...(action ? { action } : {}) },
+});
+it("enters and revisits staged battles through ordinary choices with exact retries and fresh identities", async () => {
+  const { save } = await battleFixture(false, "text");
+  const command = stagedChoiceCommand(0);
+  expect((await stagedChoice(save, command, false)).status).toBe(400);
+  const entered = await stagedChoice(save, command);
+  expect(entered.status).toBe(200);
+  expect(entered.data.player.battle.playerHealth).toBe(95);
+  expect(await stagedChoice(save, command)).toEqual(entered);
+  expect((await stagedChoice(save, stagedChoiceCommand(1))).status).toBe(400);
+  const ref = db.doc(`users/player/playthroughs/${save.id}`);
+  const first = (await ref.get()).data() as BattleSave;
+  const escaped = await battleCall(first, battleCommand(first, "escape"));
+  expect(escaped.status).toBe(200);
+  const pending = (await ref.get()).data() as BattleSave;
+  expect(
+    (await battleCall(pending, battleCommand(pending, "continue"))).status,
+  ).toBe(200);
+  const again = await stagedChoice(save, stagedChoiceCommand(3));
+  expect(again.status).toBe(200);
+  expect(again.data.player.battle.playerHealth).toBe(95);
+  expect(again.data.player.battle.battleId).not.toBe(first.battle!.battleId);
+  expect(await stagedChoice(save, command)).toEqual(entered);
+  const second = (await ref.get()).data() as BattleSave;
+  expect(
+    (
+      await battleCall(second, {
+        ...battleCommand(second),
+        payload: battleCommand(first).payload,
+      })
+    ).status,
+  ).toBe(400);
+  expect((await ref.get()).data()?.revision).toBe(4);
+  expect((await call(`/playthroughs/${save.id}/events`)).status).toBe(200);
+});
+it("persists a staged Dice roll before entering battle and serializes concurrent Next commands", async () => {
+  const { save } = await battleFixture(false, "dice");
+  expect((await stagedChoice(save, stagedChoiceCommand(0))).status).toBe(400);
+  const roll = stagedChoiceCommand(0, "roll");
+  const rolled = await stagedChoice(save, roll);
+  expect(rolled.status).toBe(200);
+  expect(rolled.data.player.save.lastRoll.pending).toBe(true);
+  expect(rolled.data.player.battle).toBeUndefined();
+  expect(await stagedChoice(save, roll)).toEqual(rolled);
+  const results = await Promise.all([
+    stagedChoice(save, stagedChoiceCommand(1)),
+    stagedChoice(save, stagedChoiceCommand(1)),
+  ]);
+  expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+  const stored = (
+    await db.doc(`users/player/playthroughs/${save.id}`).get()
+  ).data() as BattleSave;
+  expect(stored.battle!.identity.entryRevision).toBe(2);
+  expect(stored.health).toBe(95);
+  expect(stored.lastRoll?.pending).toBe(false);
+  expect(
+    (await db.collection(`users/player/playthroughs/${save.id}/events`).get())
+      .size,
+  ).toBe(2);
 });

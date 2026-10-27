@@ -1,4 +1,9 @@
-import { GameError } from "../contracts/index";
+import {
+  choiceCommandSchema,
+  type Stats,
+  type Save,
+  GameError,
+} from "../contracts/index";
 import {
   stagedBattleStorySchema,
   type StagedBattleStory,
@@ -8,7 +13,14 @@ import {
   type BattleSave,
 } from "../contracts/battle-player";
 import { actBattle, startBattle, battleResultValue } from "./battle";
-import { applyEffects, enter } from "./index";
+import {
+  applyEffects,
+  enter,
+  start,
+  transition,
+  usesAccountKey,
+  evaluate,
+} from "./index";
 import { resolveNodeInputs } from "./branch-data";
 
 // Called only after authoritative destination entry effects have been applied.
@@ -130,4 +142,72 @@ export function advanceBattle(
       at: now,
     },
   };
+}
+
+// Trusted caller supplies account stats, permission-checked snapshots and parent.
+export function startBattleStory(
+  storyInput: unknown,
+  id: string,
+  uid: string,
+  stats: Stats,
+  now: number,
+  parent?: Save,
+  progress?: Save["storyProgressSnapshot"],
+  imports?: Save["keyImportSnapshot"],
+): BattleSave {
+  const story = stagedBattleStorySchema.parse(storyInput);
+  return initializeBattle(
+    story,
+    start(story, id, uid, stats, now, parent, progress, imports),
+  );
+}
+export function advanceBattleChoice(
+  storyInput: unknown,
+  input: BattleSave,
+  commandInput: unknown,
+  now: number,
+  roll?: (sides: number) => number,
+  accountKeys: readonly string[] = [],
+) {
+  const story = stagedBattleStorySchema.parse(storyInput),
+    command = choiceCommandSchema.parse(commandInput);
+  if (input.revision !== command.expectedRevision)
+    throw new GameError(
+      "STALE_REVISION",
+      "Progress changed on another device. Reload current progress.",
+    );
+  const node = story.storyNodes[input.storyNodeId];
+  if (node?.storyNodeType === "battle")
+    throw new GameError(
+      "VALIDATION_FAILED",
+      "Use the battle controls to continue this encounter.",
+    );
+  if (input.battle)
+    throw new GameError(
+      "VALIDATION_FAILED",
+      "Unexpected battle state at this location.",
+    );
+  const selected = node?.choices.find((c) => c.id === command.payload.choiceId);
+  if (
+    selected?.availableWhen &&
+    usesAccountKey(selected.availableWhen) &&
+    !evaluate(selected.availableWhen, input, accountKeys)
+  )
+    throw new GameError(
+      "STALE_REVISION",
+      "Account key access changed. Reload current options to continue.",
+    );
+  const moved = transition(
+    story,
+    input,
+    command.payload.choiceId,
+    command.expectedRevision,
+    now,
+    roll,
+    command.payload.action,
+    accountKeys,
+  );
+  // Roll is a persisted interaction, not entry (including a self-targeting Dice).
+  if (command.payload.action !== "roll") initializeBattle(story, moved.save);
+  return moved;
 }

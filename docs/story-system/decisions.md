@@ -152,3 +152,7 @@ Reuse the conservative publication proof with all three battle outputs required 
 ### S35d — Staged authoritative persistence
 
 Embed the bounded battle state in the owned save and require `X-Story-Battle: battle-v1` plus a matching edition marker. Save revision, health, interaction, event, receipt and any Continue completion claims share one transaction. Replay the exact projected JSON response for an identical receipt; reject changed intent or stale revision after receipt expiry. Reuse entry effects and completion preparation rather than introducing a separate reward path. Live publication, public entry and full player/Studio integration remain gated; there is no browser battle flow in this slice. See [S35d](battle.md#s35d-authoritative-battle-command-boundary).
+
+### S35e — Shared ordinary choice rules for mixed Stories
+
+Broaden only the portable start/transition input to accept the staged graph structurally; battle placements cannot be selected through ordinary choices and are never rewritten as placeholder types. Staged wrappers initialize encounters after entry inputs/effects and only on traversal, never on Dice Roll. Capability-gated choices for marked editions reuse the battle transaction and existing live account-key evaluator, trusted retry-stable Dice sampling, completion preparation and item-history projection. The manifest/owner dispatch lookup is only a hint; the transaction rechecks authority. Existing clients keep their ordinary command path. Full shared-player rendering and public starts remain subsequent gates.

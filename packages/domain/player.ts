@@ -13,7 +13,7 @@ import {
 } from "../contracts/player";
 import { evaluate } from "./index";
 
-function itemDisplay(story: Story, itemId: string) {
+function itemDisplay(story: Pick<Story, "itemCatalogue">, itemId: string) {
   const definition = story.itemCatalogue?.items.find(
     (i) => i.itemId === itemId,
   );
@@ -24,7 +24,10 @@ function itemDisplay(story: Story, itemId: string) {
   };
 }
 
-export function playerInventory(story: Story, items: Save["items"]) {
+export function playerInventory(
+  story: Pick<Story, "itemCatalogue">,
+  items: Save["items"],
+) {
   return Object.keys(items)
     .sort()
     .filter((id) => items[id] > 0)
@@ -38,7 +41,7 @@ export function playerInventory(story: Story, items: Save["items"]) {
 
 // Only committed before/after state supplies these facts, never client intent.
 export function playerItemChanges(
-  story: Story,
+  story: Pick<Story, "itemCatalogue">,
   before: Save["items"],
   after: Save["items"],
 ) {
