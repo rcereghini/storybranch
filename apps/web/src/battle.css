@@ -1,0 +1,52 @@
+.battle-display {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 1rem);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.battle-health {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.battle-health strong {
+  display: block;
+  min-height: 3em;
+  overflow-wrap: anywhere;
+}
+.battle-health label {
+  display: block;
+  color: var(--text-body);
+}
+.battle-health meter {
+  display: block;
+  width: 100%;
+  height: 1.4rem;
+  accent-color: var(--success);
+}
+.battle-turn {
+  margin-block: 1rem;
+  color: var(--muted);
+}
+.battle-summary {
+  min-height: 8rem;
+}
+.battle-summary p {
+  margin-block: 0.5rem;
+}
+.battle-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  min-height: 4rem;
+}
+.battle-actions button {
+  min-width: 0;
+  padding: 0.75rem 0.4rem;
+  justify-content: center;
+}
+.battle-actions button:only-child {
+  grid-column: 1 / -1;
+}

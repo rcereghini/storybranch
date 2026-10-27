@@ -249,6 +249,14 @@ async function handleCanonical(request: Request): Promise<Response> {
       (await isBattleRun(uid, segments[2]))
     )
       return json(await battleRoutes(request, uid, segments[2], true));
+    if (
+      request.method === "GET" &&
+      segments[1] === "playthroughs" &&
+      segments.length === 3 &&
+      request.headers.get(battleContractHeader) === battleContractVersion &&
+      (await isBattleRun(uid, segments[2]))
+    )
+      return json((await battleRoutes(request, uid, segments[2])).player);
     // Gated features read the account's flags from the profile just loaded.
     const features = accountFeatures(profile.data());
     if (

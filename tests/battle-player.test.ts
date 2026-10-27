@@ -328,3 +328,40 @@ it("rechecks account-gated choices and rejects stale commands", () => {
     ),
   ).toThrow("Progress changed");
 });
+import { renderBattleNode } from "../packages/domain/battle-view";
+import { renderStoryNodeSchema } from "../packages/contracts/player";
+it("projects battle state into the shared rendering contract without private rules", () => {
+  const { story, save } = fixture();
+  const node = story.storyNodes.opening;
+  if (node.storyNodeType !== "battle") throw Error();
+  const projected = renderBattleNode(node, save);
+  expect(projected.battle?.actions).toEqual(["attack", "guard", "escape"]);
+  expect(projected.outputs).toEqual([]);
+  for (const key of [
+    "playerAttack",
+    "playerDefense",
+    "entryEffects",
+    "inputs",
+    "targetStoryNodeId",
+  ])
+    expect(JSON.stringify(projected)).not.toContain(key);
+  const won = advanceBattle(story, save, command(save, "attack"), 2).save;
+  expect(renderBattleNode(node, won).battle?.actions).toEqual(["continue"]);
+  expect(renderBattleNode(node, won).battle?.result?.outcome).toBe("win");
+});
+it("rejects missing or mismatched battle presentation and corrupted reload state", () => {
+  const { story, save } = fixture();
+  const node = story.storyNodes.opening;
+  if (node.storyNodeType !== "battle") throw Error();
+  const projected = renderBattleNode(node, save);
+  expect(() =>
+    renderStoryNodeSchema.parse({ ...projected, battle: undefined }),
+  ).toThrow();
+  expect(() =>
+    renderStoryNodeSchema.parse({ ...projected, storyNodeType: "text" }),
+  ).toThrow();
+  expect(() =>
+    renderBattleNode(node, { ...save, battle: undefined }),
+  ).toThrow();
+  expect(() => renderBattleNode(node, { ...save, revision: -1 })).toThrow();
+});

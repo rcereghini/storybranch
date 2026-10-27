@@ -1,4 +1,8 @@
 import {
+  battleContractHeader,
+  battleContractVersion,
+} from "../contracts/battle-player";
+import {
   playerContractHeader,
   playerContractVersion,
 } from "../contracts/player";
@@ -26,7 +30,10 @@ export function createApi(
       headers: {
         [storyContractHeader]: storyContractVersion,
         ...(/^\/playthroughs(?:[/?]|$)/.test(path)
-          ? { [playerContractHeader]: playerContractVersion }
+          ? {
+              [playerContractHeader]: playerContractVersion,
+              [battleContractHeader]: battleContractVersion,
+            }
           : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         "Content-Type": "application/json",

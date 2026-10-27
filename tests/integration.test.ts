@@ -6189,6 +6189,7 @@ import {
 async function battleFixture(
   invalidDestination = false,
   mixed?: "text" | "dice",
+  videoEnding = false,
 ) {
   const base = starterStory(`battle-${randomUUID()}`);
   const story = stagedBattleStorySchema.parse({
@@ -6273,6 +6274,11 @@ async function battleFixture(
       save,
       startBattleStory(story, save.id, "player", save.stats, Date.now()),
     );
+  if (videoEnding && story.storyNodes.ending.storyNodeType !== "battle") {
+    story.storyNodes.ending.storyNodeType = "video";
+    story.storyNodes.ending.video =
+      "/media/glass-harbor-success-mock-v1-landscape.mp4";
+  }
   const { storyNodes, ...manifest } = story;
   const edition = db.doc(`stories/${story.id}/versions/${story.versionId}`);
   const batch = db.batch();
@@ -6330,9 +6336,13 @@ it("persists battle results, reloads an allowlisted view and routes only on expl
   expect((await call(`/playthroughs/${save.id}`)).status).toBe(400);
   const initial = await battleCall(save);
   expect(initial.status).toBe(200);
+  expect(initial.data.player.storyNode.outputs).toEqual([]);
+  expect(initial.data.player.storyNode.battle).toBeDefined();
+  expect(initial.data.player.user.id).toBe("player");
+  expect(initial.data.player.inventory).toEqual([]);
+  expect(initial.data.player.branches).toEqual([]);
   const serialized = JSON.stringify(initial.data);
   for (const field of [
-    '"outputs"',
     '"playerAttack"',
     '"entryEffects"',
     '"storyNodes"',
@@ -6510,4 +6520,59 @@ it("persists a staged Dice roll before entering battle and serializes concurrent
     (await db.collection(`users/player/playthroughs/${save.id}/events`).get())
       .size,
   ).toBe(2);
+});
+it("reconciles pre-renderer battle receipts without repeating their saved action", async () => {
+  const { save } = await battleFixture();
+  const command = battleCommand(save);
+  const result = await battleCall(save, command);
+  expect(result.status).toBe(200);
+  const stored = result.data.player;
+  await db.doc(receipt("player", "battle", command.idempotencyKey)).update({
+    response: {
+      player: {
+        save: stored.save,
+        story: stored.story,
+        battle: stored.battle,
+      },
+    },
+  });
+  const retried = await battleCall(save, command);
+  expect(retried.status).toBe(409);
+  expect(retried.data.error.code).toBe("STALE_REVISION");
+  const response = await handle(
+    new Request(`http://localhost/api/playthroughs/${save.id}`, {
+      headers: {
+        Authorization: `Bearer ${tokens.player}`,
+        [storyContractHeader]: storyContractVersion,
+        [playerContractHeader]: playerContractVersion,
+        [battleContractHeader]: battleContractVersion,
+      },
+    }),
+  );
+  expect(response.status).toBe(200);
+  const view = await response.json();
+  expect(view.storyNode.storyNodeType).toBe("battle");
+  expect(view.user.id).toBe("player");
+  expect(view.save.revision).toBe(1);
+  expect(view.storyNode.battle.phase).toBe("result-pending");
+  expect(
+    (await db.collection(`users/player/playthroughs/${save.id}/events`).get())
+      .size,
+  ).toBe(1);
+});
+it("returns ordinary destination media and full player context after battle Continue", async () => {
+  const { save } = await battleFixture(false, undefined, true);
+  expect((await battleCall(save, battleCommand(save))).status).toBe(200);
+  const continued = await battleCall(
+    save,
+    battleCommand(save, "continue", 1, 1),
+  );
+  expect(continued.status).toBe(200);
+  expect(continued.data.player.storyNode.storyNodeType).toBe("video");
+  expect(continued.data.player.media.landscape.src).toContain(
+    "glass-harbor-success",
+  );
+  expect(continued.data.player.user.saveSpots[0].storyNodeId).toBe("ending");
+  expect(continued.data.player.storyNode.battle).toBeUndefined();
+  expect(continued.data.player.battle).toBeUndefined();
 });

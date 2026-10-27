@@ -1,4 +1,4 @@
-import type { StoryNode } from "../../../packages/contracts/index";
+import type { RenderStoryNode as StoryNode } from "../../../packages/contracts/player";
 
 export type Readiness =
   | "video-frame"

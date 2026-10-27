@@ -156,3 +156,7 @@ Embed the bounded battle state in the owned save and require `X-Story-Battle: ba
 ### S35e — Shared ordinary choice rules for mixed Stories
 
 Broaden only the portable start/transition input to accept the staged graph structurally; battle placements cannot be selected through ordinary choices and are never rewritten as placeholder types. Staged wrappers initialize encounters after entry inputs/effects and only on traversal, never on Dice Roll. Capability-gated choices for marked editions reuse the battle transaction and existing live account-key evaluator, trusted retry-stable Dice sampling, completion preparation and item-history projection. The manifest/owner dispatch lookup is only a hint; the transaction rechecks authority. Existing clients keep their ordinary command path. Full shared-player rendering and public starts remain subsequent gates.
+
+### S35f — Shared battle presentation and recovery
+
+Extend the rendering projection, not the authoring schema, with typed battle status and allowed action intents. Battle remains a child renderer of shared StoryNode inside Story; its wrapper owns controls and duplicate suppression. Full staged reload/command views compose inventory, explicit User data and ordinary destination media. Existing PlayerSession retains uncertain commands and reconciles stale progress. Pre-renderer staged receipts request reconciliation without reexecution; full-view receipts retain exact replay. No public starts or publication enablement; staged community offers stay hidden until child starts are supported.

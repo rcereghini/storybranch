@@ -1,14 +1,12 @@
+import type { PublishedClip } from "../../packages/contracts/media";
 import { createHash, randomInt } from "node:crypto";
 import type { Transaction } from "firebase-admin/firestore";
 import {
   GameError,
   id,
   choiceCommandSchema,
+  type Stats,
 } from "../../packages/contracts/index";
-import {
-  battleStateSchema,
-  battleHealthSchema,
-} from "../../packages/contracts/battle";
 import {
   battleCommandSchema,
   battleContractHeader,
@@ -23,18 +21,13 @@ import {
   advanceBattle,
   advanceBattleChoice,
 } from "../../packages/domain/battle-player";
-import { validateBattleState } from "../../packages/domain/battle";
-import {
-  playerRun,
-  renderStoryNode,
-  playerItemChanges,
-} from "../../packages/domain/player";
+import { playerItemChanges } from "../../packages/domain/player";
 import { db } from "./firebase";
 import * as paths from "./paths";
 import { prepareAchievement } from "./achievements";
 import { prepareStoryProgress } from "./story-progress";
 import { liveAccountKeys } from "./account-keys";
-import { projectStoredPlayerData } from "./player-view";
+import { fullPlayerView } from "./player-view";
 
 async function loadEdition(tx: Transaction, save: BattleSave) {
   const ref = db.doc(`stories/${save.storyId}/versions/${save.versionId}`),
@@ -52,7 +45,7 @@ async function loadEdition(tx: Transaction, save: BattleSave) {
   const {
     ready: _,
     battleContract: __,
-    clips: ___,
+    clips = {},
     manifestHash: ____,
     ...data
   } = manifest.data()!;
@@ -62,79 +55,45 @@ async function loadEdition(tx: Transaction, save: BattleSave) {
   });
   if (story.id !== save.storyId || story.versionId !== save.versionId)
     throw new Error("Stored edition identity mismatch.");
-  return story;
+  return { story, clips: clips as Record<string, PublishedClip> };
 }
-function view(
+async function view(
   story: StagedBattleStory,
+  clips: Record<string, PublishedClip>,
   save: BattleSave,
-  accountKeys: readonly string[],
+  keys: readonly string[],
+  uid: string,
+  profile: { stats: Stats; achievements?: string[] },
 ) {
-  return projectStoredPlayerData(() => {
-    const node = story.storyNodes[save.storyNodeId];
-    if (!node) throw Error("Missing current StoryNode.");
-    const common = {
-      save: playerRun(save),
-      story: { id: story.id, versionId: story.versionId, title: story.title },
-    };
-    if (node.storyNodeType !== "battle")
-      return {
-        ...common,
-        storyNode: renderStoryNode(
-          node,
-          save,
-          accountKeys,
-          story.itemCatalogue,
-        ),
-      };
-    const state = battleStateSchema.parse(save.battle);
-    if (
-      !Number.isSafeInteger(save.revision) ||
-      save.revision < state.identity.entryRevision + state.turns
-    )
-      throw Error("Invalid battle revision.");
-    validateBattleState(
-      node.battle,
-      state,
-      battleHealthSchema.parse(save.health),
-      {
-        ...state.identity,
-        runId: save.id,
-        storyId: save.storyId,
-        versionId: save.versionId,
-        storyNodeId: save.storyNodeId,
-      },
-    );
-    return {
-      ...common,
-      battle: {
-        battleId: state.battleId,
-        title: node.title,
-        transcript: node.transcript,
-        phase: state.phase,
-        turns: state.turns,
-        maxTurns: node.battle.maxTurns,
-        initiative: state.initiative,
-        playerHealth: save.health,
-        playerMaxHealth: 100,
-        enemy: {
-          name: node.battle.enemy.name,
-          health: state.enemyHealth,
-          maxHealth: node.battle.enemy.maxHealth,
-        },
-        actions:
-          state.phase === "active"
-            ? ["attack", "guard", "escape"]
-            : ["continue"],
-        ...(state.phase === "result-pending" ? { result: state.result } : {}),
-      },
-    };
-  });
+  const player = await fullPlayerView(
+    story,
+    clips,
+    keys,
+    save,
+    uid,
+    profile,
+    false,
+  );
+  // Retain the earlier staged reload/action alias while sharing the player contract.
+  return {
+    ...player,
+    ...(player.storyNode.battle
+      ? {
+          battle: {
+            ...player.storyNode.battle,
+            title: player.storyNode.title,
+            transcript: player.storyNode.transcript,
+          },
+        }
+      : {}),
+  };
 }
 export async function battleRoutes(
   request: Request,
   uid: string,
   runId: string,
   choice = false,
+  profile?: { stats: Stats; achievements?: string[] },
 ) {
   id.parse(runId);
   if (request.headers.get(battleContractHeader) !== battleContractVersion)
@@ -180,10 +139,18 @@ export async function battleRoutes(
     const current = snapshot.data() as BattleSave;
     if (current.playerUid !== uid || current.id !== runId)
       throw new GameError("NOT_FOUND", "Adventure not found.");
-    const story = await loadEdition(tx, current);
+    const { story, clips } = await loadEdition(tx, current);
+    const userProfile =
+      profile ??
+      ((await tx.get(db.doc(paths.user(uid)))).data() as {
+        stats: Stats;
+        achievements?: string[];
+      });
     if (!command) {
       const keys = await liveAccountKeys(tx, uid, story);
-      return { player: view(story, current, keys) };
+      return {
+        player: await view(story, clips, current, keys, uid, userProfile),
+      };
     }
     const receipt = db.doc(
       paths.receipt(
@@ -199,7 +166,13 @@ export async function battleRoutes(
           "IDEMPOTENCY_CONFLICT",
           "Command key was already used for a different request.",
         );
-      return prior.data()!.response;
+      const response = prior.data()!.response;
+      if (!response?.player?.storyNode || !response?.player?.user)
+        throw new GameError(
+          "STALE_REVISION",
+          "This action was already saved. Reload current progress.",
+        );
+      return response;
     }
     const keys = await liveAccountKeys(tx, uid, story);
     const moved = choice
@@ -225,7 +198,9 @@ export async function battleRoutes(
     );
     // Persist exactly the JSON response: optional projection fields may be undefined.
     const response = JSON.parse(
-      JSON.stringify({ player: view(story, moved.save, keys) }),
+      JSON.stringify({
+        player: await view(story, clips, moved.save, keys, uid, userProfile),
+      }),
     );
     achievement.write();
     progress();
