@@ -172,3 +172,7 @@ Reuse parent-scoped branch authorization and consent for marked editions, initia
 ### S35i — Staged repeatable battle playtests
 
 Establish the pure recorder/runner before enabling Studio battle controls. Reuse disposable preview scenarios and the combat/choice engines; derive encounter identity from each simulated visit and retain separate Roll/Next and result/Continue. Keep the staged bounded replay separate from existing saved setup and real command schemas until the UI and persistence acceptance path is verified. See [S35i](battle.md#s35i-staged-repeatable-playtest-engine).
+
+### S35j — Disposable Studio battle rehearsal
+
+Expose the staged simulator in a native Studio modal before widening the draft/publication contracts. Rehearse one scene substitution in a snapshot, validate all required destinations on Apply, and retain separate result/Continue and Dice Roll/Next through the shared wrapper. Record and replay bounded assertions without writes or grants. Closing discards the session. Persistent battle authoring and saved setups remain explicit follow-ups. See [S35j](battle.md#s35j-disposable-studio-battle-workshop).

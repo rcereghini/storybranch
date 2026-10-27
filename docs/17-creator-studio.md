@@ -1,5 +1,7 @@
 # Creator Studio alpha
 
+The [Battle workshop](story-system/battle.md#s35j-disposable-studio-battle-workshop) rehearses a battle in a disposable copy of the current Story. Configure an enemy and Win/Loss/Escape destinations, Apply to restart, then record and replay assertions through the shared player. Closing discards the workshop; battle draft saving and publication are not enabled.
+
 This document describes current Studio behavior. Future authoring changes must also read [StoryNodes](story-system/story-nodes.md), [type contracts](story-system/node-types.md) and [AI authoring](story-system/ai-authoring.md). New Story starts blank. Starter, Quiz and Comic templates are explicit choices. Preview and publication compile a safe effective graph with creator diagnostics.
 
 Use [the canonical Story vocabulary](story-system/terminology.md) for design: StoryTrunk, StoryNodes, StoryBranches and StoryLeaves. **StoryNodes**, **StoryNode type** and other current Studio labels below remain exact UI references. The target StoryTrunk is the single title/configuration root, outside the playthrough and selected by default for authoring Story details. Studio opens on StoryTrunk settings: title, description, start connection and local starting keys. The trunk is a typed projection of root metadata and versioned `trunkContext`, with no duplicate title or playable renderer.

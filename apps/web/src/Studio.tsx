@@ -1,5 +1,6 @@
 import { ConditionEditor } from "./ConditionEditor";
 import { PlaytestTools } from "./PlaytestTools";
+import { BattleWorkshop } from "./BattleWorkshop";
 import { recordPreviewStep } from "../../../packages/domain/playtest";
 import type { PlaytestStep } from "../../../packages/contracts/preview";
 import {
@@ -1004,6 +1005,16 @@ export function Studio({
           >
             Preview
           </Button>
+          <BattleWorkshop
+            story={draft.story}
+            mediaFor={mediaFor}
+            imageFor={(image) =>
+              uploads?.items.find((asset) => asset.id === assetIdOf(image))?.url
+            }
+            panelsFor={(node) =>
+              node.comic ? panelImages(node.comic, uploads) : undefined
+            }
+          />
           {draft.publishedVersionId && (
             <Button
               className="btn btn-secondary btn-small studio-play"
