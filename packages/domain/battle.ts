@@ -2,6 +2,7 @@ import { z } from "zod";
 import { GameError } from "../contracts/index";
 import {
   battleConfigSchema,
+  battleScopeSchema,
   battleHealthSchema,
   battleIdentitySchema,
   battleId,
@@ -223,22 +224,7 @@ export function actBattle(
     state = battleStateSchema.parse(stateInput),
     health = battleHealthSchema.parse(healthInput),
     intent = battleIntentSchema.parse(intentInput);
-  const scope = z
-    .object({
-      identity: battleIdentitySchema,
-      revision: z
-        .number()
-        .int()
-        .min(0)
-        .max(Number.MAX_SAFE_INTEGER - 1),
-      expectedRevision: z
-        .number()
-        .int()
-        .min(0)
-        .max(Number.MAX_SAFE_INTEGER - 1),
-    })
-    .strict()
-    .parse(scopeInput);
+  const scope = battleScopeSchema.parse(scopeInput);
   requireValid(
     scope.revision === scope.expectedRevision &&
       scope.revision >= scope.identity.entryRevision + state.turns,

@@ -1,6 +1,6 @@
 # TurnBasedBattle — S35
 
-Status: **S35a portable foundation implemented; playable combat not implemented**. Established October 26, 2026. These are recommended first-version defaults, not previously user-specified combat rules. Current StoryNode schemas, APIs and renderers still reject combat; standalone battle schemas/rules exist only for the staged implementation. This document owns the initial battle rules and acceptance criteria; read [types](node-types.md), [PlayerContext](player-context.md), [StoryBranch data](branch-data.md), [storage](data-storage.md) and [rendering](node-rendering.md) alongside it.
+Status: **S35a/b portable foundation and output routing implemented; playable combat not implemented**. Established October 26, 2026. These are recommended first-version defaults, not previously user-specified combat rules. Current StoryNode schemas, APIs and renderers still reject combat; standalone battle schemas/rules exist only for the staged implementation. This document owns the initial battle rules and acceptance criteria; read [types](node-types.md), [PlayerContext](player-context.md), [StoryBranch data](branch-data.md), [storage](data-storage.md) and [rendering](node-rendering.md) alongside it.
 
 ## First version
 
@@ -52,7 +52,7 @@ Example: strength 8, resolve 8, agility 5, bonuses zero; enemy health 10, attack
 
 ## Durable state and commands
 
-Store one optional version-1 battle interaction in the owned save. Its identity is bound to run ID, pinned edition, StoryNode ID and entry revision; encode those fields canonically or use a server-derived ID with collision-free semantics. Never use node ID alone. Entry revision is stable while battle actions advance run revision. Loops create fresh encounters and fresh identities, but retain run health and existing once-only effect markers.
+Store one optional version-1 battle interaction in the owned save. Its identity is bound to run ID, Story ID, pinned edition, StoryNode ID and entry revision; encode those fields canonically or use a server-derived ID with collision-free semantics. Never use node ID alone. Entry revision is stable while battle actions advance run revision. Loops create fresh encounters and fresh identities, but retain run health and existing once-only effect markers.
 
 State contains battle identity and entry revision, pinned config version/rules, resolved initiative and derived player attack/defense, enemy health, turns (0–30), phase (`active` or `result-pending`) and terminal result when present. `Save.health` is the sole mutable source of player health; do not maintain a conflicting second health value. Preserve the entry's `nodeInputs` throughout combat. Bound state to 8 KiB serialized UTF-8; no action-history array. Events use the existing paginated log. Reject a missing/corrupt interaction on an already-entered battle instead of silently resetting it; offer retry/support and leave navigation.
 
@@ -114,10 +114,22 @@ The first implementation slice adds standalone portable battle config/state/resu
 
 ### Portable entry points and trust boundary
 
-`packages/contracts/battle.ts` validates battle-1 configuration, identity, bounded state/result and intent. Identity encodes the run, edition, StoryNode and entry revision as a canonical JSON tuple; the strict scalar shape remains below the 8 KiB state bound. `packages/domain/battle.ts` provides `validateBattleEntry` for each incoming edge/default, `resolveBattleInputs`, `startBattle`, `actBattle` and allowlisted `battleResultValue`.
+`packages/contracts/battle.ts` validates battle-1 configuration, identity, bounded state/result and intent. Identity encodes the run, Story, edition, StoryNode and entry revision as a canonical JSON tuple; the strict scalar shape remains below the 8 KiB state bound. `packages/domain/battle.ts` provides `validateBattleEntry` for each incoming edge/default, `resolveBattleInputs`, `startBattle`, `actBattle` and allowlisted `battleResultValue`.
 
 The caller must supply the server-loaded pinned config and owned state. `startBattle` receives health/stats after destination entry effects and resolved values from the correct entry snapshot; it does not apply effects itself. `actBattle` validates identity/phase, expected turn and revision, then returns a fresh update proposal or a validated pending result on Continue. Continue does not advance a save revision, clear the interaction or choose a destination here: the later atomic routing transaction must do all of those together. Input-range helpers are not yet wired into publication, and result scalar extraction does not register a new binding source. No standalone helper substitutes for authorization or receipt replay.
 
 ### S35a local verification — October 26, 2026
 
 `pnpm check` passed: TypeScript, 162 tests (including 17 battle tests and the portable dependency-boundary check), and production build. Battle checks exercise both initiative orders, ties/preemptive, bounded bonuses, damage/Guard, final-turn precedence, free Escape, zero-health entry, 30-round exhaustion, strict schema rejection, malformed state, revision/turn/visit guards, deterministic reload and fresh revisit identity, input ranges and the continued rejection of battle by playable Story schemas. No service/renderer is integrated, so emulator/browser checks were not rerun; persistence, graph suppression and end-to-end acceptance remain unverified. Existing build chunk-size warnings remain. Self-review only; independent review pending.
+
+## S35b terminal routing boundary
+
+The next portable slice adds exactly three strict battle output routes and battle-only scalar bindings. `validateBattleOutputs` checks them against an existing validated effective Story, including required destination inputs; a missing/unsafe destination rejects the entire routing plan. It inherits conservative publication restrictions on inventory effects. `continueBattle` requires the engine's validated pending Continue, selects only its persisted outcome and returns the destination, route effects and next-entry input snapshot without mutating the save or applying effects.
+
+This validates standalone battle output plans against the current supported graph; it does not yet register battle placements in the graph compiler. Destinations must be present in the validated effective Story; disconnected draft content is not silently promoted. Mixed battle graph compilation, incoming battle edges, atomic service consumption, renderer and publication enablement remain follow-up work. Real Story schemas still reject both battle placements and battle sources on ordinary routes.
+
+S35b adds Story ID to the canonical battle identity and bounds its serialized command ID to 400 characters, enough for all five tuple members at their maximum lengths. Continue verifies both Story and edition identity against the routing graph. This changes only the unissued standalone battle schema: no existing persisted run/edition has battle state, so no backfill or compatibility adapter is required. The exported shared command-scope schema keeps revision guards consistent between action and routing helpers.
+
+### S35b local verification — October 26, 2026
+
+`pnpm check` passed: TypeScript, 176 tests (14 new battle-routing cases plus the 17 battle-engine cases), and production build. Tests cover win/loss/escape, pending-only Continue, result/default/constant binding, whole-plan rejection of unsafe required destinations, disconnected targets, missing required inputs, strict output shapes, conservative inventory-effect rejection, stale/foreign identity guards and no input mutation. Maximum-length scoped identity and rejection of battle sources by current real Story schemas are checked. No service/UI integration is present, so emulator/browser checks were not rerun. Mixed battle graphs and authoritative persistence remain unverified. Existing bundle warnings remain; review was self-review.

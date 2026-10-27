@@ -155,13 +155,14 @@ export const effectSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
 ]);
-const route = z
+export const storyRouteSchema = z
   .object({
     targetStoryNodeId: id,
     effects: z.array(effectSchema).max(20),
     inputBindings: inputBindingsSchema.optional(),
   })
   .strict();
+const route = storyRouteSchema;
 export const choiceSchema = z
   .object({
     id,

@@ -46,6 +46,7 @@ export const battleInputsSchema = z
 export const battleIdentitySchema = z
   .object({
     runId: id,
+    storyId: id,
     versionId: id,
     storyNodeId: id,
     entryRevision: integer(0, Number.MAX_SAFE_INTEGER),
@@ -55,6 +56,7 @@ export type BattleIdentity = z.infer<typeof battleIdentitySchema>;
 export const battleId = (identity: BattleIdentity) =>
   JSON.stringify([
     identity.runId,
+    identity.storyId,
     identity.versionId,
     identity.storyNodeId,
     identity.entryRevision,
@@ -90,7 +92,7 @@ const common = {
   version: z.literal(1),
   rules: z.literal("battle-1"),
   identity: battleIdentitySchema,
-  battleId: z.string().max(300),
+  battleId: z.string().max(400),
   initiative: z.enum(["player", "enemy"]),
   playerAttack: integer(2, 22),
   playerDefense: integer(0, 15),
@@ -123,7 +125,7 @@ export const battleStateSchema = z
 export type BattleState = z.infer<typeof battleStateSchema>;
 export const battleIntentSchema = z
   .object({
-    battleId: z.string().min(1).max(300),
+    battleId: z.string().min(1).max(400),
     expectedTurn: integer(0, 30),
     action: z.enum(["attack", "guard", "escape", "continue"]),
   })
@@ -135,5 +137,21 @@ export const battleStatsSchema = z
     intellect: integer(1, 20),
     resolve: integer(1, 20),
     charisma: integer(1, 20),
+  })
+  .strict();
+
+export const battleScopeSchema = z
+  .object({
+    identity: battleIdentitySchema,
+    revision: z
+      .number()
+      .int()
+      .min(0)
+      .max(Number.MAX_SAFE_INTEGER - 1),
+    expectedRevision: z
+      .number()
+      .int()
+      .min(0)
+      .max(Number.MAX_SAFE_INTEGER - 1),
   })
   .strict();
