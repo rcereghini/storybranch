@@ -10,7 +10,7 @@ import { launchBrowser } from "./browser";
 if (config.mode !== "emulator" || config.projectId !== "demo-storybranch")
   throw Error("Demo emulators required");
 async function seed(outcome: string) {
-  const base = starterStory("battle-ui-" + randomUUID());
+  const base = starterStory("000-battle-ui-" + randomUUID());
   base.storyNodes.opening.title = "Before the battle";
   base.storyNodes.opening.storyNodeType = "text";
   base.storyNodes.opening.choices = [
@@ -74,7 +74,20 @@ async function seed(outcome: string) {
   });
   for (const n of Object.values(storyNodes))
     batch.set(ref.collection("storyNodes").doc(n.id), n);
-  batch.set(db.doc(`users/player/playthroughs/${save.id}`), save);
+  batch.set(db.doc(`stories/${story.id}`), {
+    creatorUid: "player",
+    publishedVersionId: story.versionId,
+  });
+  batch.set(db.doc(`catalogue/${story.id}`), {
+    id: story.id,
+    title: story.title,
+    versionId: story.versionId,
+    hidden: false,
+    genre: "Adventure",
+    creator: "Test",
+    duration: "1 min",
+    description: "Battle entry check",
+  });
   await batch.commit();
   return save;
 }
@@ -86,6 +99,9 @@ try {
       reducedMotion: "reduce",
     });
     const tab = await context.newPage();
+    tab.on("pageerror", (error) =>
+      console.error("Browser error:", error.message),
+    );
     await tab.addInitScript(
       (theme) => localStorage.setItem("storybranch-theme", theme),
       width === 390 ? "dark" : "light",
@@ -103,7 +119,10 @@ try {
     await tab.getByRole("dialog").waitFor({ state: "hidden" });
     for (const outcome of ["win", "loss", "escape"]) {
       const save = await seed(outcome);
-      await tab.goto(`http://127.0.0.1:5173/play/${save.id}`);
+      await tab.goto(`http://127.0.0.1:5173/s/${save.storyId}`);
+      await tab.getByRole("button", { name: "Start a new journey" }).click();
+      await tab.waitForURL("**/play/*");
+      save.id = new URL(tab.url()).pathname.split("/").at(-1)!;
       await tab.getByRole("button", { name: /Enter battle/ }).click();
       await tab.getByRole("button", { name: "Attack", exact: true }).waitFor();
       assert.equal(
@@ -201,11 +220,29 @@ try {
           ?.status,
         "completed",
       );
+      const completed = (
+        await db.doc(`users/player/playthroughs/${save.id}`).get()
+      ).data();
+      await tab.getByRole("button", { name: /Begin another journey/ }).click();
+      await tab.getByRole("button", { name: /Enter battle/ }).waitFor();
+      const replayId = new URL(tab.url()).pathname.split("/").at(-1)!;
+      assert.notEqual(replayId, save.id);
+      assert.deepEqual(
+        (await db.doc(`users/player/playthroughs/${save.id}`).get()).data(),
+        completed,
+      );
+      await tab.getByRole("button", { name: /Enter battle/ }).click();
+      await tab.getByRole("button", { name: "Attack", exact: true }).waitFor();
+      assert.equal(
+        (await db.doc(`users/player/playthroughs/${replayId}`).get()).data()
+          ?.battle.turns,
+        0,
+      );
     }
     await context.close();
   }
   console.log(
-    "Battle shared-player browser flows passed: desktop/mobile, light/dark, reduced motion, keyboard, offline, lost-response retry, stale-tab reconciliation, reload and all three outcomes.",
+    "Battle shared-player browser flows passed: desktop/mobile, light/dark, reduced motion, keyboard, offline, lost-response retry, stale-tab reconciliation, root starts, isolated replay, reload and all three outcomes.",
   );
 } catch (error) {
   for (const context of browser.contexts())

@@ -1,3 +1,5 @@
+import type { StagedBattleStory } from "../../packages/contracts/battle-graph";
+import { initializeBattle } from "../../packages/domain/battle-player";
 import {
   battleContractHeader,
   battleContractVersion,
@@ -26,7 +28,6 @@ import {
   choiceCommandSchema,
   branchCommandSchema,
   type Save,
-  type Story,
   type Stats,
 } from "../../packages/contracts/index";
 import { start, transition } from "../../packages/domain/index";
@@ -57,7 +58,7 @@ import {
   invitationRoutes,
   storyEntryKeyHistory,
 } from "./invitations";
-import { edition } from "./story-store";
+import { edition, playerEdition } from "./story-store";
 import * as paths from "./paths";
 import {
   legacyStoryData,
@@ -259,6 +260,8 @@ async function handleCanonical(request: Request): Promise<Response> {
       return json((await battleRoutes(request, uid, segments[2])).player);
     // Gated features read the account's flags from the profile just loaded.
     const features = accountFeatures(profile.data());
+    const battleCapable =
+      request.headers.get(battleContractHeader) === battleContractVersion;
     if (
       request.method === "GET" &&
       segments[1] === "story-imports" &&
@@ -269,7 +272,14 @@ async function handleCanonical(request: Request): Promise<Response> {
       if (!/^[a-z0-9-]+:[a-z0-9-]+$/.test(keyId) || keyId.length > 100)
         throw new GameError("VALIDATION_FAILED", "Invalid imported key alias.");
       return json(
-        await storySourceRuns(uid, segments[2], segments[3], keyId, cursor),
+        await storySourceRuns(
+          uid,
+          segments[2],
+          segments[3],
+          keyId,
+          cursor,
+          battleCapable,
+        ),
       );
     }
     if (
@@ -277,7 +287,7 @@ async function handleCanonical(request: Request): Promise<Response> {
       segments[1] === "story-imports" &&
       segments.length === 3
     )
-      return json(await storyImportOffer(uid, segments[2]));
+      return json(await storyImportOffer(uid, segments[2], battleCapable));
     if (
       request.method === "GET" &&
       segments[1] === "playthroughs" &&
@@ -467,7 +477,7 @@ async function handleCanonical(request: Request): Promise<Response> {
         return readStoryData<{ save: Save }>(previous.data()!.result);
       }
       let save: Save;
-      let progressStory: Story;
+      let progressStory: StagedBattleStory;
       let event: Record<string, unknown>;
       let previousItems: Save["items"] = {};
       if (kind === "start") {
@@ -487,7 +497,12 @@ async function handleCanonical(request: Request): Promise<Response> {
         const latest = await tx.get(db.doc(`stories/${c.payload.storyId}`));
         const v = c.payload.versionId ?? latest.data()?.publishedVersionId;
         if (!v) throw new GameError("NOT_FOUND", "Story not found.");
-        const { story } = await edition(tx, c.payload.storyId, v);
+        const { story } = await playerEdition(
+          tx,
+          c.payload.storyId,
+          v,
+          battleCapable,
+        );
         await assertStoryEntry(tx, uid, story.id);
         progressStory = story;
         save = start(
@@ -505,8 +520,10 @@ async function handleCanonical(request: Request): Promise<Response> {
             c.payload.importConsent === true,
             now,
             c.payload.sourceRuns,
+            battleCapable,
           ),
         );
+        initializeBattle(story, save);
         event = {
           label: `Started ${story.title}`,
           from: null,
@@ -640,6 +657,7 @@ async function handleCanonical(request: Request): Promise<Response> {
         result.save,
         uid,
         profile.data() as { stats: Stats; achievements?: string[] },
+        battleCapable,
       ),
     });
   } catch (error) {

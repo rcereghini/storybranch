@@ -10,7 +10,7 @@ import {
   playerInventory,
 } from "../../packages/domain/player";
 import { db } from "./firebase";
-import { edition } from "./story-store";
+import { playerEdition } from "./story-store";
 import { storyNodeMedia, storyNodeImage } from "./uploads";
 
 // Invalid stored data is a service failure, never a bad player command.
@@ -26,15 +26,23 @@ export async function playerView(
   s: Save,
   uid: string,
   profile: { stats: Stats; achievements?: string[] },
+  battleCapable = false,
 ) {
-  const { story, clips, accountKeys } = await db.runTransaction(async (tx) => {
-    const stored = await edition(tx, s.storyId, s.versionId);
-    return {
-      ...stored,
-      accountKeys: await liveAccountKeys(tx, uid, stored.story),
-    };
-  });
-  return fullPlayerView(story, clips, accountKeys, s, uid, profile);
+  const { story, clips, accountKeys, battle } = await db.runTransaction(
+    async (tx) => {
+      const stored = await playerEdition(
+        tx,
+        s.storyId,
+        s.versionId,
+        battleCapable,
+      );
+      return {
+        ...stored,
+        accountKeys: await liveAccountKeys(tx, uid, stored.story),
+      };
+    },
+  );
+  return fullPlayerView(story, clips, accountKeys, s, uid, profile, !battle);
 }
 
 export async function fullPlayerView(

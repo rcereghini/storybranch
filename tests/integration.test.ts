@@ -6576,3 +6576,286 @@ it("returns ordinary destination media and full player context after battle Cont
   expect(continued.data.player.storyNode.battle).toBeUndefined();
   expect(continued.data.player.battle).toBeUndefined();
 });
+async function battleRootRequest(path: string, body?: unknown, capable = true) {
+  const response = await handle(
+    new Request(`http://localhost/api${path}`, {
+      method: body ? "POST" : "GET",
+      headers: {
+        Authorization: `Bearer ${tokens.player}`,
+        [storyContractHeader]: storyContractVersion,
+        [playerContractHeader]: playerContractVersion,
+        ...(capable ? { [battleContractHeader]: battleContractVersion } : {}),
+        "Content-Type": "application/json",
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    }),
+  );
+  return { status: response.status, data: await response.json() };
+}
+async function battleRootFixture() {
+  const fixture = await battleFixture();
+  await db
+    .doc(`stories/${fixture.story.id}`)
+    .set({ creatorUid: "player", publishedVersionId: fixture.story.versionId });
+  await db
+    .doc(`catalogue/${fixture.story.id}`)
+    .set({
+      id: fixture.story.id,
+      title: fixture.story.title,
+      versionId: fixture.story.versionId,
+      hidden: false,
+      genre: "Adventure",
+      creator: "Test",
+      duration: "1 min",
+      description: "Battle start fixture",
+    });
+  return fixture;
+}
+it("starts and replays marked battle editions with fresh isolated state and idempotent receipts", async () => {
+  const { story } = await battleRootFixture();
+  const command = {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: story.id, versionId: story.versionId },
+  };
+  expect(
+    (await battleRootRequest(`/story-imports/${story.id}`, undefined, false))
+      .status,
+  ).toBe(400);
+  expect(
+    (await battleRootRequest(`/story-imports/${story.id}`)).data,
+  ).toMatchObject({ storyId: story.id, versionId: story.versionId, keys: [] });
+  expect(
+    (await battleRootRequest("/playthroughs", command, false)).status,
+  ).toBe(400);
+  expect(
+    (await db.doc(receipt("player", "start", command.idempotencyKey)).get())
+      .exists,
+  ).toBe(false);
+  const first = await battleRootRequest("/playthroughs", command);
+  expect(first.status).toBe(200);
+  expect(first.data.player.storyNode.battle.phase).toBe("active");
+  expect(await battleRootRequest("/playthroughs", command)).toEqual(first);
+  expect(
+    (await battleRootRequest("/playthroughs", command, false)).status,
+  ).toBe(400);
+  const ref = db.doc(`users/player/playthroughs/${first.data.player.save.id}`);
+  const original = (await ref.get()).data() as BattleSave;
+  expect(original.battle!.identity.entryRevision).toBe(0);
+  expect(original.battle!.turns).toBe(0);
+  await battleCall(original, battleCommand(original));
+  await battleCall(original, battleCommand(original, "continue", 1, 1));
+  const completed = (await ref.get()).data();
+  expect(completed?.status).toBe("completed");
+  const replay = await battleRootRequest("/playthroughs", {
+    ...command,
+    idempotencyKey: randomUUID(),
+  });
+  expect(replay.status).toBe(200);
+  expect(replay.data.player.save.id).not.toBe(original.id);
+  expect(replay.data.player.storyNode.battle.phase).toBe("active");
+  expect((await ref.get()).data()).toEqual(completed);
+  expect((await db.collection(`${ref.path}/events`).get()).size).toBe(3);
+  expect(
+    (
+      await battleRootRequest("/playthroughs", {
+        ...command,
+        payload: { ...command.payload, importConsent: true },
+      })
+    ).status,
+  ).toBe(409);
+});
+it("rejects hidden, invited, unsupported and invalid-entry battle starts without consuming the command", async () => {
+  const { story } = await battleRootFixture();
+  const command = {
+    idempotencyKey: randomUUID(),
+    payload: { storyId: story.id },
+  };
+  const record = db.doc(receipt("player", "start", command.idempotencyKey));
+  const listing = db.doc(`catalogue/${story.id}`);
+  const root = db.doc(`stories/${story.id}`);
+  await listing.update({ hidden: true });
+  expect((await battleRootRequest("/playthroughs", command)).status).toBe(403);
+  await listing.update({ hidden: false });
+  await root.update({
+    creatorUid: "progressed",
+    entryPolicy: { version: 1, revision: 1, invitationRequired: true },
+  });
+  expect((await battleRootRequest("/playthroughs", command)).status).toBe(403);
+  expect((await battleRootRequest(`/story-imports/${story.id}`)).status).toBe(
+    403,
+  );
+  await root.update({
+    entryPolicy: { version: 1, revision: 2, invitationRequired: false },
+  });
+  const manifest = db.doc(`stories/${story.id}/versions/${story.versionId}`);
+  await manifest.update({ battleContract: "future-battle" });
+  expect((await battleRootRequest("/playthroughs", command)).status).toBe(400);
+  await manifest.update({ battleContract: battleContractVersion });
+  await manifest
+    .collection("storyNodes")
+    .doc("opening")
+    .update({
+      inputs: {
+        version: 1,
+        fields: [{ name: "missing", type: "integer", required: true }],
+      },
+    });
+  expect((await battleRootRequest("/playthroughs", command)).status).toBe(400);
+  expect((await record.get()).exists).toBe(false);
+  expect(
+    (
+      await db
+        .collection("users/player/playthroughs")
+        .where("storyId", "==", story.id)
+        .get()
+    ).size,
+  ).toBe(1); // fixture only
+});
+it("preserves consent and pinned battle export permissions in new-run snapshots", async () => {
+  const { story: source } = await battleRootFixture();
+  const { story: target } = await battleRootFixture();
+  const sourceKey = `${source.id}:earned`,
+    alias = `${target.id}:imported`;
+  await db.doc(`stories/${source.id}/versions/${source.versionId}`).update({
+    progression: {
+      version: 1,
+      keys: [
+        {
+          keyId: sourceKey,
+          label: "Earned",
+          afterCompletions: 1,
+          exportToStoryIds: [target.id],
+        },
+      ],
+    },
+  });
+  await db.doc(`stories/${target.id}/versions/${target.versionId}`).update({
+    keyImports: {
+      version: 1,
+      keys: [
+        {
+          keyId: alias,
+          label: "Imported",
+          sourceStoryId: source.id,
+          sourceVersionId: source.versionId,
+          sourceKeyId: sourceKey,
+          required: true,
+        },
+      ],
+    },
+  });
+  const grant = db.doc(
+    `users/player/storyProgress/${source.id}/keys/${sourceKey}`,
+  );
+  await grant.set({ runId: "source-run", versionId: source.versionId, at: 1 });
+  const offer = await battleRootRequest(`/story-imports/${target.id}`);
+  expect(offer.status).toBe(200);
+  expect(offer.data.keys[0].label).toBe("Imported");
+  expect(JSON.stringify(offer.data)).not.toContain("source-run");
+  const command = {
+    idempotencyKey: randomUUID(),
+    payload: {
+      storyId: target.id,
+      versionId: target.versionId,
+      importConsent: false,
+    },
+  };
+  expect((await battleRootRequest("/playthroughs", command)).status).toBe(403);
+  command.payload.importConsent = true;
+  const first = await battleRootRequest("/playthroughs", command);
+  expect(first.status).toBe(200);
+  expect(JSON.stringify(first.data)).not.toContain("keyImportSnapshot");
+  const stored = (
+    await db.doc(`users/player/playthroughs/${first.data.player.save.id}`).get()
+  ).data()!;
+  expect(stored.keyImportSnapshot.keys[0]).toMatchObject({
+    keyId: alias,
+    present: true,
+  });
+  await grant.delete();
+  expect(await battleRootRequest("/playthroughs", command)).toEqual(first);
+  expect(
+    (
+      await battleRootRequest("/playthroughs", {
+        ...command,
+        idempotencyKey: randomUUID(),
+      })
+    ).status,
+  ).toBe(403);
+});
+it("lists only owned completed battle runs for explicit imported local facts", async () => {
+  const { story: source, save } = await battleRootFixture();
+  const { story: target } = await battleRootFixture();
+  const sourceKey = `${source.id}:local`,
+    alias = `${target.id}:imported`;
+  await db.doc(`stories/${source.id}/versions/${source.versionId}`).update({
+    runKeyExports: {
+      version: 1,
+      keys: [
+        { keyId: sourceKey, label: "Local", exportToStoryIds: [target.id] },
+      ],
+    },
+  });
+  await db.doc(`stories/${target.id}/versions/${target.versionId}`).update({
+    keyImports: {
+      version: 1,
+      keys: [
+        {
+          keyId: alias,
+          label: "Selected fact",
+          selection: "completed-run",
+          sourceStoryId: source.id,
+          sourceVersionId: source.versionId,
+          sourceKeyId: sourceKey,
+          required: true,
+        },
+      ],
+    },
+  });
+  const url = `/story-imports/${target.id}/${target.versionId}/runs?keyId=${alias}`;
+  expect((await battleRootRequest(url)).data.items).toEqual([]);
+  await battleCall(save, battleCommand(save));
+  await battleCall(save, battleCommand(save, "continue", 1, 1));
+  const list = await battleRootRequest(url);
+  expect(list.status).toBe(200);
+  expect(list.data.items).toEqual([
+    {
+      runId: save.id,
+      completedAt: expect.any(Number),
+      endingTitle: source.storyNodes.ending.title,
+    },
+  ]);
+  const command = {
+    idempotencyKey: randomUUID(),
+    payload: {
+      storyId: target.id,
+      versionId: target.versionId,
+      importConsent: true,
+      sourceRuns: [
+        {
+          sourceStoryId: source.id,
+          sourceVersionId: source.versionId,
+          runId: save.id,
+        },
+      ],
+    },
+  };
+  const begun = await battleRootRequest("/playthroughs", command);
+  expect(begun.status).toBe(200);
+  const stored = (
+    await db.doc(`users/player/playthroughs/${begun.data.player.save.id}`).get()
+  ).data()!;
+  expect(stored.keyImportSnapshot.keys[0]).toMatchObject({
+    present: false,
+    sourceRun: { runId: save.id },
+  });
+  const foreign = {
+    ...command,
+    idempotencyKey: randomUUID(),
+    payload: {
+      ...command.payload,
+      sourceRuns: [{ ...command.payload.sourceRuns[0], runId: randomUUID() }],
+    },
+  };
+  expect((await battleRootRequest("/playthroughs", foreign)).status).toBe(403);
+});

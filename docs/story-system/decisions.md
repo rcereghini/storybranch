@@ -160,3 +160,7 @@ Broaden only the portable start/transition input to accept the staged graph stru
 ### S35f — Shared battle presentation and recovery
 
 Extend the rendering projection, not the authoring schema, with typed battle status and allowed action intents. Battle remains a child renderer of shared StoryNode inside Story; its wrapper owns controls and duplicate suppression. Full staged reload/command views compose inventory, explicit User data and ordinary destination media. Existing PlayerSession retains uncertain commands and reconciles stale progress. Pre-renderer staged receipts request reconciliation without reexecution; full-view receipts retain exact replay. No public starts or publication enablement; staged community offers stay hidden until child starts are supported.
+
+### S35g — Root start and replay
+
+Enable marked editions through the existing authorized root-start transaction and consent flow. Initialize encounters before writes and keep exact committed run/snapshot identity on retries. Replay starts a separate run; it never carries the previous encounter. Use a separate player edition loader so this cannot enable creator publication. Child starts/offers and Studio remain separate gates. See [S35g](battle.md#s35g-root-start-and-replay-boundary).
