@@ -105,7 +105,7 @@ export function resolveNodeInputs(
 
 export function choiceInputIssue(
   choice: Choice,
-  nodes: Record<string, StoryNode>,
+  nodes: Record<string, Pick<StoryNode, "id" | "inputs">>,
 ): string | undefined {
   const outcome = choice.outcome;
   const routes =

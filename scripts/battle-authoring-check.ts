@@ -503,18 +503,94 @@ try {
           .getByRole("button", { name: "Connect to Finished", exact: true })
           .click();
       }
-      // Ordinary Dice routes feed the real battle placement, keeping bindings.
-      for (const outcome of ["Pass", "Fail"]) {
+      // Ordinary routes and bindings share the outer node Apply/Reset lifecycle.
+      await tab.getByRole("button", { name: "Edit Roll", exact: true }).click();
+      await tab.getByLabel("Option 1 Dice sides", { exact: true }).fill("0");
+      await tab
+        .getByRole("button", { name: "Apply node changes", exact: true })
+        .click();
+      await tab
+        .getByRole("status")
+        .filter({ hasText: "Invalid node shape" })
+        .waitFor();
+      assert(
         await tab
-          .getByRole("button", {
-            name: `Connect Roll d20 · ${outcome} from Roll`,
-            exact: true,
-          })
-          .click();
+          .getByRole("button", { name: "Save battle draft", exact: true })
+          .isDisabled(),
+      );
+      await tab
+        .getByRole("button", { name: "Reset node changes", exact: true })
+        .click();
+      assert.equal(
         await tab
-          .getByRole("button", { name: "Connect to New battle", exact: true })
-          .click();
-      }
+          .getByLabel("Option 1 Dice sides", { exact: true })
+          .inputValue(),
+        "20",
+      );
+      await tab
+        .getByLabel("Option 1 Pass destination", { exact: true })
+        .selectOption(battle.id);
+      await tab.getByText("Bind option 1 inputs", { exact: true }).click();
+      await tab
+        .getByLabel("Pass binding 1 source", { exact: true })
+        .selectOption("constant");
+      await tab.getByLabel("Pass binding 1 value", { exact: true }).fill("7");
+      assert.equal(
+        await tab
+          .getByRole("button", { name: "Apply bindings", exact: true })
+          .count(),
+        0,
+      );
+      await tab
+        .getByRole("button", { name: "Reset node changes", exact: true })
+        .click();
+      assert.equal(
+        await tab
+          .getByLabel("Option 1 Pass destination", { exact: true })
+          .inputValue(),
+        "summary",
+      );
+      assert.equal(
+        await tab
+          .getByLabel("Pass binding 1 source", { exact: true })
+          .inputValue(),
+        "value",
+      );
+      for (const outcome of ["Pass", "Fail"])
+        await tab
+          .getByLabel(`Option 1 ${outcome} destination`, { exact: true })
+          .selectOption(battle.id);
+      await tab
+        .getByLabel("Option 1 label", { exact: true })
+        .fill("Roll d20 now");
+      await tab.getByLabel("Option 1 Dice target", { exact: true }).fill("17");
+      await tab
+        .getByRole("button", { name: "Add Pass binding", exact: true })
+        .click();
+      await tab
+        .getByLabel("Pass binding 3 value", { exact: true })
+        .selectOption("true");
+      await tab
+        .getByRole("button", { name: "Apply node changes", exact: true })
+        .click();
+      await tab.getByText("Bind option 1 inputs", { exact: true }).click();
+      await tab
+        .getByLabel("Option 1 Pass destination", { exact: true })
+        .selectOption("ending");
+      await tab
+        .getByLabel("Pass binding 1 input", { exact: true })
+        .locator("option")
+        .filter({ hasText: "unavailable" })
+        .waitFor({ state: "attached" });
+      await tab
+        .getByRole("button", { name: "Reset node changes", exact: true })
+        .click();
+      await tab
+        .getByLabel("Option 1 Pass destination", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await tab.screenshot({
+        path: `test-results/mixed-routes-${width}-${colorScheme}.png`,
+      });
       await tab
         .getByLabel("First StoryNode", { exact: true })
         .selectOption("dice");
@@ -526,6 +602,20 @@ try {
         .first()
         .filter({ hasText: "Draft saved" })
         .waitFor();
+      const routed = (await api(`/studio/${story.id}`)).story.storyNodes.dice
+        .choices[0];
+      assert.equal(routed.label, "Roll d20 now");
+      assert.equal(routed.outcome.target, 17);
+      assert.deepEqual(routed.costs, story.storyNodes.dice.choices[0].costs);
+      assert.equal(routed.outcome.success.targetStoryNodeId, battle.id);
+      assert.equal(routed.outcome.failure.targetStoryNodeId, battle.id);
+      assert.deepEqual(
+        routed.outcome.success.inputBindings.bindings.slice(0, 2),
+        [
+          { input: "roll", source: { kind: "dice", field: "value" } },
+          { input: "passed", source: { kind: "dice", field: "passed" } },
+        ],
+      );
       await tab
         .getByRole("button", { name: "Preview graph", exact: true })
         .click();
