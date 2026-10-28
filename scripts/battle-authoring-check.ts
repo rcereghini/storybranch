@@ -38,6 +38,12 @@ try {
     for (const colorScheme of ["light", "dark"] as const) {
       const story = branchDataStory(`battle-author-${randomUUID()}`);
       story.title = `Battle draft ${width} ${colorScheme}`;
+      if (width === 1440 && colorScheme === "light")
+        story.storyNodes.unfinished = {
+          ...story.storyNodes.ending,
+          id: "unfinished",
+          title: "Reserved target",
+        };
       story.progression = {
         version: 1,
         keys: [
@@ -241,6 +247,9 @@ try {
       });
       await tab
         .getByRole("button", { name: "Save battle draft", exact: true })
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
         .click();
       await tab
         .getByRole("button", { name: "Retry save", exact: true })
@@ -438,6 +447,9 @@ try {
         .click();
       await tab
         .getByRole("button", { name: "Save battle draft", exact: true })
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
         .click();
       await tab
         .locator(".battle-authoring-status")
@@ -594,6 +606,9 @@ try {
       await tab
         .getByLabel("First StoryNode", { exact: true })
         .selectOption("dice");
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
       await tab
         .getByRole("button", { name: "Save battle draft", exact: true })
         .click();
@@ -767,6 +782,9 @@ try {
         .click();
       await tab
         .getByRole("button", { name: "Save battle draft", exact: true })
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
         .click();
       await tab
         .locator(".battle-authoring-status")
@@ -776,6 +794,174 @@ try {
       const finalSetup = (await api(`/studio/${story.id}`)).graphPlaytests[0];
       assert.equal(finalSetup.name, "Mixed path");
       assert.equal(finalSetup.replay.steps.length, 4);
+      // Option counts can change only on option-bearing scenes; Reset preserves IDs.
+      await tab
+        .getByRole("button", { name: "Edit Scouting complete", exact: true })
+        .click();
+      await tab
+        .getByRole("button", { name: "Add option", exact: true })
+        .click();
+      assert.equal(
+        await tab
+          .getByLabel("Option 3 Selected route destination", { exact: true })
+          .inputValue(),
+        story.storyNodes.unfinished ? "unfinished-1" : "unfinished",
+      );
+      assert(
+        await tab
+          .getByRole("button", { name: "Save battle draft", exact: true })
+          .isDisabled(),
+      );
+      for (let i = 3; i < 20; i++)
+        await tab
+          .getByRole("button", { name: "Add option", exact: true })
+          .click();
+      assert(
+        await tab
+          .getByRole("button", { name: "Add option", exact: true })
+          .isDisabled(),
+      );
+      await tab
+        .getByRole("button", { name: "Reset node changes", exact: true })
+        .click();
+      assert.equal(
+        await tab.getByLabel("Option 3 label", { exact: true }).count(),
+        0,
+      );
+      await tab
+        .getByRole("button", { name: "Add option", exact: true })
+        .click();
+      await tab
+        .getByLabel("Option 3 label", { exact: true })
+        .fill("Bonus route");
+      await tab
+        .getByLabel("Option 3 Selected route destination", { exact: true })
+        .selectOption("ending");
+      await tab
+        .getByRole("button", { name: "Apply node changes", exact: true })
+        .click();
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .click();
+      await tab
+        .locator(".battle-authoring-status")
+        .first()
+        .filter({ hasText: "Draft saved" })
+        .waitFor();
+      const options = (await api(`/studio/${story.id}`)).story.storyNodes
+        .summary.choices;
+      assert.deepEqual(options.slice(0, 2), story.storyNodes.summary.choices);
+      assert.equal(options[2].outcome.route.targetStoryNodeId, "ending");
+      assert.equal(new Set(options.map((c: { id: string }) => c.id)).size, 3);
+      await tab
+        .getByRole("button", { name: "Remove option 1", exact: true })
+        .click();
+      assert.equal(
+        await tab.getByLabel("Option 1 label", { exact: true }).inputValue(),
+        "Again",
+      );
+      await tab
+        .getByRole("button", { name: "Apply node changes", exact: true })
+        .click();
+      await tab
+        .getByRole("button", { name: "Undo graph edit", exact: true })
+        .click();
+      assert.equal(
+        await tab.getByLabel("Option 1 label", { exact: true }).inputValue(),
+        "Finish",
+      );
+      for (let i = 0; i < 3; i++)
+        await tab
+          .getByRole("button", { name: "Remove option 1", exact: true })
+          .click();
+      await tab
+        .getByRole("button", { name: "Apply node changes", exact: true })
+        .click();
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .click();
+      await tab
+        .locator(".battle-authoring-status")
+        .first()
+        .filter({ hasText: "Draft saved" })
+        .waitFor();
+      assert.deepEqual(
+        (await api(`/studio/${story.id}`)).story.storyNodes.summary.choices,
+        [],
+      );
+      await tab
+        .getByRole("button", { name: "Undo graph edit", exact: true })
+        .click();
+      await tab
+        .getByLabel("Option 3 label", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await tab.screenshot({
+        path: `test-results/mixed-options-${width}-${colorScheme}.png`,
+      });
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .click();
+      await tab
+        .locator(".battle-authoring-status")
+        .first()
+        .filter({ hasText: "Draft saved" })
+        .waitFor();
+      await tab.reload();
+      await tab.getByRole("button", { name: new RegExp(story.title) }).click();
+      assert.deepEqual(
+        (await api(`/studio/${story.id}`)).story.storyNodes.summary.choices,
+        options,
+      );
+      await tab
+        .getByLabel("New timeline StoryNode type", { exact: true })
+        .selectOption("video-options");
+      await tab
+        .getByRole("button", { name: "+ Add StoryNode", exact: true })
+        .click();
+      await tab
+        .getByRole("button", { name: "Add option", exact: true })
+        .click();
+      assert.equal(
+        await tab.getByLabel("Option 2 label", { exact: true }).inputValue(),
+        "New option",
+      );
+      await tab
+        .getByRole("button", { name: "Remove option 1", exact: true })
+        .click();
+      await tab
+        .getByRole("button", { name: "Reset node changes", exact: true })
+        .click();
+      assert.equal(
+        await tab.getByLabel("Option 1 label", { exact: true }).inputValue(),
+        "Next",
+      );
+      await tab
+        .getByRole("button", { name: "Remove selected StoryNode", exact: true })
+        .click();
+      for (const title of ["Roll", "Finished", "New battle"]) {
+        await tab
+          .getByRole("button", { name: `Edit ${title}`, exact: true })
+          .click();
+        assert.equal(
+          await tab
+            .getByRole("button", { name: "Add option", exact: true })
+            .count(),
+          0,
+        );
+        assert.equal(
+          await tab.getByRole("button", { name: /^Remove option / }).count(),
+          0,
+        );
+      }
       await tab
         .getByRole("button", { name: "Edit New battle", exact: true })
         .click();

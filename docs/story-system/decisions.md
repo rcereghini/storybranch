@@ -200,3 +200,7 @@ Persist optional bounded private `graphPlaytests` with applied setup and mixed a
 ### S35p — One pending-edit boundary for ordinary mixed-graph routes
 
 Expose existing ordinary output configuration through controlled fields inside the selected node's Apply/Reset. Reuse typed binding controls with destination input projections, including battle targets. Retain hidden advanced fields and stale mappings; compiler validation owns safety. Ordinary Studio keeps its independent binding Apply/Reset. No persisted or player contract changes. See [S35p](battle.md#s35p-ordinary-route-controls-in-mixed-graphs).
+
+### S35q — Variable options only on option-bearing scenes
+
+Allow add/remove only for Text with Options and Video with Options, within the existing 20-choice contract. Create stable IDs and unconnected direct routes; retain existing fields and saved assertions. Empty options remain an incomplete draft diagnosed by the compiler. Share node Apply/Reset, draft Save and graph Undo. Fixed-output types and public authority are unchanged. See [S35q](battle.md#s35q-option-creation-and-removal-in-mixed-graphs).
