@@ -188,3 +188,7 @@ Allow strict Battle StoryNodes in private `Draft.story`, sharing the existing ow
 ### S35m — Visual bindings preserve incomplete authored intent
 
 Expose compatible constants and battle-result sources on each required output, using existing version-1 bindings. Destination changes preserve stale mappings until explicit repair/removal. Pending-node compiler diagnostics include conservative battle-to-battle ranges; Apply/Reset and draft Save remain distinct. No publication, command, projection or persistence schema changes. See [S35m](battle.md#s35m-visual-battle-output-bindings).
+
+### S35n — Configurable private mixed-graph playtests
+
+Reuse bounded starting stats/inventory and Dice scenarios in actual mixed graph previews. Successful Apply restarts the run and clears recorded/captured assertions; failed Apply preserves the active simulation. Inspect current-entry inputs privately and expose applied setup JSON alongside assertions. Setup remains session-only; real authority, persistence and publication contracts are unchanged. See [S35n](battle.md#s35n-configurable-mixed-graph-previews).

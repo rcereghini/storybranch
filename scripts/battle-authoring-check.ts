@@ -38,6 +38,17 @@ try {
     for (const colorScheme of ["light", "dark"] as const) {
       const story = branchDataStory(`battle-author-${randomUUID()}`);
       story.title = `Battle draft ${width} ${colorScheme}`;
+      const previewItem = `${story.id}:token`;
+      story.itemCatalogue = {
+        version: 1,
+        items: [
+          {
+            itemId: previewItem,
+            name: "Preview token",
+            description: "Disposable inventory test",
+          },
+        ],
+      };
       story.storyNodes.ending.inputs = {
         version: 1,
         fields: [
@@ -278,6 +289,85 @@ try {
         .filter({ hasText: "PASS: 2 assertions passed. Story completed." })
         .waitFor();
       await preview
+        .getByText("Test stats and inventory", { exact: true })
+        .click();
+      await preview.getByLabel("Starting strength", { exact: true }).fill("21");
+      assert(
+        await preview
+          .getByRole("button", {
+            name: "Apply stats and inventory",
+            exact: true,
+          })
+          .isDisabled(),
+      );
+      assert(
+        await preview
+          .getByRole("button", { name: "Replay graph", exact: true })
+          .isVisible(),
+      );
+      await preview.getByLabel("Starting strength", { exact: true }).fill("20");
+      await preview
+        .getByLabel(`Starting quantity ${previewItem}`, { exact: true })
+        .fill("3");
+      await preview
+        .getByRole("button", { name: "Apply stats and inventory", exact: true })
+        .click();
+      assert.equal(
+        await preview
+          .getByLabel("Graph assertions JSON", { exact: true })
+          .inputValue(),
+        "",
+      );
+      const setup = JSON.parse(
+        await preview
+          .getByLabel("Applied graph setup JSON", { exact: true })
+          .inputValue(),
+      );
+      assert.equal(setup.stats.strength, 20);
+      assert.equal(setup.items[previewItem], 3);
+      await preview
+        .getByText("Resolved StoryNode inputs", { exact: true })
+        .click();
+      await preview
+        .getByLabel("Resolved input values")
+        .getByText("preemptive: true", { exact: true })
+        .waitFor();
+      await preview
+        .getByRole("button", { name: "Escape", exact: true })
+        .click();
+      // Terminal action keeps entry inputs; only Continue resolves output bindings.
+      await preview
+        .getByLabel("Resolved input values")
+        .getByText("preemptive: true", { exact: true })
+        .waitFor();
+      await preview
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await preview
+        .getByLabel("Resolved input values")
+        .getByText("victory: false", { exact: true })
+        .waitFor();
+      await preview
+        .getByLabel("Resolved input values")
+        .getByText('message: "escape message"', { exact: true })
+        .waitFor();
+      await preview
+        .getByRole("button", { name: "Capture graph assertions" })
+        .click();
+      await preview
+        .getByRole("button", { name: "Run graph assertions" })
+        .click();
+      await preview
+        .getByRole("status")
+        .filter({ hasText: "PASS: 2 assertions passed. Story completed." })
+        .waitFor();
+      await preview
+        .getByLabel("Resolved input values")
+        .scrollIntoViewIfNeeded();
+      await tab.screenshot({
+        path: `test-results/battle-preview-setup-${width}-${colorScheme}.png`,
+      });
+      await preview
         .getByRole("button", { name: "Close graph preview" })
         .click();
       // All three battle edges are exposed on the shared canvas.
@@ -319,9 +409,63 @@ try {
       await tab
         .getByRole("button", { name: "Preview graph", exact: true })
         .click();
+      // Applied setup survives close/reopen within the editor session.
+      await preview
+        .getByText("Test stats and inventory", { exact: true })
+        .click();
+      assert.equal(
+        await preview
+          .getByLabel("Starting strength", { exact: true })
+          .inputValue(),
+        "20",
+      );
+      assert.equal(
+        await preview
+          .getByLabel(`Starting quantity ${previewItem}`, { exact: true })
+          .inputValue(),
+        "3",
+      );
+      await preview.getByText("Test Dice outcomes", { exact: true }).click();
+      await preview
+        .getByLabel("Preview Dice mode", { exact: true })
+        .selectOption("fixed");
+      await preview.getByLabel("Preview fixed draw", { exact: true }).fill("0");
+      assert(
+        await preview
+          .getByRole("button", { name: "Apply Dice setup", exact: true })
+          .isDisabled(),
+      );
+      await preview
+        .getByLabel("Preview fixed draw", { exact: true })
+        .fill("21");
+      await preview
+        .getByRole("button", { name: "Apply Dice setup", exact: true })
+        .click();
+      await preview.getByRole("button", { name: /Roll d20/ }).click();
+      assert.equal(
+        await preview.locator('[data-dice-state="result"]').count(),
+        0,
+      );
+      await preview
+        .getByLabel("Preview fixed draw", { exact: true })
+        .fill("14");
+      await preview
+        .getByRole("button", { name: "Apply Dice setup", exact: true })
+        .click();
       await preview.getByRole("button", { name: /Roll d20/ }).click();
       await preview.locator('[data-dice-state="result"]').waitFor();
       await preview.getByRole("button", { name: /Next/ }).click();
+      await preview
+        .getByText("Resolved StoryNode inputs", { exact: true })
+        .click();
+      await preview
+        .getByLabel("Resolved input values")
+        .getByText("roll: 14", { exact: true })
+        .waitFor();
+      await preview
+        .getByLabel("Resolved input values")
+        .getByText("passed: false", { exact: true })
+        .waitFor();
       await preview
         .getByRole("button", { name: "Attack", exact: true })
         .click();

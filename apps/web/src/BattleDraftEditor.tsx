@@ -34,7 +34,10 @@ import {
 import { StoryGraph } from "./StoryGraph";
 import { StoryOutline } from "./StoryOutline";
 import { BattleOutputBindingsEditor } from "./BattleOutputBindingsEditor";
-import { StoryInputsEditor } from "./StoryInputsEditor";
+import { StoryInputsEditor, PreviewInputs } from "./StoryInputsEditor";
+import { PreviewStateEditor } from "./PreviewStateEditor";
+import { PreviewDiceEditor } from "./PreviewDiceEditor";
+import type { PreviewScenario } from "../../../packages/contracts/preview";
 import { Story } from "./Story";
 import { StoryNode } from "./StoryNode";
 import { panelImages } from "./ComicEditor";
@@ -44,7 +47,7 @@ const api = createApi(
   fetch,
   async () => auth.currentUser?.getIdToken() ?? null,
 );
-const scenario = {
+const defaultScenario: PreviewScenario = {
   version: 1,
   storyKeys: [],
   importedKeys: [],
@@ -75,6 +78,7 @@ export function BattleDraftEditor({
   const [pending, setPending] = useState(false);
   const [uploads, setUploads] = useState<UploadListing>();
   const [replay, setReplay] = useState("");
+  const [previewScenario, setPreviewScenario] = useState(defaultScenario);
   const [request, setRequest] = useState<{
     idempotencyKey: string;
     expectedRevision: number;
@@ -300,7 +304,12 @@ export function BattleDraftEditor({
         <button
           className="btn btn-secondary"
           disabled={!review.story || busy || pending}
-          onClick={() => setPreview(true)}
+          onClick={() =>
+            attempt(() => {
+              startBattlePreview(draft.story, previewScenario);
+              setPreview(true);
+            })
+          }
         >
           Preview graph
         </button>
@@ -421,10 +430,23 @@ export function BattleDraftEditor({
           story={draft.story}
           uploads={uploads}
           replay={replay}
+          scenario={previewScenario}
+          onScenario={setPreviewScenario}
           onReplay={setReplay}
           onClose={() => setPreview(false)}
         />
       )}
+      <button
+        className="btn btn-secondary"
+        disabled={busy}
+        onClick={() => {
+          setPreviewScenario(defaultScenario);
+          setReplay("");
+          setNotice("Preview setup reset to defaults. Draft unchanged.");
+        }}
+      >
+        Reset graph preview setup
+      </button>
     </section>
   );
 }
@@ -717,12 +739,16 @@ function GraphPreview({
   story,
   uploads,
   replay,
+  scenario,
+  onScenario,
   onReplay,
   onClose,
 }: {
   story: StagedBattleStory;
   uploads?: UploadListing;
   replay: string;
+  scenario: PreviewScenario;
+  onScenario: (value: PreviewScenario) => void;
   onReplay: (value: string) => void;
   onClose: () => void;
 }) {
@@ -769,6 +795,15 @@ function GraphPreview({
       history: [],
       serial: session.serial + 1,
     });
+  const applyScenario = (next: PreviewScenario) => {
+    const started = startBattlePreview(source, next);
+    onScenario(next);
+    setSession({ ...started, history: [], serial: session.serial + 1 });
+    onReplay("");
+    setStatus(
+      "Preview restarted. Recorded commands and captured assertions cleared.",
+    );
+  };
   const media =
     current.storyNodeType === "battle"
       ? undefined
@@ -787,7 +822,7 @@ function GraphPreview({
         if (event.key !== "Tab") return;
         const elements = Array.from(
           event.currentTarget.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), textarea, summary, [tabindex="0"]',
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea, summary, [tabindex="0"]',
           ),
         ).filter((element) => element.getClientRects().length);
         if (event.shiftKey && document.activeElement === elements[0]) {
@@ -810,16 +845,29 @@ function GraphPreview({
       </header>
       <div className="battle-workshop-body">
         <p>
-          Private preview of the actual graph. Default starting stats and
-          highest Dice rolls. No real progress is saved.
+          Private preview of the actual graph. Starting values are simulated; no
+          real progress is saved. Setup lasts only for this editor session.
         </p>
+        <PreviewStateEditor
+          story={source}
+          scenario={scenario}
+          onRestart={applyScenario}
+        />
+        <PreviewDiceEditor scenario={scenario} onRestart={applyScenario} />
+        <PreviewInputs story={session.story} save={session.save} />
         <details>
           <summary>Graph assertions</summary>
           <p>
             {session.history.length}/100 commands recorded. Assertions are
-            retained during this editor session only; copy the JSON to keep
-            them.
+            retained during this editor session only; copy the JSON to keep them
+            together with the applied setup below.
           </p>
+          <textarea
+            aria-label="Applied graph setup JSON"
+            readOnly
+            rows={5}
+            value={JSON.stringify(scenario, null, 2)}
+          />
           <button
             className="btn btn-secondary"
             disabled={!session.history.length}
@@ -870,7 +918,7 @@ function GraphPreview({
           save={session.save}
           user={{
             id: "preview",
-            stats: baseStats,
+            stats: { ...baseStats, ...scenario.stats },
             achievements: [],
             saveSpots: [],
           }}
