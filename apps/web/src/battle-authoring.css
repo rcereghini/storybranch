@@ -68,6 +68,17 @@
   overflow-wrap: anywhere;
   color: var(--muted);
 }
+.battle-workshop .graph-preview-keys label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.battle-workshop .graph-preview-keys input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
 @media (max-width: 1100px) {
   .battle-authoring {
     height: auto;

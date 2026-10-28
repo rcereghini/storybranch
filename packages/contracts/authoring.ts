@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { savedPlaytestScenariosSchema } from "./preview";
 import { savedBattlePlaytestsSchema } from "./battle-workshop";
+import { savedGraphPlaytestsSchema } from "./battle-playtest";
 import { stagedBattleStorySchema } from "./battle-graph";
 import { id, storySchema, storyTrunkContextSchema } from "./index";
 // The trunk is a configuration view, not a playable placement. Existing root
@@ -74,10 +75,14 @@ export const draftSchema = z
     comic: comicStudioSchema.optional(),
     playtestScenarios: savedPlaytestScenariosSchema.optional(),
     battlePlaytests: savedBattlePlaytestsSchema.optional(),
+    graphPlaytests: savedGraphPlaytestsSchema.optional(),
   })
   .strict()
   .superRefine((draft, ctx) => {
-    for (const entry of draft.playtestScenarios ?? []) {
+    for (const entry of [
+      ...(draft.playtestScenarios ?? []),
+      ...(draft.graphPlaytests ?? []),
+    ]) {
       const scenario = entry.scenario;
       if (
         [

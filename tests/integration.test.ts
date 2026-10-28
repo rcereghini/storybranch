@@ -5718,6 +5718,39 @@ it("records authoritative net inventory once and projects pinned owned metadata"
 
 it("saves private playtest setups with revision guards and excludes them from editions and real runs", async () => {
   const story = starterStory(`setups-${randomUUID()}`);
+  const graphPlaytest = {
+    version: 1,
+    id: "graph-setup",
+    name: "Private actual graph setup",
+    scenario: {
+      version: 1,
+      storyKeys: [`${story.id}:retired-graph-key`],
+      importedKeys: [],
+      accountKeys: [],
+      dice: { mode: "fixed", value: 14 },
+    },
+    replay: {
+      version: 1,
+      steps: [
+        {
+          from: "old-battle",
+          intent: { kind: "battle", action: "escape" },
+          expected: {
+            storyNodeId: "old-battle",
+            status: "active",
+            health: 100,
+            battle: {
+              phase: "result-pending",
+              turns: 0,
+              playerHealth: 100,
+              enemyHealth: 10,
+              outcome: "escape",
+            },
+          },
+        },
+      ],
+    },
+  };
   const path = `/studio/${story.id}`;
   const battleRehearsal = {
     version: 1,
@@ -5772,6 +5805,7 @@ it("saves private playtest setups with revision guards and excludes them from ed
       description: "Setups",
       playtestScenarios: [entry],
       battlePlaytests: [battleRehearsal],
+      graphPlaytests: [graphPlaytest],
     },
   };
   const saved = await call(path, command);
@@ -5779,6 +5813,24 @@ it("saves private playtest setups with revision guards and excludes them from ed
   expect((await call(path, command)).data).toEqual(saved.data);
   expect((await call(path)).data.playtestScenarios).toEqual([entry]);
   expect((await call(path)).data.battlePlaytests).toEqual([battleRehearsal]);
+  expect((await call(path)).data.graphPlaytests).toEqual([graphPlaytest]);
+  for (const invalid of [
+    { ...graphPlaytest, version: 2 },
+    {
+      ...graphPlaytest,
+      scenario: { ...graphPlaytest.scenario, accountKeys: ["foreign:key"] },
+    },
+  ])
+    expect(
+      (
+        await call(path, {
+          ...command,
+          idempotencyKey: randomUUID(),
+          expectedRevision: 1,
+          draft: { ...command.draft, graphPlaytests: [invalid] },
+        })
+      ).status,
+    ).toBe(400);
   expect(
     (
       await call(path, {
@@ -5828,6 +5880,10 @@ it("saves private playtest setups with revision guards and excludes them from ed
   ).data();
   expect(edition).not.toHaveProperty("playtestScenarios");
   expect(edition).not.toHaveProperty("battlePlaytests");
+  expect(edition).not.toHaveProperty("graphPlaytests");
+  expect(JSON.stringify(edition)).not.toMatch(
+    /Private actual graph setup|retired-graph-key|old-battle/,
+  );
   expect(JSON.stringify(edition)).not.toMatch(
     /Private enemy|Private battle rehearsal|removed-scene/,
   );
@@ -5847,6 +5903,9 @@ it("saves private playtest setups with revision guards and excludes them from ed
     payload: { storyId: story.id },
   });
   expect(real.status).toBe(200);
+  expect(JSON.stringify(real.data)).not.toMatch(
+    /graphPlaytests|Private actual graph setup|retired-graph-key|old-battle/,
+  );
   expect(real.data.save.items).toEqual({});
   expect(JSON.stringify(real.data)).not.toMatch(
     /battlePlaytests|Private enemy|Private battle rehearsal/,
@@ -5858,11 +5917,17 @@ it("saves private playtest setups with revision guards and excludes them from ed
     ...command,
     idempotencyKey: randomUUID(),
     expectedRevision: 1,
-    draft: { ...command.draft, playtestScenarios: [], battlePlaytests: [] },
+    draft: {
+      ...command.draft,
+      playtestScenarios: [],
+      battlePlaytests: [],
+      graphPlaytests: [],
+    },
   });
   expect(removed.status).toBe(200);
   expect((await call(path)).data.playtestScenarios).toEqual([]);
   expect((await call(path)).data.battlePlaytests).toEqual([]);
+  expect((await call(path)).data.graphPlaytests).toEqual([]);
 });
 
 it("pins item catalogues to editions and keeps definitions out of player projections", async () => {

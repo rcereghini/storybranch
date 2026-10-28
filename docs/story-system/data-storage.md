@@ -1,5 +1,7 @@
 # Story data, storage and command contracts
 
+S35o adds optional private draft `graphPlaytests` for actual-graph scenarios and mixed assertions, separate from ordinary scenarios and substitution rehearsals. Up to ten unique version-1 entries and 500 total replay steps share existing draft ownership, revision/idempotency and 250 KB request limits. Same-Story stale aliases/references are retained; foreign scenario namespaces are rejected. Metadata never enters editions, catalogue, AI context or player state. No collection, index, security-rule or data migration is introduced. See [saved actual-graph playtests](battle.md#s35o-saved-actual-graph-playtests).
+
 Status: target persistence design with an explicit current-path map. Decisions S04–S10. Read the context documents and [keys](keys.md) before altering state. Examples are logical contracts, not a migration or a claim that future collections exist.
 
 ## Data ownership and storage

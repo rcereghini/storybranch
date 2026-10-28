@@ -51,7 +51,7 @@ export const battlePlaytestStepSchema = z
       (step.roll !== undefined),
     "Only Roll steps require an exact draw.",
   );
-// Deliberately separate from saved Studio setups until the shared preview is wired.
+// Mixed replay stays separate from the ordinary choice-only replay contract.
 export const battlePlaytestScenarioSchema = previewScenarioSchema.omit({
   replay: true,
 });
@@ -63,3 +63,39 @@ export const battlePlaytestReplaySchema = z
   .strict();
 export type BattlePlaytestIntent = z.infer<typeof battlePlaytestIntentSchema>;
 export type BattlePlaytestStep = z.infer<typeof battlePlaytestStepSchema>;
+
+// Private actual-graph setups, separate from substitution rehearsals.
+export const savedGraphPlaytestsSchema = z
+  .array(
+    z
+      .object({
+        version: z.literal(1),
+        id: nodeId,
+        name: z.string().trim().min(1).max(60),
+        scenario: battlePlaytestScenarioSchema,
+        replay: battlePlaytestReplaySchema.optional(),
+      })
+      .strict(),
+  )
+  .max(10)
+  .superRefine((entries, ctx) => {
+    if (
+      new Set(entries.map((e) => e.id)).size !== entries.length ||
+      new Set(entries.map((e) => e.name.toLowerCase())).size !== entries.length
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Graph playtests need unique IDs and names.",
+      });
+    if (
+      entries.reduce((total, e) => total + (e.replay?.steps.length ?? 0), 0) >
+      500
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "At most 500 assertions across graph playtests.",
+      });
+  });
+export type SavedGraphPlaytest = z.infer<
+  typeof savedGraphPlaytestsSchema
+>[number];
