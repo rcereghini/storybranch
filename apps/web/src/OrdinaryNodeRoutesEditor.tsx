@@ -12,6 +12,10 @@ export function OrdinaryNodeRoutesEditor({
   story: StagedBattleStory;
   onChange: (node: StoryNode) => void;
 }) {
+  const supportsOptions =
+    node.kind === "scene" &&
+    (node.storyNodeType === "text-options" ||
+      node.storyNodeType === "video-options");
   const update = (index: number, choice: Choice) =>
     onChange({
       ...node,
@@ -45,7 +49,7 @@ export function OrdinaryNodeRoutesEditor({
                   <input
                     aria-label={`Option ${option} Dice ${field}`}
                     type="number"
-                min={field === "sides" ? 2 : 1}
+                    min={field === "sides" ? 2 : 1}
                     max={100}
                     step={1}
                     value={
@@ -102,9 +106,52 @@ export function OrdinaryNodeRoutesEditor({
               onApply={(next) => update(index, next)}
               onEdit={(next) => update(index, next)}
             />
+            {supportsOptions && (
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  onChange({
+                    ...node,
+                    choices: node.choices.filter((_, i) => i !== index),
+                  })
+                }
+              >
+                Remove option {option}
+              </button>
+            )}
           </fieldset>
         );
       })}
+      {supportsOptions && (
+        <button
+          className="btn btn-secondary"
+          disabled={node.choices.length >= 20}
+          onClick={() => {
+            // A legal existing ID must never become the new option's implicit target.
+            let target = "unfinished";
+            let suffix = 0;
+            while (story.storyNodes[target]) target = `unfinished-${++suffix}`;
+            onChange({
+              ...node,
+              choices: [
+                ...node.choices,
+                {
+                  id: crypto.randomUUID(),
+                  label: "New option",
+                  unavailableDisplay: "hidden",
+                  costs: [],
+                  outcome: {
+                    kind: "direct",
+                    route: { targetStoryNodeId: target, effects: [] },
+                  },
+                },
+              ],
+            });
+          }}
+        >
+          Add option
+        </button>
+      )}
       {!node.choices.length && <p>No outgoing options on this StoryNode.</p>}
     </section>
   );

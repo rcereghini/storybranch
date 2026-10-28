@@ -244,3 +244,7 @@ These are local Chrome/emulator results. No hosted deployment, physical device/S
 ## S35i — Staged battle playtest foundation
 
 The portable [battle playtest engine](story-system/battle.md#s35i-staged-repeatable-playtest-engine) now prepares disposable effective mixed graphs, records choice/Dice and battle intent, and replays bounded state assertions. It reuses starting stats/items and simulated declared keys, including battle entry effects and result routing. This is not yet wired into Studio controls or saved setups. Existing PreviewScenario replay records remain unchanged; battle authoring, shared-wrapper preview, saved battle histories and publication remain gated.
+
+## Mixed-graph option creation and removal
+
+[S35q](story-system/battle.md#s35q-option-creation-and-removal-in-mixed-graphs) adds Add/Remove option to Text with Options and Video with Options, up to 20 options. New options begin unconnected. Apply/Reset, explicit Save and Undo provide recovery; removing all options leaves an incomplete draft with existing diagnostics. Other StoryNode types retain their fixed output rules.
