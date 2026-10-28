@@ -196,3 +196,7 @@ Reuse bounded starting stats/inventory and Dice scenarios in actual mixed graph 
 ### S35o — Save actual-graph scenarios independently
 
 Persist optional bounded private `graphPlaytests` with applied setup and mixed assertions, distinct from substitution rehearsals and ordinary scenarios. Retain stale local references for repair, reject foreign namespaces, and validate the current graph and assertions before replacing an active preview on Load. Simulated key aliases never grant rights. Existing draft persistence/undo applies; editions and real runs exclude this metadata. See [S35o](battle.md#s35o-saved-actual-graph-playtests).
+
+### S35p — One pending-edit boundary for ordinary mixed-graph routes
+
+Expose existing ordinary output configuration through controlled fields inside the selected node's Apply/Reset. Reuse typed binding controls with destination input projections, including battle targets. Retain hidden advanced fields and stale mappings; compiler validation owns safety. Ordinary Studio keeps its independent binding Apply/Reset. No persisted or player contract changes. See [S35p](battle.md#s35p-ordinary-route-controls-in-mixed-graphs).

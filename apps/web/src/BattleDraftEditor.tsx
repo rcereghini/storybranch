@@ -39,6 +39,7 @@ import { PreviewStateEditor } from "./PreviewStateEditor";
 import { PreviewDiceEditor } from "./PreviewDiceEditor";
 import { SavedGraphPlaytests } from "./SavedGraphPlaytests";
 import { GraphPreviewKeys } from "./GraphPreviewKeys";
+import { OrdinaryNodeRoutesEditor } from "./OrdinaryNodeRoutesEditor";
 import type { SavedGraphPlaytest } from "../../../packages/contracts/battle-playtest";
 import type { PreviewScenario } from "../../../packages/contracts/preview";
 import { Story } from "./Story";
@@ -497,12 +498,10 @@ function NodeEditor({
     }
   };
   const battle = value.storyNodeType === "battle" ? value : null;
-  const pendingReview = battle
-    ? reviewBattleGraph({
-        ...story,
-        storyNodes: { ...story.storyNodes, [value.id]: value },
-      })
-    : null;
+  const pendingReview = reviewBattleGraph({
+    ...story,
+    storyNodes: { ...story.storyNodes, [value.id]: value },
+  });
   const updateBattle = (change: Partial<StagedBattleNode["battle"]>) => {
     if (battle)
       setValue({ ...battle, battle: { ...battle.battle, ...change } });
@@ -532,6 +531,16 @@ function NodeEditor({
         node={value}
         onApply={(inputs) => setValue({ ...value, inputs })}
       />
+      {value.storyNodeType !== "battle" && (
+        <OrdinaryNodeRoutesEditor
+          node={value}
+          story={{
+            ...story,
+            storyNodes: { ...story.storyNodes, [value.id]: value },
+          }}
+          onChange={setValue}
+        />
+      )}
       {battle && (
         <>
           <label>
@@ -680,20 +689,20 @@ function NodeEditor({
               />
             </div>
           ))}
-          <div
-            className="battle-binding-diagnostics"
-            aria-label="Pending battle diagnostics"
-            role="status"
-          >
-            {pendingReview?.error}
-            {pendingReview?.diagnostics
-              .filter((item) => item.storyNodeId === value.id)
-              .map((item, index) => (
-                <p key={index}>{item.message}</p>
-              ))}
-          </div>
         </>
       )}
+      <div
+        className="battle-binding-diagnostics"
+        aria-label="Pending battle diagnostics"
+        role="status"
+      >
+        {pendingReview?.error}
+        {pendingReview?.diagnostics
+          .filter((item) => item.storyNodeId === value.id)
+          .map((item, index) => (
+            <p key={index}>{item.message}</p>
+          ))}
+      </div>
       <button className="btn btn-primary" onClick={() => apply(value)}>
         Apply node changes
       </button>

@@ -1,5 +1,7 @@
 # Story component documentation
 
+`OrdinaryNodeRoutesEditor.tsx` exposes existing labels, destinations, Dice configuration and bindings in mixed graphs. Follow [S35p](../../../docs/story-system/battle.md#s35p-ordinary-route-controls-in-mixed-graphs) and S32/S33 branch data. `BranchInputsEditor.onEdit` is controlled by the enclosing node's Apply/Reset, while ordinary Studio retains its independent Apply/Reset. Preserve costs/conditions/effects and stale bindings on reconnection; never infer trusted results or destinations from a renderer.
+
 `SavedGraphPlaytests.tsx` manages private actual-graph setup metadata; `GraphPreviewKeys.tsx` simulates only declared aliases. Follow [S35o](../../../docs/story-system/battle.md#s35o-saved-actual-graph-playtests), storage and key authority. Save/Update capture applied setup plus validated assertions; draft Save persists them. Load validates current graph/references/assertions before replacing the active preview. Never merge these records into substitution rehearsals or published/player data.
 
 `PreviewDiceEditor.tsx`, `PreviewStateEditor.tsx` and `PreviewInputs` also serve the mixed battle graph preview. Read [S35n](../../../docs/story-system/battle.md#s35n-configurable-mixed-graph-previews): successful setup Apply restarts the disposable run and clears assertions; failed Apply preserves it. Setup and resolved input inspection are private/session-only, never real player authority.

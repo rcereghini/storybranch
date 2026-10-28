@@ -8,7 +8,6 @@ import {
   choiceSchema,
   type StoryNode,
   type Choice,
-  type Story,
   type Save,
 } from "../../../packages/contracts/index";
 import {
@@ -231,13 +230,19 @@ export function BranchInputsEditor({
   choice,
   option,
   onApply,
+  onEdit,
 }: {
-  story: Story;
+  story: {
+    storyNodes: Record<string, Pick<StoryNode, "id" | "title" | "inputs">>;
+  };
   choice: Choice;
   option: number;
   onApply: (choice: Choice) => void;
+  // Controlled editing uses the enclosing node's Apply/Reset lifecycle.
+  onEdit?: (choice: Choice) => void;
 }) {
-  const [draft, setDraft] = useState(() => structuredClone(choice));
+  const [localDraft, setDraft] = useState(() => structuredClone(choice));
+  const draft = onEdit ? choice : localDraft;
   const [message, setMessage] = useState("");
   useEffect(() => {
     setDraft(structuredClone(choice));
@@ -252,7 +257,8 @@ export function BranchInputsEditor({
   const edit = (change: (copy: Choice) => void) => {
     const copy = structuredClone(draft);
     change(copy);
-    setDraft(copy);
+    if (onEdit) onEdit(copy);
+    else setDraft(copy);
   };
   return (
     <details className="key-condition-editor">
@@ -431,25 +437,29 @@ export function BranchInputsEditor({
             </fieldset>
           );
         })}
-        <button
-          className="btn btn-secondary"
-          onClick={() => {
-            setDraft(structuredClone(choice));
-            setMessage("Binding edits reset.");
-          }}
-        >
-          Reset bindings
-        </button>
-        <button
-          className="btn btn-primary"
-          disabled={!!error}
-          onClick={() => {
-            onApply(choiceSchema.parse(draft));
-            setMessage("Bindings applied.");
-          }}
-        >
-          Apply bindings
-        </button>
+        {!onEdit && (
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setDraft(structuredClone(choice));
+                setMessage("Binding edits reset.");
+              }}
+            >
+              Reset bindings
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={!!error}
+              onClick={() => {
+                onApply(choiceSchema.parse(draft));
+                setMessage("Bindings applied.");
+              }}
+            >
+              Apply bindings
+            </button>
+          </>
+        )}
         <p className="key-history-status" role="status">
           {error || message}
         </p>
