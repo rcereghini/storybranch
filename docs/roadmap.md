@@ -1,6 +1,6 @@
 # Current delivery checklist
 
-Reviewed October 27, 2026 against merged main `bb3241e` (through PR68), with S35n configurable mixed graph previews implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means the named deliverable is complete; a design-only item is explicitly labeled and does not imply runtime support or hosted/device acceptance. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
+Reviewed October 27, 2026 against merged main `fc3551e` (through PR69), with S35o saved actual-graph playtests implemented in this change. This is the current planning checklist; dated verification records remain historical evidence. A checked item means the named deliverable is complete; a design-only item is explicitly labeled and does not imply runtime support or hosted/device acceptance. See [delivery acceptance](08-delivery-and-acceptance.md) for release gates and [Story decisions](story-system/decisions.md) for authority.
 
 ## Implemented foundation
 
@@ -35,7 +35,7 @@ Implementation details: [player runtime](story-system/player-runtime.md), [Studi
 - [x] S35l actual mixed draft graph persistence/authoring and shared-wrapper previews, merged PR67.
 - [x] S35m visual Win/Loss/Escape input bindings with stale-reference repair, merged PR68.
 - [x] S35n session-only starting stats/inventory, Dice setup and resolved-input inspection for actual mixed graph previews. See [battle previews](story-system/battle.md#s35n-configurable-mixed-graph-previews).
-- [ ] Durable named setups/assertions for actual mixed graphs, including key scenarios (saved substitution rehearsals are a separate feature).
+- [x] S35o durable named setups/assertions for actual mixed graphs, including declared Story/import/account key scenarios, stale-reference checks and draft undo. Saved substitution rehearsals remain a separate feature. See [saved graph playtests](story-system/battle.md#s35o-saved-actual-graph-playtests).
 - [ ] Richer visual ordinary-node editing within mixed graphs and end-to-end battle publication acceptance. Publication remains disabled until the full acceptance path is verified.
 - [ ] Checkpoint restore with explicit roll/visit semantics; broader item use and reward configuration without duplicating permanent claims.
 

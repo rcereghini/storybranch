@@ -1,5 +1,7 @@
 # Story component documentation
 
+`SavedGraphPlaytests.tsx` manages private actual-graph setup metadata; `GraphPreviewKeys.tsx` simulates only declared aliases. Follow [S35o](../../../docs/story-system/battle.md#s35o-saved-actual-graph-playtests), storage and key authority. Save/Update capture applied setup plus validated assertions; draft Save persists them. Load validates current graph/references/assertions before replacing the active preview. Never merge these records into substitution rehearsals or published/player data.
+
 `PreviewDiceEditor.tsx`, `PreviewStateEditor.tsx` and `PreviewInputs` also serve the mixed battle graph preview. Read [S35n](../../../docs/story-system/battle.md#s35n-configurable-mixed-graph-previews): successful setup Apply restarts the disposable run and clears assertions; failed Apply preserves it. Setup and resolved input inspection are private/session-only, never real player authority.
 
 `BattleOutputBindingsEditor.tsx` edits controlled Win/Loss/Escape mappings within the selected node's Apply/Reset lifecycle. Read [S35m](../../../docs/story-system/battle.md#s35m-visual-battle-output-bindings) and typed branch data. Retain stale bindings for explicit repair, preserve effects, and use the mixed graph compiler for type/range diagnostics.

@@ -3,9 +3,11 @@ import { starterStory } from "../apps/web/src/studio-model";
 import { stagedBattleStorySchema } from "../packages/contracts/battle-graph";
 import {
   battlePlaytestReplaySchema,
+  savedGraphPlaytestsSchema,
   type BattlePlaytestStep,
 } from "../packages/contracts/battle-playtest";
 import { previewScenarioSchema } from "../packages/contracts/preview";
+import { draftSchema } from "../packages/contracts/authoring";
 import { storySchema, startSchema } from "../packages/contracts/index";
 import {
   startBattlePreview,
@@ -19,6 +21,86 @@ const scenario = {
   importedKeys: [],
   accountKeys: [],
 } as const;
+it("bounds private graph setups and separates them from rehearsal and player contracts", () => {
+  const result = record();
+  const entry = {
+    version: 1,
+    id: "setup",
+    name: "Win",
+    scenario,
+    replay: result.replay,
+  };
+  expect(savedGraphPlaytestsSchema.safeParse([entry]).success).toBe(true);
+  for (const change of [
+    { version: 2 },
+    { name: " " },
+    { setup: {} },
+    { scenario: { ...scenario, health: 100 } },
+  ])
+    expect(
+      savedGraphPlaytestsSchema.safeParse([{ ...entry, ...change }]).success,
+    ).toBe(false);
+  expect(
+    savedGraphPlaytestsSchema.safeParse([
+      entry,
+      { ...entry, id: "second", name: "win" },
+    ]).success,
+  ).toBe(false);
+  expect(
+    savedGraphPlaytestsSchema.safeParse([entry, { ...entry, name: "Other" }])
+      .success,
+  ).toBe(false);
+  const hundred = {
+    version: 1,
+    steps: Array.from({ length: 100 }, () => result.replay.steps[0]),
+  };
+  const entries = Array.from({ length: 6 }, (_, i) => ({
+    ...entry,
+    id: `setup-${i}`,
+    name: `Setup ${i}`,
+    replay: hundred,
+  }));
+  expect(savedGraphPlaytestsSchema.safeParse(entries.slice(0, 5)).success).toBe(
+    true,
+  );
+  expect(savedGraphPlaytestsSchema.safeParse(entries).success).toBe(false);
+  expect(
+    savedGraphPlaytestsSchema.safeParse(
+      Array.from({ length: 11 }, (_, i) => ({
+        ...entry,
+        id: `s-${i}`,
+        name: `S ${i}`,
+        replay: undefined,
+      })),
+    ).success,
+  ).toBe(false);
+});
+it("retains stale local graph setup references but rejects foreign namespaces", () => {
+  const story = fixture();
+  const entry = {
+    version: 1,
+    id: "stale",
+    name: "Stale",
+    scenario: {
+      ...scenario,
+      storyKeys: [`${story.id}:removed`],
+      items: { [`${story.id}:retired`]: 2 },
+    },
+  };
+  const draft = { story, description: "", graphPlaytests: [entry] };
+  expect(draftSchema.parse(draft).graphPlaytests).toEqual([entry]);
+  expect(() => startBattlePreview(story, entry.scenario)).toThrow(
+    /unavailable/,
+  );
+  expect(
+    draftSchema.safeParse({
+      ...draft,
+      graphPlaytests: [
+        { ...entry, scenario: { ...scenario, accountKeys: ["foreign:key"] } },
+      ],
+    }).success,
+  ).toBe(false);
+});
 function fixture(dice = false) {
   const base = starterStory("battle-playtest");
   const battle = {

@@ -37,6 +37,9 @@ import { BattleOutputBindingsEditor } from "./BattleOutputBindingsEditor";
 import { StoryInputsEditor, PreviewInputs } from "./StoryInputsEditor";
 import { PreviewStateEditor } from "./PreviewStateEditor";
 import { PreviewDiceEditor } from "./PreviewDiceEditor";
+import { SavedGraphPlaytests } from "./SavedGraphPlaytests";
+import { GraphPreviewKeys } from "./GraphPreviewKeys";
+import type { SavedGraphPlaytest } from "../../../packages/contracts/battle-playtest";
 import type { PreviewScenario } from "../../../packages/contracts/preview";
 import { Story } from "./Story";
 import { StoryNode } from "./StoryNode";
@@ -430,6 +433,8 @@ export function BattleDraftEditor({
           story={draft.story}
           uploads={uploads}
           replay={replay}
+          playtests={draft.graphPlaytests ?? []}
+          onPlaytests={(graphPlaytests) => edit({ ...draft, graphPlaytests })}
           scenario={previewScenario}
           onScenario={setPreviewScenario}
           onReplay={setReplay}
@@ -739,6 +744,8 @@ function GraphPreview({
   story,
   uploads,
   replay,
+  playtests,
+  onPlaytests,
   scenario,
   onScenario,
   onReplay,
@@ -747,6 +754,8 @@ function GraphPreview({
   story: StagedBattleStory;
   uploads?: UploadListing;
   replay: string;
+  playtests: SavedGraphPlaytest[];
+  onPlaytests: (entries: SavedGraphPlaytest[]) => void;
   scenario: PreviewScenario;
   onScenario: (value: PreviewScenario) => void;
   onReplay: (value: string) => void;
@@ -854,6 +863,32 @@ function GraphPreview({
           onRestart={applyScenario}
         />
         <PreviewDiceEditor scenario={scenario} onRestart={applyScenario} />
+        <GraphPreviewKeys
+          story={source}
+          scenario={scenario}
+          onRestart={applyScenario}
+        />
+        <SavedGraphPlaytests
+          entries={playtests}
+          scenario={scenario}
+          replay={replay}
+          onChange={onPlaytests}
+          onLoad={(entry) => {
+            const started = startBattlePreview(source, entry.scenario);
+            if (entry.replay) {
+              const report = runBattlePlaytest(
+                source,
+                entry.scenario,
+                entry.replay,
+              );
+              if (!report.passed) throw Error(report.message);
+            }
+            onScenario(entry.scenario);
+            setSession({ ...started, history: [], serial: session.serial + 1 });
+            onReplay(entry.replay ? JSON.stringify(entry.replay, null, 2) : "");
+            setStatus("Saved playtest loaded. A fresh preview has started.");
+          }}
+        />
         <PreviewInputs story={session.story} save={session.save} />
         <details>
           <summary>Graph assertions</summary>
@@ -930,7 +965,7 @@ function GraphPreview({
                 : renderStoryNode(
                     current,
                     session.save,
-                    [],
+                    scenario.accountKeys,
                     session.story.itemCatalogue,
                   )
             }

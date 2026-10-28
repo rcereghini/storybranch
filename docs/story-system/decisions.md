@@ -192,3 +192,7 @@ Expose compatible constants and battle-result sources on each required output, u
 ### S35n — Configurable private mixed-graph playtests
 
 Reuse bounded starting stats/inventory and Dice scenarios in actual mixed graph previews. Successful Apply restarts the run and clears recorded/captured assertions; failed Apply preserves the active simulation. Inspect current-entry inputs privately and expose applied setup JSON alongside assertions. Setup remains session-only; real authority, persistence and publication contracts are unchanged. See [S35n](battle.md#s35n-configurable-mixed-graph-previews).
+
+### S35o — Save actual-graph scenarios independently
+
+Persist optional bounded private `graphPlaytests` with applied setup and mixed assertions, distinct from substitution rehearsals and ordinary scenarios. Retain stale local references for repair, reject foreign namespaces, and validate the current graph and assertions before replacing an active preview on Load. Simulated key aliases never grant rights. Existing draft persistence/undo applies; editions and real runs exclude this metadata. See [S35o](battle.md#s35o-saved-actual-graph-playtests).

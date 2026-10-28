@@ -38,6 +38,40 @@ try {
     for (const colorScheme of ["light", "dark"] as const) {
       const story = branchDataStory(`battle-author-${randomUUID()}`);
       story.title = `Battle draft ${width} ${colorScheme}`;
+      story.progression = {
+        version: 1,
+        keys: [
+          {
+            keyId: `${story.id}:earned`,
+            label: "Earned",
+            afterCompletions: 1,
+            exportToStoryIds: [],
+          },
+        ],
+      };
+      story.accountKeys = {
+        version: 1,
+        keys: [
+          {
+            keyId: `${story.id}:account`,
+            label: "Account",
+            definitionId: "private-definition",
+          },
+        ],
+      };
+      story.keyImports = {
+        version: 1,
+        keys: [
+          {
+            keyId: `${story.id}:imported`,
+            label: "Imported",
+            sourceStoryId: "source",
+            sourceVersionId: "edition-1",
+            sourceKeyId: "source:earned",
+            required: false,
+          },
+        ],
+      };
       const previewItem = `${story.id}:token`;
       story.itemCatalogue = {
         version: 1,
@@ -325,6 +359,14 @@ try {
       );
       assert.equal(setup.stats.strength, 20);
       assert.equal(setup.items[previewItem], 3);
+      await preview.getByText("Test graph keys", { exact: true }).click();
+      for (const suffix of ["earned", "account", "imported"])
+        await preview
+          .getByLabel(`Simulate ${story.id}:${suffix}`, { exact: true })
+          .check();
+      await preview
+        .getByRole("button", { name: "Apply graph keys", exact: true })
+        .click();
       await preview
         .getByText("Resolved StoryNode inputs", { exact: true })
         .click();
@@ -367,8 +409,86 @@ try {
       await tab.screenshot({
         path: `test-results/battle-preview-setup-${width}-${colorScheme}.png`,
       });
+      await preview.getByText("Saved graph playtests", { exact: true }).click();
+      await preview
+        .getByLabel("Graph playtest name", { exact: true })
+        .fill("Escape check");
+      await preview
+        .getByRole("button", { name: "Save new graph playtest", exact: true })
+        .click();
+      const setupId = await preview
+        .getByLabel("Saved graph playtest", { exact: true })
+        .inputValue();
+      assert(setupId);
+      await preview
+        .getByRole("button", { name: "Save new graph playtest", exact: true })
+        .click();
+      await preview
+        .getByRole("status")
+        .filter({ hasText: "Use a unique name" })
+        .waitFor();
+      await preview
+        .getByLabel("Graph playtest name", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await tab.screenshot({
+        path: `test-results/saved-graph-playtests-${width}-${colorScheme}.png`,
+      });
       await preview
         .getByRole("button", { name: "Close graph preview" })
+        .click();
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .click();
+      await tab
+        .locator(".battle-authoring-status")
+        .first()
+        .filter({ hasText: "Draft saved" })
+        .waitFor();
+      const withSetup = await api(`/studio/${story.id}`);
+      assert.equal(withSetup.graphPlaytests.length, 1);
+      assert.equal(withSetup.graphPlaytests[0].replay.steps.length, 2);
+      assert.deepEqual(withSetup.graphPlaytests[0].scenario.accountKeys, [
+        `${story.id}:account`,
+      ]);
+      assert.deepEqual(withSetup.graphPlaytests[0].scenario.storyKeys, [
+        `${story.id}:earned`,
+      ]);
+      assert.deepEqual(withSetup.graphPlaytests[0].scenario.importedKeys, [
+        `${story.id}:imported`,
+      ]);
+      await tab.reload();
+      await tab.getByRole("button", { name: new RegExp(story.title) }).click();
+      await tab
+        .getByRole("button", { name: "Preview graph", exact: true })
+        .click();
+      await preview.getByText("Saved graph playtests", { exact: true }).click();
+      await preview
+        .getByLabel("Saved graph playtest", { exact: true })
+        .selectOption(setupId);
+      await preview
+        .getByRole("button", { name: "Load graph playtest", exact: true })
+        .click();
+      await preview
+        .getByRole("status")
+        .filter({ hasText: "Playtest loaded and checked" })
+        .waitFor();
+      await preview
+        .getByText("Test stats and inventory", { exact: true })
+        .click();
+      assert.equal(
+        await preview
+          .getByLabel("Starting strength", { exact: true })
+          .inputValue(),
+        "20",
+      );
+      await preview.getByText("Test graph keys", { exact: true }).click();
+      assert(
+        await preview
+          .getByLabel(`Simulate ${story.id}:account`, { exact: true })
+          .isChecked(),
+      );
+      await preview
+        .getByRole("button", { name: "Close graph preview", exact: true })
         .click();
       // All three battle edges are exposed on the shared canvas.
       await tab.getByRole("button", { name: "Fit", exact: true }).click();
@@ -484,9 +604,88 @@ try {
         .getByRole("status")
         .filter({ hasText: "PASS: 4 assertions passed. Story completed." })
         .waitFor();
+      const mixedReplay = await preview
+        .getByLabel("Graph assertions JSON", { exact: true })
+        .inputValue();
+      await preview.getByText("Saved graph playtests", { exact: true }).click();
+      await preview
+        .getByLabel("Saved graph playtest", { exact: true })
+        .selectOption(setupId);
+      await preview
+        .getByRole("button", { name: "Load graph playtest", exact: true })
+        .click();
+      await preview
+        .getByRole("status")
+        .filter({ hasText: "Step 1: Expected source" })
+        .waitFor();
+      assert(
+        await preview
+          .getByRole("button", { name: "Replay graph", exact: true })
+          .isVisible(),
+      );
+      assert.equal(
+        await preview
+          .getByLabel("Graph assertions JSON", { exact: true })
+          .inputValue(),
+        mixedReplay,
+      );
+      await preview
+        .getByLabel("Graph playtest name", { exact: true })
+        .fill("Mixed path");
+      await preview
+        .getByRole("button", { name: "Update graph playtest", exact: true })
+        .click();
+      await preview
+        .getByRole("button", { name: "Load graph playtest", exact: true })
+        .click();
+      await preview
+        .getByRole("status")
+        .filter({ hasText: "Playtest loaded and checked" })
+        .waitFor();
+      await preview
+        .getByLabel("Graph assertions JSON", { exact: true })
+        .fill("{");
+      await preview
+        .getByRole("button", { name: "Update graph playtest", exact: true })
+        .click();
+      await preview
+        .getByRole("button", { name: "Load graph playtest", exact: true })
+        .click();
+      assert.equal(
+        JSON.parse(
+          await preview
+            .getByLabel("Graph assertions JSON", { exact: true })
+            .inputValue(),
+        ).steps.length,
+        4,
+      );
+      await preview
+        .getByRole("button", { name: "Remove graph playtest", exact: true })
+        .click();
+      assert.equal(
+        await preview
+          .getByLabel("Saved graph playtest", { exact: true })
+          .locator("option")
+          .count(),
+        1,
+      );
       await preview
         .getByRole("button", { name: "Close graph preview" })
         .click();
+      await tab
+        .getByRole("button", { name: "Undo graph edit", exact: true })
+        .click();
+      await tab
+        .getByRole("button", { name: "Save battle draft", exact: true })
+        .click();
+      await tab
+        .locator(".battle-authoring-status")
+        .first()
+        .filter({ hasText: "Draft saved" })
+        .waitFor();
+      const finalSetup = (await api(`/studio/${story.id}`)).graphPlaytests[0];
+      assert.equal(finalSetup.name, "Mixed path");
+      assert.equal(finalSetup.replay.steps.length, 4);
       await tab
         .getByRole("button", { name: "Edit New battle", exact: true })
         .click();
